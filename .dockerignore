@@ -1,0 +1,14 @@
+# Environment files and credentials must never enter the Docker build context.
+.env
+.env.*
+
+# Repository and local tooling state
+.git
+.gitignore
+.DS_Store
+supabase/.temp/
+
+# Dependencies, generated output, and test artifacts
+node_modules/
+dist/
+coverage/

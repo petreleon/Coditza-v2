@@ -1,0 +1,15 @@
+# Local environment files and credentials
+.env
+.env.*
+!.env.example
+
+# Supabase CLI state
+supabase/.temp/
+
+# Node.js build and test output
+node_modules/
+dist/
+coverage/
+
+# macOS metadata
+.DS_Store
