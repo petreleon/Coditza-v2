@@ -5,8 +5,8 @@
   implementation on 2026-07-27; only task-scoped local work is currently
   authorized.
 - Current phase: 1 — Foundation and API container
-- Active implementation task: PRD-WASM-001 (next; not started)
-- Last verified implementation task: PRD-AUTH-001
+- Active implementation task: FOUND-001 (next; not started)
+- Last verified implementation task: PRD-WASM-001
 - Last updated: 2026-07-27
 
 ## Phase status
@@ -14,7 +14,7 @@
 | Phase | Status | Gate |
 | --- | --- | --- |
 | 0 — Plan acceptance | Complete; G0 and PLAN-004 passed | G0 |
-| 1 — Foundation and containers | PRD-AUTH-001 complete; PRD-WASM-001 next | G1 |
+| 1 — Foundation and containers | PRD-WASM-001 complete; FOUND-001 next | G1 |
 | 2 — Local Supabase and schema | Not started | G2 |
 | 3 — Fastify identity/read slice | Not started | G3 |
 | 4 — Learning workflows | Not started | G4 |
@@ -25,10 +25,10 @@
 
 ## Blockers
 
-- No active Phase-1 blocker. PRD-WASM-001 is limited to Python package,
-  verdict, deterministic-fixture, and Auth/TOTP-exclusion contracts; it must
-  not select a Pyodide runtime, outer-sandbox launcher, dependency, or hosted
-  topology.
+- No active Phase-1 blocker. FOUND-001 may select current compatible
+  API/tooling versions and create the minimal strict TypeScript/Fastify
+  workspace; it must not initialize Supabase, create Docker artifacts, choose a
+  Python runtime/outer sandbox, or change hosted state.
 - Exact Vercel team/project/region/tier/owner, client origins/email mode,
   source/CI/registry, optional staging, and any supplemental private grader
   host remain deferred to their named decision deadlines and approvals.
@@ -50,6 +50,10 @@ to the deadlines in that file.
 - [PRD-AUTH-001 report](../docs/implementation/PRD-AUTH-001.md); the direct
   Supabase Auth mandatory-TOTP ADR and provider-neutral state/error/AAL2
   contract exist without a client, SDK mapping, or external configuration.
+- [PRD-WASM-001 report](../docs/implementation/PRD-WASM-001.md); the canonical
+  Python source-package/verdict vectors, authoritative grading semantics, and
+  Auth/TOTP exclusion contract exist without a runtime, launcher, or external
+  configuration.
 
 ## Update rule
 

@@ -60,9 +60,11 @@ environment-level operations.
 - Product/backend plan changes live under `todo/`; Romanian curriculum plan
   changes live under `todo-curriculum-ro/`.
 - The sole active task defines the permitted implementation scope. G0 and
-  PLAN-004 have passed; PRD-WASM-001 may add only Python exercise semantics,
-  credential-free vectors, and related contract documentation, not a runtime,
-  launcher, application dependency, or infrastructure artifact.
+  PLAN-004 have passed; FOUND-001 may select documented compatible API/tooling
+  versions and add only the minimal private strict TypeScript/Fastify workspace
+  and its version evidence. It must not initialize Supabase, add Docker/Compose
+  artifacts, select a Python runtime/launcher, use credentials, or change
+  external state.
 - A hosted, production, billing-sensitive, destructive, or secret-dependent
   action still needs its own task-specific authority; broad implementation
   authorization does not authorize it.

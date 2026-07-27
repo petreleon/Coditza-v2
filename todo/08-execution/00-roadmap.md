@@ -368,7 +368,7 @@ Execute in this order:
    composition root and rule authority.
 4. [x] PRD-AUTH-001 — freeze the mandatory TOTP registration/login/factor
    client contract without claiming a UI.
-5. [ ] PRD-WASM-001 — freeze `python_code` package, authoritative grading,
+5. [x] PRD-WASM-001 — freeze `python_code` package, authoritative grading,
    deterministic verdict, and Auth/TOTP exclusion rules.
 6. [ ] FOUND-001 — pinned API runtime/tooling baseline.
 7. [ ] ARC-BOUND-001 — enforce the dependency graph with failing negative

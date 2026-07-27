@@ -53,7 +53,9 @@ Each authoritative run must have all of these controls:
 - one bounded writable tmpfs/work directory, destroyed after the run;
 - no host path, database, service-account, socket, device, home directory, or
   parent process filesystem mount;
-- only sealed stdin/stdout pipes carrying the versioned runner protocol;
+- only sealed control/stdin/stdout pipes carrying the versioned learner-facing
+  runner protocol and isolated trusted-harness initialization; no such handoff
+  is exposed to learner Python;
 - hard wall-clock and CPU time, address-space/memory, file-count/bytes,
   process/thread, stdout/stderr/result-size limits;
 - parent-side termination of the entire sandbox on a limit or protocol breach;
@@ -121,12 +123,20 @@ bundle. A build or deployment with an unexplained manifest/SBOM drift fails.
 
 ## Trust and data minimization
 
-The sandbox request contains only a random job ID, canonical learner files,
-the frozen declarative case plan, the five expected digests, and non-secret
-limits. It
-contains no user ID, email, role, JWT, request authorization header, TOTP
-material, Supabase URL/key, idempotency key, database row, or authored content
-unneeded by the tests.
+The learner-facing sandbox request contains only a random job ID, canonical
+learner files, frozen entry-point/public-case data, the five expected digests,
+and non-secret limits. It contains no user ID, email, role, JWT, request
+authorization header, TOTP material, Supabase URL/key, idempotency key,
+database row, private case plan, private expected value, or authored content
+unneeded by public execution.
+
+A separate protected controller-to-trusted-harness initialization handoff
+supplies the frozen declarative private case plan only after digest agreement.
+It is not a field in the learner-facing request/result and never becomes a
+learner virtual file, Python/JavaScript global, environment value, standard
+input/output value, log, report, artifact, or public feedback. ARC-WASM-001 and
+SUP-WASM-001 must choose and prove the exact sealed handoff without creating a
+generic database or network capability in the sandbox.
 
 The controller accepts only a bounded JSON result with an allowlisted verdict,
 safe public feedback, output excerpts, resource-limit flags, and echoed

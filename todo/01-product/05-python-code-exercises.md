@@ -110,18 +110,22 @@ not a learner failure.
 
 Prerequisites: G0 and the accepted modular-architecture ADR.
 
-- [ ] Add `python_code` only to the exercise type union and reject it for quiz
+- [x] Add `python_code` only to the exercise type union and reject it for quiz
       questions.
-- [ ] Implement the exact canonical source-package validator and golden
+- [x] Implement the exact canonical source-package validator and golden
       vectors, including traversal, case-collision, NUL, size, and duplicate
       cases.
-- [ ] Freeze the authored-definition, verdict, no-partial-credit, feedback, and
+- [x] Freeze the authored-definition, verdict, no-partial-credit, feedback, and
       deterministic-fixture contracts above.
-- [ ] Prove no public/browser result field is accepted by an authoritative
+- [x] Prove no public/browser result field is accepted by an authoritative
       submission use case.
-- [ ] Record the distinction between learner verdicts and infrastructure
+- [x] Record the distinction between learner verdicts and infrastructure
       outcomes in the API, database, retry, and progress specifications.
-- [ ] Keep all Auth/TOTP operations and material outside the verifier contract.
+- [x] Keep all Auth/TOTP operations and material outside the verifier contract.
 
 Evidence is a reviewed product contract plus canonical request/verdict vectors
 shared by the API, database adapters, runner protocol, and tests.
+
+Accepted evidence: [verification contract](../../docs/implementation/python-exercise-verification-contract.md),
+[golden vectors](../../docs/implementation/python-exercise-golden-vectors.md),
+and [PRD-WASM-001 report](../../docs/implementation/PRD-WASM-001.md).

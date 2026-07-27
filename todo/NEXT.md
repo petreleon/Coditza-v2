@@ -2,7 +2,7 @@
 
 The next implementation task is:
 
-**PRD-WASM-001 — Freeze Python exercise semantics.**
+**FOUND-001 — Establish the API runtime and tooling baseline.**
 
 Read first:
 
@@ -11,21 +11,23 @@ Read first:
 3. `STATUS.md`
 4. `00-control/01-fixed-decisions.md`
 5. `00-control/03-execution-protocol.md`
-6. `01-product/03-learning-and-grading-rules.md`
-7. `01-product/05-python-code-exercises.md`
-8. `02-architecture/04-data-flow-and-security.md`
+6. `02-architecture/00-system-boundaries.md`
+7. `02-architecture/01-target-project-structure.md`
+8. `02-architecture/02-environments-and-secrets.md`
 9. `02-architecture/06-modular-hexagonal-architecture.md`
-10. `02-architecture/07-python-wasm-verification.md`
-11. `03-supabase/13-python-code-verification-data.md`
-12. `04-fastify/06-python-wasm-runner.md`
-13. `05-api/07-python-code-attempts.md`
-14. `06-quality/06-python-wasm-verification.md`
-15. `08-execution/00-roadmap.md`
-16. `08-execution/01-dependency-map.md`
+10. `04-fastify/00-bootstrap-and-config.md`
+11. `06-quality/00-testing-strategy.md`
+12. `08-execution/00-roadmap.md`
+13. `08-execution/01-dependency-map.md`
+14. `../docs/implementation/architecture-boundary-contract.md`
+15. `../docs/implementation/auth-mfa-client-contract.md`
+16. `../docs/implementation/python-exercise-verification-contract.md`
+17. `../docs/implementation/python-exercise-golden-vectors.md`
 
-Create only the product/verification contract, canonical source-package and
-canonical-verdict golden vectors, explicit learner-versus-infrastructure
-outcomes, and Auth/TOTP-exclusion proof in the established documentation
-location. Do not select or download Pyodide/runtime assets, choose an
-outer-sandbox launcher or Vercel topology, create application/dependency code,
-run learner Python, use credentials, or change external state.
+Use current primary documentation to choose a compatible active Node LTS,
+Fastify, official plugins, TypeScript, and tooling versions. Create only the
+minimal private npm workspace and strict ESM TypeScript/Fastify foundation,
+its version ADR, and focused empty-test/build evidence. Do not initialize
+Supabase, add a domain route or database adapter, create Docker/Compose
+artifacts, select/download a Python runtime or outer sandbox, use credentials,
+open Chrome, or change hosted state.
