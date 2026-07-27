@@ -63,11 +63,13 @@ environment-level operations.
   PLAN-004 have passed; ARC-DOCKER-001 accepted the non-root local API
   Dockerfile, Compose service, explicit Docker exclusions, and local
   configuration/liveness/shutdown evidence. ARC-DOCKER-002 accepted the
-  disposable foundation container-check path and guide. ARC-DOCKER-003 may now
-  verify only the existing final runtime image and its non-root/read-only/
-  shutdown behavior. It must not add a Supabase stack, root Compose SMTP,
-  readiness behavior, a Python runtime/controller, credentials, or external
-  state.
+  disposable foundation container-check path and guide. ARC-DOCKER-003
+  accepted the final non-root/read-only production image, its excluded-content
+  proof, liveness, and shutdown behavior. QA-STRAT-001 may now establish only
+  local test configuration, layer separation, in-memory fake Auth helpers, and
+  a no-network local Supabase target guard. It must not start Supabase, create
+  a client/remote connection, add credentials or real Auth/TOTP material,
+  change application behavior, or perform external state work.
 - A hosted, production, billing-sensitive, destructive, or secret-dependent
   action still needs its own task-specific authority; broad implementation
   authorization does not authorize it.

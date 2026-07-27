@@ -41,7 +41,11 @@ runtime-verified the non-root local API Docker/Compose path: pinned image,
 ignored context, health/liveness, source reload, and graceful shutdown.
 ARC-DOCKER-002 added a profile-gated, non-root/read-only/no-network container
 check path for foundation scripts with exact exit-code and cleanup proof. The
-next task verifies the production image; real application modules/adapters
+ARC-DOCKER-003 verified the no-cache final production image and made the narrow
+runtime-only correction that removes emitted source maps. It runs non-root with
+a read-only filesystem, bounded temporary storage, loopback liveness, graceful
+SIGTERM shutdown, and no excluded application inputs. The next task establishes
+the local-only test harness and target guard; real application modules/adapters
 remain deferred.
 Planning files plus the separately requested root `.env`, `.env.example`,
 `.gitignore`, and `.dockerignore` safety files may exist. The existing

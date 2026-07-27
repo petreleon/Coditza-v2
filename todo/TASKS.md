@@ -45,8 +45,8 @@ Modes:
 | FAST-LIVE-001 | local | app factory | [health](04-fastify/05-openapi-health-and-readiness.md) | no-dependency 200 schema test | complete |
 | ARC-DOCKER-001 | local | liveness | [Compose](02-architecture/03-docker-compose.md) — Dockerfile/compose/.dockerignore | config + host liveness + shutdown | complete |
 | ARC-DOCKER-002 | local | ARC-DOCKER-001 | [Compose](02-architecture/03-docker-compose.md) — test profile/guide | disposable checks preserve exit codes | complete |
-| ARC-DOCKER-003 | local | Docker artifacts | [Compose](02-architecture/03-docker-compose.md) — runtime image | clean non-root image/contents/SIGTERM proof | next |
-| QA-STRAT-001 | local | test scripts/container path | [test strategy](06-quality/00-testing-strategy.md) — test config/helpers | layer separation + remote-URL guard | not started |
+| ARC-DOCKER-003 | local | Docker artifacts | [Compose](02-architecture/03-docker-compose.md) — runtime image | clean non-root image/contents/SIGTERM proof | complete |
+| QA-STRAT-001 | local | test scripts/container path | [test strategy](06-quality/00-testing-strategy.md) — test config/helpers | layer separation + remote-URL guard | next |
 
 ## Phase 2
 

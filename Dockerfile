@@ -55,4 +55,7 @@ COPY --from=production-dependencies --chown=node:node /workspace/node_modules ./
 COPY --from=build --chown=node:node /workspace/apps/api/package.json apps/api/package.json
 COPY --from=build --chown=node:node /workspace/apps/api/dist apps/api/dist
 
+# Runtime debugging maps can disclose source layout and are not needed by Node.
+RUN find /workspace -type f -name '*.map' -delete
+
 CMD ["node", "apps/api/dist/server.js"]

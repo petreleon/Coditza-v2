@@ -5,8 +5,8 @@
   implementation on 2026-07-27; only task-scoped local work is currently
   authorized.
 - Current phase: 1 — Foundation and API container
-- Active implementation task: ARC-DOCKER-003 (next; production image proof)
-- Last verified implementation task: ARC-DOCKER-002
+- Active implementation task: QA-STRAT-001 (next; test harness and local-target guard)
+- Last verified implementation task: ARC-DOCKER-003
 - Last updated: 2026-07-27
 
 ## Phase status
@@ -14,7 +14,7 @@
 | Phase | Status | Gate |
 | --- | --- | --- |
 | 0 — Plan acceptance | Complete; G0 and PLAN-004 passed | G0 |
-| 1 — Foundation and containers | ARC-DOCKER-002 complete; ARC-DOCKER-003 next | G1 |
+| 1 — Foundation and containers | ARC-DOCKER-003 complete; QA-STRAT-001 next | G1 |
 | 2 — Local Supabase and schema | Not started | G2 |
 | 3 — Fastify identity/read slice | Not started | G3 |
 | 4 — Learning workflows | Not started | G4 |
@@ -84,6 +84,11 @@ to the deadlines in that file.
   non-root/read-only/no-network Compose checks passed format, lint, typecheck,
   155 tests, boundary verification, build, exact nonzero exit propagation, and
   exact-project cleanup using safe placeholder configuration.
+- [ARC-DOCKER-003 report](../docs/implementation/ARC-DOCKER-003.md); the final
+  no-cache production image contains compiled production output only, has no
+  source maps or excluded inputs, runs non-root/read-only with bounded tmpfs,
+  serves loopback liveness, exits cleanly on SIGTERM, and leaves no disposable
+  runtime resources.
 
 ## Update rule
 

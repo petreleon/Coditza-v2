@@ -91,12 +91,12 @@ runtime image.
 
 ### ARC-DOCKER-003 — Verify production image
 
-- [ ] Build the final runtime stage from a clean checkout.
-- [ ] Inspect that no source maps containing secrets, `.env`, npm cache, or test
+- [x] Build the final runtime stage from a clean checkout.
+- [x] Inspect that no source maps containing secrets, `.env`, npm cache, or test
       fixtures are present.
-- [ ] Run as a non-root UID.
-- [ ] Start with read-only filesystem where the target platform supports it.
-- [ ] Exercise `SIGTERM` and verify no request is accepted after shutdown begins.
+- [x] Run as a non-root UID.
+- [x] Start with read-only filesystem where the target platform supports it.
+- [x] Exercise `SIGTERM` and verify no request is accepted after shutdown begins.
 
 ### ARC-DOCKER-004 — Verify API-to-local-Supabase connectivity
 
