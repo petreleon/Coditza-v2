@@ -46,13 +46,13 @@ Modes:
 | ARC-DOCKER-001 | local | liveness | [Compose](02-architecture/03-docker-compose.md) — Dockerfile/compose/.dockerignore | config + host liveness + shutdown | complete |
 | ARC-DOCKER-002 | local | ARC-DOCKER-001 | [Compose](02-architecture/03-docker-compose.md) — test profile/guide | disposable checks preserve exit codes | complete |
 | ARC-DOCKER-003 | local | Docker artifacts | [Compose](02-architecture/03-docker-compose.md) — runtime image | clean non-root image/contents/SIGTERM proof | complete |
-| QA-STRAT-001 | local | test scripts/container path | [test strategy](06-quality/00-testing-strategy.md) — test config/helpers | layer separation + remote-URL guard | next |
+| QA-STRAT-001 | local | test scripts/container path | [test strategy](06-quality/00-testing-strategy.md) — test config/helpers | layer separation + remote-URL guard | complete |
 
 ## Phase 2
 
 | ID | Mode | Hard prerequisite | Owner / permitted scope | Minimum evidence | Status |
 | --- | --- | --- | --- | --- | --- |
-| OPS-VERCEL-001 | review | G1 + ARC-DESIGN-001 + PRD-WASM-001 + user Vercel direction | [deployment topology](07-operations/01-deployment-environments.md) — Vercel/supplemental-host ADR only | current capability/topology evidence or explicit smallest decision blocker; no resource | not started |
+| OPS-VERCEL-001 | review | G1 + ARC-DESIGN-001 + PRD-WASM-001 + user Vercel direction | [deployment topology](07-operations/01-deployment-environments.md) — Vercel/supplemental-host ADR only | current capability/topology evidence or explicit smallest decision blocker; no resource | next |
 | ARC-WASM-001 | local | G1 + PRD-WASM-001 + FOUND-001 + OPS-VERCEL-001; owns DEC-032 resolution | [WASM architecture](02-architecture/07-python-wasm-verification.md) — ADR/runtime lock/threat model | exact asset digests + compliant outer-sandbox/protocol proof | not started |
 | SUP-LOCAL-001 | local | G1 | [local Supabase](03-supabase/01-local-cli-and-migrations.md) — CLI config | start/status/stop evidence, no remote | not started |
 | SUP-LOCAL-002 | local | SUP-LOCAL-001 | [local Supabase](03-supabase/01-local-cli-and-migrations.md) — migrations/seed commands | two clean identical resets | not started |

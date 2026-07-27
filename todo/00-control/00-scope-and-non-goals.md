@@ -65,11 +65,12 @@ environment-level operations.
   configuration/liveness/shutdown evidence. ARC-DOCKER-002 accepted the
   disposable foundation container-check path and guide. ARC-DOCKER-003
   accepted the final non-root/read-only production image, its excluded-content
-  proof, liveness, and shutdown behavior. QA-STRAT-001 may now establish only
-  local test configuration, layer separation, in-memory fake Auth helpers, and
-  a no-network local Supabase target guard. It must not start Supabase, create
-  a client/remote connection, add credentials or real Auth/TOTP material,
-  change application behavior, or perform external state work.
+  proof, liveness, and shutdown behavior. QA-STRAT-001 is complete and G1 has
+  passed. OPS-VERCEL-001 may now perform only read-only official documentation
+  research and write a local capability matrix/topology ADR. It must not create
+  a Vercel project, authenticate a CLI, enter a secret, configure a hosted
+  resource, deploy, choose a supplemental private host, or change application
+  behavior.
 - A hosted, production, billing-sensitive, destructive, or secret-dependent
   action still needs its own task-specific authority; broad implementation
   authorization does not authorize it.

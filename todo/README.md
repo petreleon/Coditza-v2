@@ -44,9 +44,12 @@ check path for foundation scripts with exact exit-code and cleanup proof. The
 ARC-DOCKER-003 verified the no-cache final production image and made the narrow
 runtime-only correction that removes emitted source maps. It runs non-root with
 a read-only filesystem, bounded temporary storage, loopback liveness, graceful
-SIGTERM shutdown, and no excluded application inputs. The next task establishes
-the local-only test harness and target guard; real application modules/adapters
-remain deferred.
+SIGTERM shutdown, and no excluded application inputs. QA-STRAT-001 added
+explicit test layers, deterministic in-memory identity/Auth helpers, a
+no-network local target guard, sanitized ignored reports, and a reproducible
+read-only/no-network checks-container loop. G1 is now passed; the next task is
+the read-only OPS-VERCEL-001 topology review. Real application modules,
+Supabase, and all hosted configuration remain deferred.
 Planning files plus the separately requested root `.env`, `.env.example`,
 `.gitignore`, and `.dockerignore` safety files may exist. The existing
 hosted-project environment values do not authorize a schema or deployment action;

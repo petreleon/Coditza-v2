@@ -11,16 +11,27 @@
     "apps/*"
   ],
   "scripts": {
-    "format": "prettier --write package.json tsconfig.base.json eslint.config.js .dependency-cruiser.cjs apps/api/package.json apps/api/tsconfig.json apps/api/src apps/api/test",
-    "format:check": "prettier --check package.json tsconfig.base.json eslint.config.js .dependency-cruiser.cjs apps/api/package.json apps/api/tsconfig.json apps/api/src apps/api/test",
-    "lint": "eslint apps/api/src && npm run boundaries",
+    "format": "prettier --write package.json tsconfig.base.json eslint.config.js .dependency-cruiser.cjs apps/api/package.json apps/api/tsconfig.json apps/api/tsconfig.test.json apps/api/vitest.config.ts apps/api/src apps/api/test",
+    "format:check": "prettier --check package.json tsconfig.base.json eslint.config.js .dependency-cruiser.cjs apps/api/package.json apps/api/tsconfig.json apps/api/tsconfig.test.json apps/api/vitest.config.ts apps/api/src apps/api/test",
+    "lint": "eslint apps/api/src apps/api/test/support apps/api/vitest.config.ts && npm run boundaries",
     "boundaries": "depcruise --config .dependency-cruiser.cjs -- apps/api/src",
-    "typecheck": "npm run typecheck --workspace=@coditza/api",
+    "typecheck:api": "npm run typecheck --workspace=@coditza/api",
+    "typecheck:test": "tsc --project apps/api/tsconfig.test.json",
+    "typecheck": "npm run typecheck:api && npm run typecheck:test",
     "build": "npm run build --workspace=@coditza/api",
     "dev": "npm run dev --workspace=@coditza/api",
     "start": "npm run start --workspace=@coditza/api",
     "test:boundaries": "node apps/api/test/boundaries/verify-fixtures.mjs",
-    "test": "vitest run --passWithNoTests && npm run test:boundaries"
+    "test:unit": "vitest run --configLoader runner --config apps/api/vitest.config.ts --project unit",
+    "test:integration": "vitest run --configLoader runner --config apps/api/vitest.config.ts --project integration",
+    "test:contract": "vitest run --configLoader runner --config apps/api/vitest.config.ts --project contract",
+    "test:db": "vitest run --configLoader runner --config apps/api/vitest.config.ts --project db",
+    "test:e2e": "vitest run --configLoader runner --config apps/api/vitest.config.ts --project e2e",
+    "test:security": "vitest run --configLoader runner --config apps/api/vitest.config.ts --project security",
+    "test:wasm": "node apps/api/test/wasm/require-approved-outer-sandbox.mjs",
+    "test:coverage": "CODITZA_TEST_REPORTS=1 vitest run --configLoader runner --config apps/api/vitest.config.ts --project unit --coverage && node apps/api/test/support/verify-sanitized-reports.mjs apps/api/coverage",
+    "test": "npm run test:unit && npm run test:boundaries",
+    "check:foundation": "npm run format:check && npm run lint && npm run typecheck && npm run test && npm run build"
   },
   "devDependencies": {
     "@eslint/js": "10.0.1",

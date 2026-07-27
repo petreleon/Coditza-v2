@@ -14,7 +14,7 @@ dependencies; a task also requires its prior phase gate and its exact row in
 | ARC-BOUND-001 | FOUND-001 + architecture matrix | all production module/adapters |
 | FAST-CONFIG + ARC-ENV-001 | FOUND-001 | dependency construction |
 | FAST-BOOT + ARC-BOUND-002 + FAST-LIVE | typed config | Compose API |
-| ARC-DOCKER-001/002/003 | liveness + app factory | G1/local runtime |
+| ARC-DOCKER-001/002/003 + QA-STRAT-001 | liveness + app factory + local test harness | G1/local runtime |
 | OPS-VERCEL-001 | G1 + architecture/Python contracts + user Vercel direction | reviewed public-API/private-grader deployment topology |
 | ARC-WASM-001 | G1 + PRD-WASM-001 + FOUND-001 + OPS-VERCEL-001; owns DEC-032 resolution | exact runtime manifest + compliant sandbox boundary |
 | SUP-LOCAL-001/002 | G1 + Docker engine | migrations/schema |

@@ -11,6 +11,9 @@
 
 ## G1 — Foundation reproducible
 
+Status: PASSED on 2026-07-27. The synchronized completion record is in the
+roadmap; QA-STRAT-001 supplies the current no-network test-harness evidence.
+
 - clean npm install, format, lint, typecheck, unit harness, and build pass;
 - modular ownership/composition/RPC maps are accepted and negative import
   fixtures prove the dependency graph can fail;

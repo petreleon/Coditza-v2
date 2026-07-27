@@ -62,18 +62,37 @@ generated-type drift, API integration/contract/security tests, production build,
 Python WASM offline/determinism/sandbox tests, and Docker image verification in
 a documented order.
 
+## Current foundation verification
+
+Run npm run check:foundation for the current local-only loop: formatting, lint,
+source and test type checks, the unit project, dependency-boundary fixtures, and
+the API build. It does not load an environment file, construct a Supabase
+client, start Supabase, or contact a network target. The reserved integration,
+contract, database, end-to-end, security, and WASM selectors fail until their
+task-owned suites exist; they must never turn an empty future layer into a pass.
+Vitest uses its runner config loader so the same command works in the
+read-only, networkless Compose checks container without writing under
+node_modules.
+
+Run npm run test:coverage only when a sanitized local report is needed. It
+creates ignored JSON, LCOV, and JUnit artifacts under apps/api/coverage and
+rejects unexpected files or likely credential, Auth, answer, or console output.
+No coverage threshold is set before a reviewed baseline.
+
 ## QA-STRAT-001 — Establish the harness
 
-- [ ] Configure Vitest projects or equivalent clear separation by layer.
-- [ ] Create test config and user/token helpers without global shared user state.
-- [ ] Add a hard guard rejecting non-local Supabase URLs in integration tests.
-- [ ] Define the injectable Auth-test-helper interface and deterministic fake
+- [x] Configure Vitest projects or equivalent clear separation by layer.
+- [x] Create test config and user/token helpers without global shared user state.
+- [x] Add a hard guard rejecting non-local Supabase URLs in integration tests.
+- [x] Define the injectable Auth-test-helper interface and deterministic fake
       AAL states without starting Supabase. SUP-MFA-001 later implements the
       genuine local `aal1`/TOTP-`aal2` adapter and secret-safe cleanup.
-- [ ] Make cleanup deterministic and safe under parallel tests.
-- [ ] Publish sanitized JUnit/coverage reports in CI.
-- [ ] Set coverage thresholds only after baseline; critical grading,
+- [x] Make cleanup deterministic and safe under parallel tests.
+- [x] Configure sanitized, ignored JUnit/coverage artifacts for later CI
+      publication. This task does not create a CI workflow; OPS-CI-001 owns
+      that external publication path.
+- [x] Leave coverage thresholds unset until a reviewed baseline; critical grading,
       authorization, and progress branches require 100% branch coverage.
-- [ ] Document one command for the complete clean verification loop.
-- [ ] Make `test:wasm` fail when it cannot use the approved hardened outer
+- [x] Document one command for the complete clean verification loop.
+- [x] Make test:wasm fail when it cannot use the approved hardened outer
       sandbox; never silently replace it with an in-process/worker-thread run.

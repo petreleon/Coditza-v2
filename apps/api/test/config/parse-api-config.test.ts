@@ -353,7 +353,14 @@ describe("parseApiConfig", () => {
     },
   );
 
-  const boundedNumberFields = [
+  type BoundedNumberField = Readonly<{
+    readonly variable: string;
+    readonly minimum: number;
+    readonly maximum: number;
+    readonly dependencies?: Readonly<Record<string, string>>;
+  }>;
+
+  const boundedNumberFields: readonly BoundedNumberField[] = [
     { variable: "PORT", minimum: 1, maximum: 65_535 },
     { variable: "CONNECTION_TIMEOUT_MS", minimum: 1_000, maximum: 60_000 },
     {
@@ -379,7 +386,7 @@ describe("parseApiConfig", () => {
     { variable: "SHUTDOWN_TIMEOUT_MS", minimum: 1_000, maximum: 60_000 },
     { variable: "PYTHON_GRADER_CONCURRENCY", minimum: 1, maximum: 8 },
     { variable: "PYTHON_GRADER_QUEUE_LIMIT", minimum: 1, maximum: 10_000 },
-  ] as const;
+  ];
 
   it.each(boundedNumberFields)(
     "accepts both bounds for $variable",

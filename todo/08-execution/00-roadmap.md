@@ -381,11 +381,48 @@ Execute in this order:
 13. [x] ARC-DOCKER-001 — local Compose API service.
 14. [x] ARC-DOCKER-002 — disposable container check path.
 15. [x] ARC-DOCKER-003 — production image proof.
-16. [ ] QA-STRAT-001 — test harness, Auth helpers and local-environment guard.
-17. [ ] Verify and record G1.
+16. [x] QA-STRAT-001 — test harness, Auth helpers and local-environment guard.
+17. [x] Verify and record G1.
 
 Outcome: a minimal tested Fastify process builds and runs through Compose; no
 Supabase schema, domain routes, or remote state exists.
+
+### G1 completion record
+
+- Outcome: PASSED
+- Environment: LOCAL
+- Date: 2026-07-27
+- Authorization checked: The user authorized task-scoped implementation and
+  local Docker verification. No hosted, production, credential, or external
+  state action is inferred by this gate.
+- Foundation tooling and harness:
+  - Result: PASS.
+  - Non-secret evidence: FOUND-001 recorded the clean locked install; the
+    current QA foundation command passes formatting, lint, source/test
+    typechecks, 177 unit tests, 63 negative plus four positive boundary
+    fixtures, and the API build without Supabase.
+- Architecture, MFA, and Python contracts:
+  - Result: PASS.
+  - Non-secret evidence: ARC-DESIGN-001/ARC-BOUND-001 accept and enforce the
+    modular ownership graph; PRD-AUTH-001 preserves the provider-neutral
+    mandatory-TOTP contract without a client or credential proxy; PRD-WASM-001
+    preserves the authoritative server-only Python verdict contract.
+- App, image, and Compose evidence:
+  - Result: PASS.
+  - Non-secret evidence: FAST-BOOT-001 and FAST-LIVE-001 prove the canonical
+    app/server split and closed liveness route. ARC-DOCKER-001 through
+    ARC-DOCKER-003 prove the non-root production image plus local API liveness
+    and shutdown. QA-STRAT-001 reran the complete checks loop in an isolated
+    read-only/no-network Compose container using placeholders only.
+- Scope review:
+  - Result: PASS.
+  - Non-secret evidence: the current diff adds only test harness/configuration,
+    focused support tests, reports, and tracker state. It starts no Supabase
+    service, builds no client, reads no real environment file, and creates no
+    remote/domain implementation.
+- Next: OPS-VERCEL-001 is the sole next review task. It may research the
+  required Vercel public API and private grader topology but may not create or
+  configure an external resource.
 
 ## Phase 2 — Local Supabase and database security
 

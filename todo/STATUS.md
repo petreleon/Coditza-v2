@@ -4,9 +4,9 @@
 - Implementation authorization: **GRANTED** — user explicitly requested
   implementation on 2026-07-27; only task-scoped local work is currently
   authorized.
-- Current phase: 1 — Foundation and API container
-- Active implementation task: QA-STRAT-001 (next; test harness and local-target guard)
-- Last verified implementation task: ARC-DOCKER-003
+- Current phase: 2 — Local Supabase and database security
+- Active implementation task: OPS-VERCEL-001 (next; read-only deployment-topology review)
+- Last verified implementation task: QA-STRAT-001 and G1
 - Last updated: 2026-07-27
 
 ## Phase status
@@ -14,8 +14,8 @@
 | Phase | Status | Gate |
 | --- | --- | --- |
 | 0 — Plan acceptance | Complete; G0 and PLAN-004 passed | G0 |
-| 1 — Foundation and containers | ARC-DOCKER-003 complete; QA-STRAT-001 next | G1 |
-| 2 — Local Supabase and schema | Not started | G2 |
+| 1 — Foundation and containers | Complete; QA-STRAT-001 and G1 passed | G1 |
+| 2 — Local Supabase and schema | OPS-VERCEL-001 next; review only | G2 |
 | 3 — Fastify identity/read slice | Not started | G3 |
 | 4 — Learning workflows | Not started | G4 |
 | 5 — Authoring/admin workflows | Not started | G5 |
@@ -89,6 +89,14 @@ to the deadlines in that file.
   source maps or excluded inputs, runs non-root/read-only with bounded tmpfs,
   serves loopback liveness, exits cleanly on SIGTERM, and leaves no disposable
   runtime resources.
+- [QA-STRAT-001 report](../docs/implementation/QA-STRAT-001.md); explicit
+  Vitest layer separation, deterministic in-memory Auth helpers, no-network
+  local-target guard, sanitized ignored reports, 177 unit tests, and a
+  read-only/no-network Compose checks proof now exist without Supabase or
+  hosted state.
+- [G1 completion record](08-execution/00-roadmap.md#g1-completion-record);
+  Foundation reproducibility is recorded from the accepted architecture/product
+  contracts, current checks, Docker evidence, and scope review.
 
 ## Update rule
 
