@@ -1,0 +1,21 @@
+name: coditza
+
+services:
+  api:
+    build:
+      context: .
+      target: development
+    env_file:
+      - "${CODITZA_ENV_FILE:-.env}"
+    environment:
+      HOST: 0.0.0.0
+      PORT: "${PORT:-3000}"
+    init: true
+    ports:
+      - "127.0.0.1:${PORT:-3000}:${PORT:-3000}"
+    stop_grace_period: 70s
+    volumes:
+      - type: bind
+        source: ./apps/api/src
+        target: /workspace/apps/api/src
+        read_only: true

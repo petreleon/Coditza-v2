@@ -36,8 +36,11 @@ evidence. FAST-BOOT-001 introduced the canonical injected Fastify app/server
 split with a listener-free factory and bounded server lifecycle. ARC-BOUND-002
 accepted the one-factory/one-listener boundary with an AST-backed regression
 guard. FAST-LIVE-001 added the closed dependency-free foundation liveness
-route with listener-free injection evidence. ARC-DOCKER-001 is next to add the
-local API Docker/Compose path before real application modules/adapters.
+route with listener-free injection evidence. ARC-DOCKER-001 added and
+runtime-verified the non-root local API Docker/Compose path: pinned image,
+ignored context, health/liveness, source reload, and graceful shutdown. The
+next task is the isolated foundation container-check path; real application
+modules/adapters remain deferred.
 Planning files plus the separately requested root `.env`, `.env.example`,
 `.gitignore`, and `.dockerignore` safety files may exist. The existing
 hosted-project environment values do not authorize a schema or deployment action;

@@ -2,13 +2,23 @@
 .env
 .env.*
 
-# Repository and local tooling state
+# Repository and local tooling state.
 .git
 .gitignore
 .DS_Store
-supabase/.temp/
+.agents/
+.codex/
+
+# The API image never owns Supabase, course plans, or implementation reports.
+supabase/
+todo/
+todo-curriculum-ro/
+docs/
 
 # Dependencies, generated output, and test artifacts
-node_modules/
-dist/
-coverage/
+**/node_modules/
+**/dist/
+**/coverage/
+**/test-results/
+**/playwright-report/
+.nyc_output/

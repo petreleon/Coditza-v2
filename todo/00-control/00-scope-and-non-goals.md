@@ -60,10 +60,10 @@ environment-level operations.
 - Product/backend plan changes live under `todo/`; Romanian curriculum plan
   changes live under `todo-curriculum-ro/`.
 - The sole active task defines the permitted implementation scope. G0 and
-  PLAN-004 have passed; FAST-LIVE-001 accepted the dependency-free
-  `GET /health/live` foundation route. ARC-DOCKER-001 may now add only the
-  reviewed local API Dockerfile, Compose service, explicit Docker exclusions,
-  and local configuration/liveness/shutdown evidence. It must not add a
+  PLAN-004 have passed; ARC-DOCKER-001 accepted the non-root local API
+  Dockerfile, Compose service, explicit Docker exclusions, and local
+  configuration/liveness/shutdown evidence. ARC-DOCKER-002 may now add only a
+  disposable foundation container-check path or guide. It must not add a
   Supabase stack, root Compose SMTP, readiness behavior, a Python
   runtime/controller, credentials, or external state.
 - A hosted, production, billing-sensitive, destructive, or secret-dependent

@@ -64,22 +64,22 @@ runtime image.
 
 ### ARC-DOCKER-001 — Define `api`
 
-- [ ] Build the development target for local work.
-- [ ] Publish only the configured API port.
-- [ ] Bind the source for reload without masking container-installed
+- [x] Build the development target for local work.
+- [x] Publish only the configured API port.
+- [x] Bind the source for reload without masking container-installed
       `node_modules`.
-- [ ] Set `HOST=0.0.0.0`.
-- [ ] Load ignored local environment values at runtime.
+- [x] Set `HOST=0.0.0.0`.
+- [x] Load ignored local environment values at runtime.
 - [ ] Do not treat a Linux host-gateway mapping as sufficient for a loopback-only
       CLI service; keep the base service portable and document the tested
       Linux-only connectivity path.
-- [ ] Use an API liveness health check.
-- [ ] Implement the image health check with Node's built-in `fetch` so the
+- [x] Use an API liveness health check.
+- [x] Implement the image health check with Node's built-in `fetch` so the
       runtime image contains the executable; do not assume `curl`/`wget`.
-- [ ] Configure graceful stop time long enough for Fastify shutdown.
-- [ ] Enable a minimal init/reaping mechanism supported by Compose and keep Node
+- [x] Configure graceful stop time long enough for Fastify shutdown.
+- [x] Enable a minimal init/reaping mechanism supported by Compose and keep Node
       as the exec-form foreground process so signals reach it.
-- [ ] Do not use privileged mode or mount the Docker socket.
+- [x] Do not use privileged mode or mount the Docker socket.
 
 ### ARC-DOCKER-002 — Define foundation test execution
 
