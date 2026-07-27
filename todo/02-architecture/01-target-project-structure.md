@@ -107,9 +107,11 @@ ARC-WASM-001; they are not downloaded by a running application.
 
 ### ARC-TREE-001 — Create root workspace
 
-- [ ] Add minimal root package metadata with name `Coditza`, `"private": true`,
-      `"type": "module"`, and no dependencies/scripts yet.
-- [ ] Declare only `apps/*` as npm workspaces.
+- [x] Add minimal root package metadata with package name `coditza`,
+      `"private": true`, `"type": "module"`, and no dependencies/scripts yet.
+      The product display name remains `Coditza`; npm package names are
+      lowercase identifiers.
+- [x] Declare only `apps/*` as npm workspaces.
 - [ ] Add only root ignore/editor files that do not require a tool-version
       choice.
 - [ ] Do not invent Node/npm/Fastify/TypeScript versions, create `apps/api`,

@@ -2,7 +2,7 @@
 
 The next implementation task is:
 
-**ARC-TREE-001 — Create the root workspace metadata.**
+**ARC-DESIGN-001 — Freeze module ownership and dependency graph.**
 
 Read first:
 
@@ -11,12 +11,15 @@ Read first:
 3. `STATUS.md`
 4. `00-control/01-fixed-decisions.md`
 5. `00-control/03-execution-protocol.md`
-6. `02-architecture/01-target-project-structure.md`
-7. `08-execution/00-roadmap.md`
-8. `08-execution/02-phase-gates.md`
+6. `02-architecture/00-system-boundaries.md`
+7. `02-architecture/04-data-flow-and-security.md`
+8. `02-architecture/06-modular-hexagonal-architecture.md`
+9. `02-architecture/07-python-wasm-verification.md`
+10. `08-execution/00-roadmap.md`
+11. `08-execution/01-dependency-map.md`
 
-Create only the root `package.json` metadata with `Coditza`, `private: true`,
-`type: module`, and the `apps/*` workspace declaration. Do not choose versions,
-dependencies, scripts, Node/Fastify/TypeScript tooling, create `apps/api`,
-generate a lockfile, install packages, create Docker/Supabase artifacts, or
-touch external resources.
+Create only the architecture ADR, ownership inventory, dependency matrix,
+composition graph, RPC-coordinator map, and negative-fixture strategy in the
+established implementation documentation location. Do not create application
+source, package dependencies, database schema, Docker artifacts, Supabase
+state, external resources, or a generic service/repository abstraction.

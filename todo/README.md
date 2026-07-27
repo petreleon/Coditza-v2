@@ -18,13 +18,14 @@ configuration.
 
 ## Current repository state
 
-Implementation is authorized; G0 and PLAN-004 have passed. ARC-TREE-002 has
-established the first implementation-report location, and ARC-TREE-001 is next
-to add only minimal root workspace metadata. Planning files plus the separately
-requested root `.env`, `.env.example`, `.gitignore`, and `.dockerignore` safety
-files may exist. The existing hosted-project environment values do not authorize
-a schema or deployment action; every hosted, production, secret-dependent, and
-destructive task retains its explicit safeguards.
+Implementation is authorized; G0 and PLAN-004 have passed. ARC-TREE-002 created
+the implementation-report location and ARC-TREE-001 added only private ESM
+workspace metadata. ARC-DESIGN-001 is next to freeze architecture contracts.
+Planning files plus the separately requested root `.env`, `.env.example`,
+`.gitignore`, and `.dockerignore` safety files may exist. The existing
+hosted-project environment values do not authorize a schema or deployment action;
+every hosted, production, secret-dependent, and destructive task retains its
+explicit safeguards.
 
 Implementation tracking starts in [TASKS.md](TASKS.md), [STATUS.md](STATUS.md),
 and [NEXT.md](NEXT.md). They name the single task currently permitted by the

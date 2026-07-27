@@ -1,0 +1,8 @@
+{
+  "name": "coditza",
+  "private": true,
+  "type": "module",
+  "workspaces": [
+    "apps/*"
+  ]
+}
