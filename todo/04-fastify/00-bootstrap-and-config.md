@@ -60,23 +60,25 @@ framework, or validation framework unless an ADR proves it is necessary.
 
 ## FAST-BOOT-001 — App/server split
 
-- [ ] The only app factory signature is
+- [x] The only app factory signature is
       `buildApp({ config, dependencies }: BuildAppOptions)`; both properties are
       required, production `server.ts` constructs them, and tests pass explicit
       fakes.
-- [ ] `bootstrap/composition-root.ts` is the sole production wiring point:
-      construct module-specific adapters/use cases and pass only inbound facades
-      to route registration.
-- [ ] No Fastify decoration/request property contains the raw secret client, a
+- [x] `bootstrap/composition-root.ts` is the sole production wiring point. At
+      this foundation stage it returns only a frozen typed no-op boundary;
+      future adapters/use cases must pass only narrow inbound facades to routes.
+- [x] No Fastify decoration/request property contains the raw secret client, a
       repository bag, or a service locator.
-- [ ] `app.ts` never calls `listen`.
-- [ ] `server.ts` is the only network entry point.
-- [ ] Tests call `buildApp` and `fastify.inject`.
-- [ ] The server waits for `app.ready()` before listening.
-- [ ] Startup failure exits non-zero without leaking config.
-- [ ] `SIGTERM`/`SIGINT` stop accepting work, close Fastify once, and respect a
+- [x] `app.ts` never calls `listen`.
+- [x] `server.ts` is the only network entry point.
+- [x] Tests call `buildApp` and `fastify.inject`.
+- [x] The server waits for `app.ready()` before listening.
+- [x] Startup failure exits non-zero without leaking config.
+- [x] `SIGTERM`/`SIGINT` stop accepting work, close Fastify once, and respect a
       finite shutdown timeout.
-- [ ] No service/route/plugin calls `process.exit()`.
+- [x] No service/route/plugin calls `process.exit()`.
+
+Completion evidence: [FAST-BOOT-001 report](../../docs/implementation/FAST-BOOT-001.md).
 
 ## FAST-CONFIG-001 — Fail-fast typed configuration
 

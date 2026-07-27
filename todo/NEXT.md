@@ -2,11 +2,11 @@
 
 The next implementation task is:
 
-**FAST-BOOT-001 — App/server split.**
+**ARC-BOUND-002 — Accept the app/listener boundary.**
 
 Prerequisites already verified: G0, PLAN-004, FOUND-001, ARC-BOUND-001,
-FAST-CONFIG-001, and ARC-ENV-001 are complete. This is the sole task allowed
-to change implementation files now.
+FAST-CONFIG-001, ARC-ENV-001, and FAST-BOOT-001 are complete. This is the sole
+task allowed to change implementation files now.
 
 Read first:
 
@@ -31,35 +31,33 @@ Read first:
 19. `../docs/implementation/ARC-BOUND-001.md`
 20. `../docs/implementation/FAST-CONFIG-001.md`
 21. `../docs/implementation/ARC-ENV-001.md`
-22. `../docs/implementation/architecture-boundary-contract.md`
+22. `../docs/implementation/FAST-BOOT-001.md`
+23. `../docs/implementation/architecture-boundary-contract.md`
 
-Implement only a minimal canonical Fastify factory/server split using the
-existing injected `ApiConfig` contract. Do not add endpoint behavior.
+Perform a local acceptance of the existing app/listener split. Do not replace it
+with a second bootstrap design.
 
 ## Required work
 
-- Define exactly one `buildApp({ config, dependencies }: BuildAppOptions)` app
-  factory. Both properties are required; it creates and returns a Fastify
-  instance but never calls `listen`.
-- Define the minimum typed dependency/composition contract needed for this
-  foundation. The production `server.ts` is the only network entry point and
-  constructs configuration/dependencies explicitly; tests pass explicit fakes.
-  Do not make a service locator, repository bag, raw-client decoration, or
-  mutable request-global state.
-- Keep `bootstrap/composition-root.ts` as the sole future production wiring
-  point. At this foundation stage it may return a typed empty/no-op composition
-  boundary only; it must not construct a Supabase client, business module,
-  controller, or external dependency.
-- Make the server wait for `app.ready()` before listen, fail startup without
-  exposing configuration, and handle `SIGTERM`/`SIGINT` by closing Fastify
-  exactly once within the injected shutdown timeout. Keep `process.exit()` out
-  of services/routes/plugins.
-- Add focused tests using `buildApp` and `fastify.inject`; use fake injected
-  dependencies and never mutate `process.env`. Test no listener from the app
-  factory, ready-before-listen ordering, startup error safety, and idempotent
-  signal shutdown without opening a real network port where a fake is enough.
-- Create `docs/implementation/FAST-BOOT-001.md`, then synchronize the tracker
-  only after all acceptance evidence passes.
+- Build a traceable source/test inventory proving there is exactly one
+  production `buildApp({ config, dependencies }: BuildAppOptions)` factory,
+  `app.ts` contains no `listen`, and `server.ts` is the only production file
+  that listens. Imports must remain inert unless the compiled server is the
+  direct Node entrypoint.
+- Prove the app factory accepts explicit immutable configuration and a typed
+  composition boundary, never exposes that boundary via a Fastify decoration or
+  request property, and never constructs a raw client, repository bag, service
+  locator, route, plugin, or external resource.
+- Recheck ready-before-listen, safe fixed-message startup failure, both signal
+  paths, close-once behavior, and bounded server-only termination. The current
+  no-op composition has no resource to close; do not introduce a placeholder
+  resource merely to simulate later work.
+- Reuse the existing synthetic `buildApp`/`fastify.inject` and fake lifecycle
+  tests. Add only a focused regression test if the audit finds a concrete gap;
+  never bind a real port when a fake lifecycle surface proves the requirement.
+- Create `docs/implementation/ARC-BOUND-002.md`, then synchronize the task
+  registry, status, roadmap, and this file only after all acceptance evidence
+  passes.
 
 ## Required verification
 
@@ -67,10 +65,12 @@ existing injected `ApiConfig` contract. Do not add endpoint behavior.
   `npm run format:check`, `npm run lint`, `npm run typecheck`, `npm test`, and
   `npm run build`.
 - Run `git diff --check`, the full dependency-boundary verifier, and a scoped
-  secret/scope review of intended tracked files.
+  source/secret review of intended tracked files. Include a source inventory of
+  `listen`, `buildApp`, `process.exit`, Fastify decoration, client, route, and
+  plugin calls.
 
-Do not add routes, Fastify plugins, health behavior, Supabase client/adapters,
-Docker/Compose, Python/WASM runtime/controller, real business module,
-credential, Chrome action, SMTP configuration, Vercel resource, hosted state,
-or a frontend. Do not create or alter a production, staging, or development
-platform configuration.
+Do not add routes, Fastify plugins, liveness/readiness behavior, Supabase
+clients/adapters, Docker/Compose, Python/WASM runtime/controller, real business
+modules, credentials, Chrome actions, SMTP configuration, Vercel resources,
+hosted state, or a frontend. Do not create or alter a production, staging, or
+development platform configuration.

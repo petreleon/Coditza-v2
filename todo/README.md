@@ -32,8 +32,10 @@ enforces the accepted import graph with exact BND-001 through BND-010 rules,
 API source scan. FAST-CONFIG-001 replaced the type-only configuration seam
 with an injected, immutable, TypeBox-validated API parser and focused tests.
 ARC-ENV-001 accepted its ownership, separation, and environment-safety
-evidence. FAST-BOOT-001 is next to introduce only the canonical injected
-Fastify app/server split before real application modules/adapters exist.
+evidence. FAST-BOOT-001 introduced the canonical injected Fastify app/server
+split with a listener-free factory and bounded server lifecycle. ARC-BOUND-002
+is next to accept that one-factory/one-listener boundary before real
+application modules/adapters exist.
 Planning files plus the separately requested root `.env`, `.env.example`,
 `.gitignore`, and `.dockerignore` safety files may exist. The existing
 hosted-project environment values do not authorize a schema or deployment action;
