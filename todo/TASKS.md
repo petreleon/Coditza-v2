@@ -31,8 +31,8 @@ Modes:
 
 | ID | Mode | Hard prerequisite | Owner / permitted scope | Minimum evidence | Status |
 | --- | --- | --- | --- | --- | --- |
-| ARC-TREE-002 | local | G0 + PLAN-004 | [target tree](02-architecture/01-target-project-structure.md) — first report/location only | report exists, no empty docs folders | next |
-| ARC-TREE-001 | local | ARC-TREE-002 | [target tree](02-architecture/01-target-project-structure.md) — minimal root metadata | name/private/workspace/type, no version guesses | not started |
+| ARC-TREE-002 | local | G0 + PLAN-004 | [target tree](02-architecture/01-target-project-structure.md) — first report/location only | [report exists, no empty docs folders](../docs/implementation/ARC-TREE-002.md) | complete |
+| ARC-TREE-001 | local | ARC-TREE-002 | [target tree](02-architecture/01-target-project-structure.md) — minimal root metadata | name/private/workspace/type, no version guesses | next |
 | ARC-DESIGN-001 | local | ARC-TREE-001 + G0 | [modular architecture](02-architecture/06-modular-hexagonal-architecture.md) — ADR/ownership/dependency contracts | accepted ownership + composition/RPC maps | not started |
 | PRD-AUTH-001 | review | ARC-DESIGN-001 | [mandatory MFA](01-product/04-authentication-and-mfa.md) — provider-neutral Auth contract only | ADR + operations/state/error/conditional assurance, no SDK/UI claim | not started |
 | PRD-WASM-001 | local | ARC-DESIGN-001 + G0 | [Python exercises](01-product/05-python-code-exercises.md) — package/verdict/determinism contract | canonical package/verdict vectors + server-authority/Auth-exclusion proof | not started |

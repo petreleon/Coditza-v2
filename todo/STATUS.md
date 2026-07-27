@@ -5,8 +5,8 @@
   implementation on 2026-07-27; only task-scoped local work is currently
   authorized.
 - Current phase: 1 — Foundation and API container
-- Active implementation task: ARC-TREE-002 (next; not started)
-- Last verified implementation task: PLAN-004 (review)
+- Active implementation task: ARC-TREE-001 (next; not started)
+- Last verified implementation task: ARC-TREE-002
 - Last updated: 2026-07-27
 
 ## Phase status
@@ -14,7 +14,7 @@
 | Phase | Status | Gate |
 | --- | --- | --- |
 | 0 — Plan acceptance | Complete; G0 and PLAN-004 passed | G0 |
-| 1 — Foundation and containers | ARC-TREE-002 next | G1 |
+| 1 — Foundation and containers | ARC-TREE-002 complete; ARC-TREE-001 next | G1 |
 | 2 — Local Supabase and schema | Not started | G2 |
 | 3 — Fastify identity/read slice | Not started | G3 |
 | 4 — Learning workflows | Not started | G4 |
@@ -25,8 +25,8 @@
 
 ## Blockers
 
-- No active Phase-1 blocker. ARC-TREE-002 is limited to the first
-  implementation-report location and report.
+- No active Phase-1 blocker. ARC-TREE-001 is limited to minimal root workspace
+  metadata without version, dependency, or application guesses.
 - Exact Vercel team/project/region/tier/owner, client origins/email mode,
   source/CI/registry, optional staging, and any supplemental private grader
   host remain deferred to their named decision deadlines and approvals.
@@ -45,9 +45,8 @@ to the deadlines in that file.
 
 ## Non-secret evidence
 
-- [PLAN-004 completion record](08-execution/00-roadmap.md#plan-004--completion-record);
-  Vercel, local SMTP, and environment-variable paths are explicit, and no
-  application implementation evidence exists yet.
+- [ARC-TREE-002 report](../docs/implementation/ARC-TREE-002.md); the first
+  implementation-report location exists and no application code exists yet.
 
 ## Update rule
 

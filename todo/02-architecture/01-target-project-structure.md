@@ -118,7 +118,7 @@ ARC-WASM-001; they are not downloaded by a running application.
 
 ### ARC-TREE-002 — Establish documentation locations
 
-- [ ] As the first local task, create only `docs/implementation/` together with
+- [x] As the first local task, create only `docs/implementation/` together with
       this task's first real report; do not create empty documentation folders.
 - [ ] Later tasks create ADR, generated API, and operations folders only with
       their first real document.

@@ -362,7 +362,7 @@ future external action still retains its named approval and secret safeguards.
 
 Execute in this order:
 
-1. [ ] ARC-TREE-002 — create the first implementation-report location/report.
+1. [x] ARC-TREE-002 — create the first implementation-report location/report.
 2. [ ] ARC-TREE-001 — minimal root workspace metadata, no version guesses.
 3. [ ] ARC-DESIGN-001 — freeze bounded-context ownership, ports/adapters,
    composition root and rule authority.

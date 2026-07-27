@@ -60,9 +60,8 @@ environment-level operations.
 - Product/backend plan changes live under `todo/`; Romanian curriculum plan
   changes live under `todo-curriculum-ro/`.
 - The sole active task defines the permitted implementation scope. G0 and
-  PLAN-004 have passed; ARC-TREE-002 may create only the first
-  implementation-report location and report, not application or infrastructure
-  artifacts.
+  PLAN-004 have passed; ARC-TREE-001 may add only minimal root workspace
+  metadata, not application or infrastructure artifacts.
 - A hosted, production, billing-sensitive, destructive, or secret-dependent
   action still needs its own task-specific authority; broad implementation
   authorization does not authorize it.
