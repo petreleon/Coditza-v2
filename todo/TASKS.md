@@ -42,8 +42,8 @@ Modes:
 | ARC-ENV-001 | local | FAST-CONFIG-001 | [environment contract](02-architecture/02-environments-and-secrets.md) | [one-parser inventory plus local/hosted/separation acceptance report](../docs/implementation/ARC-ENV-001.md) | complete |
 | FAST-BOOT-001 | local | typed config | [bootstrap](04-fastify/00-bootstrap-and-config.md) — app/server/tests | [inject test + signal-safe startup/shutdown](../docs/implementation/FAST-BOOT-001.md) | complete |
 | ARC-BOUND-002 | local | FAST-BOOT-001 | [boundaries](02-architecture/00-system-boundaries.md) | [single factory/listener proof](../docs/implementation/ARC-BOUND-002.md) | complete |
-| FAST-LIVE-001 | local | app factory | [health](04-fastify/05-openapi-health-and-readiness.md) | no-dependency 200 schema test | next |
-| ARC-DOCKER-001 | local | liveness | [Compose](02-architecture/03-docker-compose.md) — Dockerfile/compose/.dockerignore | config + host liveness + shutdown | not started |
+| FAST-LIVE-001 | local | app factory | [health](04-fastify/05-openapi-health-and-readiness.md) | no-dependency 200 schema test | complete |
+| ARC-DOCKER-001 | local | liveness | [Compose](02-architecture/03-docker-compose.md) — Dockerfile/compose/.dockerignore | config + host liveness + shutdown | next |
 | ARC-DOCKER-002 | local | ARC-DOCKER-001 | [Compose](02-architecture/03-docker-compose.md) — test profile/guide | disposable checks preserve exit codes | not started |
 | ARC-DOCKER-003 | local | Docker artifacts | [Compose](02-architecture/03-docker-compose.md) — runtime image | clean non-root image/contents/SIGTERM proof | not started |
 | QA-STRAT-001 | local | test scripts/container path | [test strategy](06-quality/00-testing-strategy.md) — test config/helpers | layer separation + remote-URL guard | not started |

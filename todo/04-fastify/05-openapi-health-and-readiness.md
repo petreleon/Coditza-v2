@@ -25,11 +25,11 @@ shape so probes receive one minimal stable schema.
 
 ## FAST-LIVE-001 — Implement foundation liveness
 
-- [ ] Add `/health/live` during Phase 1 with its response schema/test.
+- [x] Add `/health/live` during Phase 1 with its response schema/test.
 - [ ] Use it for Compose health with an executable guaranteed to exist in the
       runtime image; prefer a Node-based check rather than adding `curl` only for
       health.
-- [ ] Prove it has no Supabase dependency.
+- [x] Prove it has no Supabase dependency.
 
 ## FAST-HEALTH-001 — Verify runtime behavior
 

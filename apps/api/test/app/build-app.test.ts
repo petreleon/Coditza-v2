@@ -9,6 +9,44 @@ const fakeDependencies: ApiApplicationDependencies = Object.freeze({
 });
 
 describe("buildApp", () => {
+  it("serves the closed liveness response without a listener or dependencies", async () => {
+    const config = createTestApiConfig();
+    const inaccessibleDependencies: ApiApplicationDependencies = new Proxy(
+      fakeDependencies,
+      {
+        get() {
+          throw new Error("The liveness route must not access dependencies.");
+        },
+      },
+    );
+    const app = buildApp({
+      config,
+      dependencies: inaccessibleDependencies,
+    });
+
+    try {
+      expect(app.server.listening).toBe(false);
+
+      const response = await app.inject({
+        method: "GET",
+        url: "/health/live",
+      });
+
+      expect(response.statusCode).toBe(200);
+      expect(response.json()).toStrictEqual({ status: "ok" });
+      expect(app.server.listening).toBe(false);
+
+      const headResponse = await app.inject({
+        method: "HEAD",
+        url: "/health/live",
+      });
+
+      expect(headResponse.statusCode).toBe(404);
+    } finally {
+      await app.close();
+    }
+  });
+
   it("creates an unlistened Fastify app from explicit inputs", async () => {
     const config = createTestApiConfig();
     const app = buildApp({ config, dependencies: fakeDependencies });

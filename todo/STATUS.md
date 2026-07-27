@@ -5,8 +5,8 @@
   implementation on 2026-07-27; only task-scoped local work is currently
   authorized.
 - Current phase: 1 — Foundation and API container
-- Active implementation task: FAST-LIVE-001 (next; not started)
-- Last verified implementation task: ARC-BOUND-002
+- Active implementation task: ARC-DOCKER-001 (next; not started)
+- Last verified implementation task: FAST-LIVE-001
 - Last updated: 2026-07-27
 
 ## Phase status
@@ -14,7 +14,7 @@
 | Phase | Status | Gate |
 | --- | --- | --- |
 | 0 — Plan acceptance | Complete; G0 and PLAN-004 passed | G0 |
-| 1 — Foundation and containers | ARC-BOUND-002 complete; FAST-LIVE-001 next | G1 |
+| 1 — Foundation and containers | FAST-LIVE-001 complete; ARC-DOCKER-001 next | G1 |
 | 2 — Local Supabase and schema | Not started | G2 |
 | 3 — Fastify identity/read slice | Not started | G3 |
 | 4 — Learning workflows | Not started | G4 |
@@ -25,10 +25,11 @@
 
 ## Blockers
 
-- No active Phase-1 blocker. FAST-LIVE-001 may add only the dependency-free
-  liveness route, response schema, focused inject test, and local evidence. It
-  must not add a plugin, Auth, a Supabase client, readiness behavior, Docker
-  artifact, Python runtime/controller, credentials, or hosted state.
+- No active Phase-1 blocker. ARC-DOCKER-001 may add only the reviewed local API
+  Dockerfile, Compose service, explicit Docker exclusions, and local
+  configuration/liveness/shutdown evidence. It must not add a Supabase stack,
+  root Compose SMTP, readiness behavior, a Python runtime/controller,
+  credentials, or hosted state.
 - Exact Vercel team/project/region/tier/owner, client origins/email mode,
   source/CI/registry, optional staging, and any supplemental private grader
   host remain deferred to their named decision deadlines and approvals.
@@ -77,6 +78,9 @@ to the deadlines in that file.
 - [ARC-BOUND-002 report](../docs/implementation/ARC-BOUND-002.md); AST-backed
   one-factory/one-listener ownership, composition-leak regression protection,
   154 tests, and no external state.
+- [FAST-LIVE-001 report](../docs/implementation/FAST-LIVE-001.md); one closed,
+  dependency-free `GET /health/live` response, listener-free injection proof,
+  155 tests, and no external state.
 
 ## Update rule
 
