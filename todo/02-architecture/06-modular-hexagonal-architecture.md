@@ -171,21 +171,26 @@ type-switched RPC cannot become a cross-context escape hatch.
 
 Prerequisites: ARC-TREE-001 and G0.
 
-- [ ] Create an ADR for the modular-monolith/ports-and-adapters decision.
-- [ ] Create the exact table/RPC/route/job ownership inventory and reject
+- [x] Create an ADR for the modular-monolith/ports-and-adapters decision.
+- [x] Create the exact table/RPC/route/job ownership inventory and reject
       unowned or multiply owned artifacts.
-- [ ] Record every allowed cross-module public contract and coordinating
+- [x] Record every allowed cross-module public contract and coordinating
       transaction; default to no cross-module import.
-- [ ] Record the layer import matrix and the narrow shared-kernel allowlist.
-- [ ] Fix the composition-root contract and prohibit global repository bags,
+- [x] Record the layer import matrix and the narrow shared-kernel allowlist.
+- [x] Fix the composition-root contract and prohibit global repository bags,
       service locators and request-bound raw clients.
-- [ ] Inventory every allowed one-off executable and its isolated entrypoint;
+- [x] Inventory every allowed one-off executable and its isolated entrypoint;
       prove none is imported or registered by the API.
-- [ ] Map current generic lifecycle RPC plans to module-specific public facades
+- [x] Map current generic lifecycle RPC plans to module-specific public facades
       with private shared helpers where necessary.
-- [ ] Define a negative-fixture strategy proving each forbidden import fails.
-- [ ] Confirm the design still deploys as one process/database and adds no
+- [x] Define a negative-fixture strategy proving each forbidden import fails.
+- [x] Confirm the design still deploys as one process/database and adds no
       speculative infrastructure.
 
 Evidence is the accepted ADR, ownership inventory, dependency matrix,
 composition graph, RPC-coordinator map, and review with no ambiguous owner.
+
+Accepted evidence: [ADR 0001](../../docs/adr/0001-modular-monolith-and-ports-adapters.md),
+[ownership inventory](../../docs/implementation/architecture-ownership-inventory.md),
+[boundary and composition contract](../../docs/implementation/architecture-boundary-contract.md),
+and [ARC-DESIGN-001 report](../../docs/implementation/ARC-DESIGN-001.md).

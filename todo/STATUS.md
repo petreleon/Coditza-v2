@@ -5,8 +5,8 @@
   implementation on 2026-07-27; only task-scoped local work is currently
   authorized.
 - Current phase: 1 — Foundation and API container
-- Active implementation task: ARC-DESIGN-001 (next; not started)
-- Last verified implementation task: ARC-TREE-001
+- Active implementation task: PRD-AUTH-001 (next; not started)
+- Last verified implementation task: ARC-DESIGN-001
 - Last updated: 2026-07-27
 
 ## Phase status
@@ -14,7 +14,7 @@
 | Phase | Status | Gate |
 | --- | --- | --- |
 | 0 — Plan acceptance | Complete; G0 and PLAN-004 passed | G0 |
-| 1 — Foundation and containers | ARC-TREE-001 complete; ARC-DESIGN-001 next | G1 |
+| 1 — Foundation and containers | ARC-DESIGN-001 complete; PRD-AUTH-001 next | G1 |
 | 2 — Local Supabase and schema | Not started | G2 |
 | 3 — Fastify identity/read slice | Not started | G3 |
 | 4 — Learning workflows | Not started | G4 |
@@ -25,8 +25,9 @@
 
 ## Blockers
 
-- No active Phase-1 blocker. ARC-DESIGN-001 is limited to architecture ADR and
-  ownership/dependency contracts, not application/runtime implementation.
+- No active Phase-1 blocker. PRD-AUTH-001 is a review task limited to a
+  provider-neutral mandatory-TOTP client contract; it must not claim an SDK
+  mapping, UI, or external configuration.
 - Exact Vercel team/project/region/tier/owner, client origins/email mode,
   source/CI/registry, optional staging, and any supplemental private grader
   host remain deferred to their named decision deadlines and approvals.
@@ -45,9 +46,10 @@ to the deadlines in that file.
 
 ## Non-secret evidence
 
-- [ARC-TREE-001 report](../docs/implementation/ARC-TREE-001.md); the private
-  workspace root exists without versions, dependencies, lockfile, or
-  application code.
+- [ARC-DESIGN-001 report](../docs/implementation/ARC-DESIGN-001.md); the
+  accepted ADR, single-owner inventory, composition boundary, RPC coordinator
+  map, and negative-fixture strategy exist without application or
+  infrastructure artifacts.
 
 ## Update rule
 

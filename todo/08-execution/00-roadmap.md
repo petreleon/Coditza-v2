@@ -364,7 +364,7 @@ Execute in this order:
 
 1. [x] ARC-TREE-002 — create the first implementation-report location/report.
 2. [x] ARC-TREE-001 — minimal root workspace metadata, no version guesses.
-3. [ ] ARC-DESIGN-001 — freeze bounded-context ownership, ports/adapters,
+3. [x] ARC-DESIGN-001 — freeze bounded-context ownership, ports/adapters,
    composition root and rule authority.
 4. [ ] PRD-AUTH-001 — freeze the mandatory TOTP registration/login/factor
    client contract without claiming a UI.

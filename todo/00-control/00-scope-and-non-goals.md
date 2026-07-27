@@ -60,8 +60,9 @@ environment-level operations.
 - Product/backend plan changes live under `todo/`; Romanian curriculum plan
   changes live under `todo-curriculum-ro/`.
 - The sole active task defines the permitted implementation scope. G0 and
-  PLAN-004 have passed; ARC-DESIGN-001 may add only architecture contract
-  documents, not application or infrastructure artifacts.
+  PLAN-004 have passed; PRD-AUTH-001 may add only provider-neutral Auth/MFA
+  contract documentation, not a client, SDK mapping, application or
+  infrastructure artifact.
 - A hosted, production, billing-sensitive, destructive, or secret-dependent
   action still needs its own task-specific authority; broad implementation
   authorization does not authorize it.
