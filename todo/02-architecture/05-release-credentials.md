@@ -33,8 +33,9 @@ development credential-binding action is authorized.
 - [ ] Create only the protected development runtime/release scopes; this task
       does not create optional staging or production credentials.
 - [ ] Bind each development job to the exact project reference, registry
-      repository, immutable image source, API host service, and `APP_ENV`;
-      fail if any target is missing or mismatched.
+      repository, immutable image source, Vercel public API service, any
+      separately approved private grader host, and `APP_ENV`; fail if any target
+      is missing or mismatched.
 - [ ] Bind the runtime scope to the exact HTTPS Supabase URL/issuer mapping and
       current key types without copying secret values into evidence.
 - [ ] Mask values and ensure logs/artifacts cannot echo them.
@@ -43,6 +44,42 @@ development credential-binding action is authorized.
 
 Evidence is a sanitized name/owner/scope matrix plus a successful least-
 privilege dry run against the exact development target.
+
+## OPS-VERCEL-ENV-001 — Bind Vercel development and preview runtime variables
+
+Prerequisites: OPS-VERCEL-001 has recorded a compliant Vercel public-API
+topology; OPS-HOST-001 has created or confirmed the approved empty Vercel
+development service; SUP-CHROME-001/002 and ARC-ENV-003 are complete; the user
+approves the exact development/preview binding action.
+
+- [ ] Re-read the current Vercel documentation and identify the exact project,
+      team, Development and Preview environment scopes. State their non-secret
+      identifiers before changing anything.
+- [ ] Use Chrome for the approved Vercel Dashboard binding flow. The user
+      handles login, MFA, password-manager, and direct secret entry; do not
+      screenshot, transcribe, or inspect secret values.
+- [ ] Derive the complete runtime-variable inventory from the reviewed typed
+      configuration contract, not from memory. Classify each as public,
+      runtime-secret, release-only, or prohibited for Vercel. API runtime must
+      never receive Supabase CLI, database-release, OCI-registry, sandbox-host,
+      or deployment credentials.
+- [ ] Have the user transfer values directly into the approved Vercel secret
+      interface. Never paste, echo, screenshot, store, or report values. Do not
+      use a source-controlled `.env` file as an import mechanism.
+- [ ] Bind Development and Preview values only to the exact non-production
+      Supabase target and approved CORS/Auth metadata. Reject a production URL,
+      issuer, key, project reference, wildcard origin, or secret scope in a
+      preview binding.
+- [ ] Verify variable names, environment scope, masking, and target metadata
+      without reading values. Perform a no-secret target/configuration dry run
+      and prove the separate grader host, if one exists, receives its own
+      minimal runtime scope rather than Vercel's API scope.
+- [ ] Do not deploy an image, apply a migration, configure a Vercel Production
+      variable, or create a production resource. ARC-ENV-PROD-001 owns any
+      separately approved production Vercel binding.
+
+Evidence is a sanitized Vercel project/environment/name/classification matrix,
+approved-target proof, and masked dry-run result with no values.
 
 ## ARC-ENV-STAGING-001 — Establish optional staging release identities
 
@@ -81,6 +118,9 @@ the named production project, host service, registry, and protected environment.
       never expose values in chat, screenshots, reports, or shell history.
 - [ ] Bind the exact project reference, HTTPS URL/issuer mapping, immutable
       digest source, `APP_ENV=production`, and production CORS/Auth metadata.
+- [ ] If Vercel is the approved public API host, bind Vercel Production runtime
+      values only after the exact production action is approved; record names,
+      scopes, masking, and target metadata without values.
 - [ ] Prove the runtime receives only runtime keys and the release job receives
       only its narrow migration/deploy credentials.
 - [ ] Configure owner, rotation/revocation, break-glass approval, and last

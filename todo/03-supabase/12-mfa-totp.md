@@ -46,8 +46,8 @@ snapshot it, print it, put it in a fixture, or commit an `otpauth` URI.
 
 ## SUP-MFA-001 — Enable and prove local TOTP MFA
 
-Prerequisites: FOUND-001, SUP-LOCAL-002, SUP-AUTH-001, PRD-AUTH-001 and
-resolved DEC-030.
+Prerequisites: FOUND-001, SUP-LOCAL-002, SUP-SMTP-LOCAL-001, SUP-AUTH-001,
+PRD-AUTH-001 and resolved DEC-030.
 
 - [ ] Re-open current official CLI/Auth MFA documentation and record the pinned
       config/API names.

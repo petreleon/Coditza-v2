@@ -29,6 +29,11 @@ Prerequisites: FOUND-001 workspace baseline; Docker runtime available.
 - [ ] Never use a destructive linked reset.
 - [ ] Use an expand/migrate/contract sequence for breaking changes.
 
+After SUP-LOCAL-001/002 and PRD-AUTH-001, SUP-SMTP-LOCAL-001 owns optional
+user-requested Gmail SMTP delivery for the CLI-owned local Auth service. It is
+not a root Compose service, migration, hosted Dashboard action, or production
+email decision.
+
 ## SUP-PRIMITIVES-001 — Create database primitives
 
 Prerequisites: SUP-LOCAL-001/002.

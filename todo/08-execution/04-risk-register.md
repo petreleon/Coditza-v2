@@ -35,6 +35,8 @@
 | R-031 | Python queue/resource abuse exhausts API/controller/database | High | High | infinite loop/output/memory flood or burst submissions | async bounded queue, rate/backpressure, leases, concurrency/resource ceilings, circuit breaker |
 | R-032 | Hidden Python tests or learner source leak | Medium | High | traceback/log/OpenAPI/report/status oracle | private definitions, safe projections, generic hidden feedback, redaction/scans, bounded output |
 | R-033 | Grader crash/lease race duplicates or misattributes an attempt | Medium | High | controller death/late result/reclaim | deterministic replay, unguessable lease token, digest checks, idempotent finalization, concurrency tests |
+| R-034 | Vercel public API deployment is mistaken for a compliant private grader/sandbox host | Medium | Critical | serverless/function runtime or Docker socket is treated as the outer sandbox | early OPS-VERCEL-001 topology review, ARC-WASM-001 launcher proof, explicit supplemental-host approval, no fallback |
+| R-035 | Gmail App Password or Auth email artifacts leak into API Compose/image/source | Medium | Critical | Gmail transport is added to root Compose or a secret file/report | SUP-SMTP-LOCAL-001 through CLI-owned Auth only, ignored runtime secret storage, redacted local delivery proof, scans |
 
 ## Review rule
 

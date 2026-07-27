@@ -1,25 +1,58 @@
 # Deployment and environment promotion
 
-The API hosting provider and registry are not selected. Keep the container
-portable and record the final decision in an ADR.
+Vercel is the user-requested eventual public API deployment target. Keep the
+API image portable, but do not assume Vercel can host the private grader
+controller or its compliant disposable outer sandbox. OPS-VERCEL-001 verifies
+the current deployment topology before ARC-WASM-001; OPS-HOST-001 later creates
+only the approved external boundaries.
+
+## OPS-VERCEL-001 — Verify the Vercel deployment topology before sandbox selection
+
+Prerequisites: G1, ARC-DESIGN-001, and PRD-WASM-001.
+
+- [ ] Recheck current official Vercel documentation for the public Fastify API
+      deployment model, request/body/time limits, streaming/shutdown behavior,
+      environment scopes, health/proxy behavior, immutable artifact support,
+      and available isolation boundaries. This is read-only research; do not
+      create a Vercel project, deploy, authenticate a CLI, or enter a secret.
+- [ ] Map the public Fastify API, private grader controller, immutable Pyodide
+      assets, one-off migration/release job, and disposable no-network sandbox
+      to concrete capabilities. The controller must not become a public Vercel
+      function, and no function/runtime is presumed to be a hardened sandbox.
+- [ ] Decide whether the documented Vercel capability can serve the public API
+      while a separately approved provider/launcher is required for the private
+      grader. If a supplemental host is needed, state the minimal capabilities
+      and stop for explicit user approval before selecting or creating it.
+- [ ] Record a topology ADR and capability matrix with current documentation
+      dates, limitations, ownership, variable scopes, cost/egress implications,
+      deployment/rollback implications, and the exact handoff to ARC-WASM-001
+      and OPS-HOST-001.
+- [ ] Reject any topology that makes the controller public, gives Vercel/API a
+      general Docker socket, weakens the required outer sandbox, combines
+      development and production scopes, or silently substitutes a non-Vercel
+      public host.
+
+Evidence is a reviewed Vercel/supplemental-host topology ADR and capability
+matrix, or a concise blocker asking for the smallest user decision. No external
+resource, secret, billing, or deployment occurs in this task.
 
 ## OPS-HOST-001 — Select the API host and create the development boundary
 
 Prerequisites: G6; OPS-SOURCE-001 has resolved DEC-024 and named the image
-registry; the user is available to resolve DEC-007. This task owns DEC-007—it is
-not a prerequisite that must already be resolved. Before creating any account,
+registry; OPS-VERCEL-001 has recorded the required topology; the user is
+available to approve exact external creation. Before creating any account,
 project, service, paid resource, domain, or billing commitment, state its exact
 provider/name/region/tier/cost/owner and obtain user approval.
 
-- [ ] Compare providers against required OCI-digest deployment, one-off release
-      jobs, protected environment/secret scopes, HTTPS, health checks, a
-      production traffic gate, scheduler support, structured logs/alerts,
-      graceful shutdown, region, egress, quota, and cost. Also require the exact
-      ARC-WASM-001 narrow launcher for disposable no-network/secret-free/
-      non-root/read-only/resource-limited sandboxes; no API/controller Docker
-      socket or worker-thread fallback.
-- [ ] Select and record one provider in an ADR; do not add multiple half-working
-      provider paths.
+- [ ] Confirm the Vercel public API boundary against the reviewed topology:
+      immutable deployment path, protected environment/secret scopes, HTTPS,
+      health checks, traffic gate, logs/alerts, shutdown, region/egress/quota,
+      cost, and rollback. Do not replace Vercel as the public host without a
+      new user decision.
+- [ ] If OPS-VERCEL-001 requires a supplemental private runner host, compare
+      only candidates that meet the exact ARC-WASM-001 launcher requirements,
+      then obtain explicit user approval before selecting or creating it. The
+      API/controller never receives a Docker socket or worker-thread fallback.
 - [ ] Record the exact development deployment-environment identifier and a
       collision-free naming rule for optional staging and production. Naming a
       future production resource does not authorize creating it.
@@ -53,8 +86,8 @@ not deploy the Coditza image or place Supabase credentials during this task.
 
 ## OPS-DEPLOY-DEV-001 — Development promotion
 
-Prerequisites: OPS-HOST-001, SUP-CHROME-003, ARC-ENV-003, and the reviewed
-OPS-ARTIFACT-001 digest.
+Prerequisites: OPS-HOST-001, SUP-CHROME-003, ARC-ENV-003,
+OPS-VERCEL-ENV-001, and the reviewed OPS-ARTIFACT-001 digest.
 
 1. acquire the provider's single migration/deploy concurrency lock;
 2. select the exact reviewed revision and immutable API/controller/sandbox

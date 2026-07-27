@@ -25,13 +25,13 @@ Modes:
 | PLAN-001 | review | plan delivered | [roadmap](08-execution/00-roadmap.md) | [accepted changes/defaults recorded](08-execution/00-roadmap.md#plan-001--completion-record) | complete |
 | PLAN-002 | review | PLAN-001 | [roadmap](08-execution/00-roadmap.md) | [explicit implementation request](08-execution/00-roadmap.md#plan-002--completion-record) | complete |
 | PLAN-003 | review | PLAN-002 | [G0](08-execution/02-phase-gates.md) | [G0 checklist + synchronized STATUS/NEXT](08-execution/00-roadmap.md#plan-003--completion-record) | complete |
-| PLAN-004 | review | PLAN-003 | [roadmap](08-execution/00-roadmap.md) — reconcile explicit operational directives | executable Vercel/SMTP task paths + synchronized dependencies | next |
+| PLAN-004 | review | PLAN-003 | [roadmap](08-execution/00-roadmap.md) — reconcile explicit operational directives | [executable Vercel/SMTP task paths + synchronized dependencies](08-execution/00-roadmap.md#plan-004--completion-record) | complete |
 
 ## Phase 1
 
 | ID | Mode | Hard prerequisite | Owner / permitted scope | Minimum evidence | Status |
 | --- | --- | --- | --- | --- | --- |
-| ARC-TREE-002 | local | G0 + PLAN-004 | [target tree](02-architecture/01-target-project-structure.md) — first report/location only | report exists, no empty docs folders | blocked |
+| ARC-TREE-002 | local | G0 + PLAN-004 | [target tree](02-architecture/01-target-project-structure.md) — first report/location only | report exists, no empty docs folders | next |
 | ARC-TREE-001 | local | ARC-TREE-002 | [target tree](02-architecture/01-target-project-structure.md) — minimal root metadata | name/private/workspace/type, no version guesses | not started |
 | ARC-DESIGN-001 | local | ARC-TREE-001 + G0 | [modular architecture](02-architecture/06-modular-hexagonal-architecture.md) — ADR/ownership/dependency contracts | accepted ownership + composition/RPC maps | not started |
 | PRD-AUTH-001 | review | ARC-DESIGN-001 | [mandatory MFA](01-product/04-authentication-and-mfa.md) — provider-neutral Auth contract only | ADR + operations/state/error/conditional assurance, no SDK/UI claim | not started |
@@ -52,13 +52,15 @@ Modes:
 
 | ID | Mode | Hard prerequisite | Owner / permitted scope | Minimum evidence | Status |
 | --- | --- | --- | --- | --- | --- |
-| ARC-WASM-001 | local | G1 + PRD-WASM-001 + FOUND-001; owns DEC-032 resolution | [WASM architecture](02-architecture/07-python-wasm-verification.md) — ADR/runtime lock/threat model | exact asset digests + compliant outer-sandbox/protocol proof | not started |
+| OPS-VERCEL-001 | review | G1 + ARC-DESIGN-001 + PRD-WASM-001 + user Vercel direction | [deployment topology](07-operations/01-deployment-environments.md) — Vercel/supplemental-host ADR only | current capability/topology evidence or explicit smallest decision blocker; no resource | not started |
+| ARC-WASM-001 | local | G1 + PRD-WASM-001 + FOUND-001 + OPS-VERCEL-001; owns DEC-032 resolution | [WASM architecture](02-architecture/07-python-wasm-verification.md) — ADR/runtime lock/threat model | exact asset digests + compliant outer-sandbox/protocol proof | not started |
 | SUP-LOCAL-001 | local | G1 | [local Supabase](03-supabase/01-local-cli-and-migrations.md) — CLI config | start/status/stop evidence, no remote | not started |
 | SUP-LOCAL-002 | local | SUP-LOCAL-001 | [local Supabase](03-supabase/01-local-cli-and-migrations.md) — migrations/seed commands | two clean identical resets | not started |
+| SUP-SMTP-LOCAL-001 | local | SUP-LOCAL-001 + SUP-LOCAL-002 + PRD-AUTH-001 + user-provided Gmail App Password at execution | [local Auth SMTP](03-supabase/14-local-smtp.md) — CLI-owned Auth transport only | sanitized local delivery/redaction/ignore proof; root Compose and hosted state unchanged | not started |
 | SUP-PRIMITIVES-001 | local | migration discipline | [local Supabase](03-supabase/01-local-cli-and-migrations.md) — primitive migration | schemas/enums/extensions/default grants tests | not started |
 | SUP-AUTH-001 | local | primitives | [Auth schema](03-supabase/06-auth-profiles-and-roles.md) — profile trigger migration/tests | learner/default/fallback/cascade tests | not started |
 | PRD-ROLE-001 | local | SUP-AUTH-001 | [roles](01-product/01-roles-and-permissions.md) — requirement verification | client role ignored; one learner profile | not started |
-| SUP-MFA-001 | local | FOUND-001 + local Auth + profile + PRD-AUTH-001 + DEC-030 | [TOTP MFA](03-supabase/12-mfa-totp.md) — local config/headless Auth flow | sanitized enroll/login AAL transitions + leak scan | not started |
+| SUP-MFA-001 | local | FOUND-001 + local Auth + profile + PRD-AUTH-001 + SUP-SMTP-LOCAL-001 + DEC-030 | [TOTP MFA](03-supabase/12-mfa-totp.md) — local config/headless Auth flow | sanitized enroll/login AAL transitions + leak scan | not started |
 | SUP-DATA-001 | local | Auth/profile primitives | [core schema](03-supabase/02-core-content-schema.md) — hierarchy migration/tests | constraints/indexes/hierarchy tests | not started |
 | SUP-DATA-002 | local | core hierarchy | [assessment schema](03-supabase/03-assessment-schema.md) — assessment/private migration/tests | key isolation/definition/immutability tests | not started |
 | SUP-DATA-003 | local | assessments | [learning schema](03-supabase/04-learning-progress-schema.md) — learning/audit migration/tests | attempt/progress/privacy constraints | not started |
@@ -149,12 +151,13 @@ Modes:
 
 | ID | Mode | Hard prerequisite | Owner / permitted scope | Minimum evidence | Status |
 | --- | --- | --- | --- | --- | --- |
-| OPS-HOST-001 | hosted | G6 + OPS-SOURCE-001 + user available; owns DEC-007 + exact creation approval | [deployment](07-operations/01-deployment-environments.md) — provider ADR + empty dev host shell | capability/ownership/cost matrix + service ID | not started |
+| OPS-HOST-001 | hosted | G6 + OPS-SOURCE-001 + OPS-VERCEL-001 + exact creation approval | [deployment](07-operations/01-deployment-environments.md) — Vercel public boundary + approved private-host shell | capability/ownership/cost matrix + service ID | not started |
 | SUP-CHROME-001 | hosted | G6 + DEC-018 + approval | [Chrome development](03-supabase/00-chrome-dashboard-setup.md) | healthy `Coditza-dev` metadata | not started |
 | SUP-CHROME-002 | hosted | dev project + Auth decisions | [Chrome development](03-supabase/00-chrome-dashboard-setup.md) | saved Auth/issuer evidence or explicit limitation | not started |
 | ARC-ENV-003 | hosted | dev project + OPS-HOST-001 + DEC-024 + binding approval | [release credentials](02-architecture/05-release-credentials.md) — development scopes/metadata | sanitized identity/scope/dry-run matrix | not started |
-| SUP-CHROME-003 | hosted | dev/Auth + release identity + digest | [Chrome development](03-supabase/00-chrome-dashboard-setup.md) | sanitized exact-target/config preflight, no deployment | not started |
-| OPS-DEPLOY-DEV-001 | hosted | host + target preflight + dev identity + image digest | [deployment](07-operations/01-deployment-environments.md) | one migration job + digest/readiness/security/smoke | not started |
+| OPS-VERCEL-ENV-001 | hosted | OPS-VERCEL-001 + OPS-HOST-001 + SUP-CHROME-001/002 + ARC-ENV-003 + exact binding approval | [release credentials](02-architecture/05-release-credentials.md) — Vercel Development/Preview runtime scopes | sanitized Vercel name/scope/masking/target dry-run matrix; no production values | not started |
+| SUP-CHROME-003 | hosted | dev/Auth + release identity + OPS-VERCEL-ENV-001 + digest | [Chrome development](03-supabase/00-chrome-dashboard-setup.md) | sanitized exact-target/config preflight, no deployment | not started |
+| OPS-DEPLOY-DEV-001 | hosted | host + target preflight + dev identity + OPS-VERCEL-ENV-001 + image digest | [deployment](07-operations/01-deployment-environments.md) | one migration job + digest/readiness/security/smoke | not started |
 | SUP-CHROME-STAGING-001 | hosted | DEC-027 approval + G6 | [optional staging](03-supabase/10-chrome-staging.md) | separate project/Auth/config metadata, no deployment | not started |
 | ARC-ENV-STAGING-001 | hosted | optional staging project + host + binding/creation approval | [release credentials](02-architecture/05-release-credentials.md) — empty staging host shell + scopes | service ID + separate sanitized target/scope matrix | not started |
 | OPS-DEPLOY-STAGING-001 | hosted | optional staging project + identity | [deployment](07-operations/01-deployment-environments.md) | one migration job + separate staging promotion report | not started |

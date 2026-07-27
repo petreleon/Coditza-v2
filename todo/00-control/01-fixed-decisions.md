@@ -189,6 +189,13 @@ approved ADR supersedes one.
   verification. Schema authoring remains migration-first.
 - Production creation, billing changes, destructive remote migrations, key
   rotation, and production deployment require explicit user approval.
-- No frontend framework or hosting provider is assumed.
+- No frontend framework is selected. Vercel is the user-requested eventual
+  public deployment target. OPS-VERCEL-001 must verify the exact public-API and
+  private-grader deployment topology before ARC-WASM-001 chooses a hosted
+  sandbox launcher; a supplemental private host is never selected implicitly.
+- Local Auth email delivery uses the user-controlled Gmail SMTP account only
+  through the Supabase CLI-owned local Auth stack. Root `compose.yaml` never
+  owns that transport or its credential. SUP-SMTP-LOCAL-001 requires a Gmail
+  App Password in ignored runtime secret storage and never the account password.
 - Browser Pyodide/Web Worker behavior is only a future client adapter contract;
   it does not resolve DEC-006 or authorize a frontend.

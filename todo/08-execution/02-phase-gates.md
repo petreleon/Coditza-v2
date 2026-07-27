@@ -42,6 +42,8 @@
 - local TOTP enrollment/verification is explicitly enabled; genuine synthetic
   sessions prove `aal1 → aal2`, multiple-factor selection and no secret
   persistence;
+- the CLI-owned local Auth SMTP path proves one sanitized Gmail delivery with
+  an ignored App Password, while root Compose and hosted SMTP remain unchanged;
 - generated types have no drift;
 - no hosted project/schema change was needed.
 
@@ -134,6 +136,9 @@ This is a mandatory component of G4 and every later gate:
 - exact grader-controller/sandbox image plus Python runtime-manifest digests
   work on the selected host with no-network/secret-free isolation, and the
   synthetic G-WASM smoke passes;
+- the Vercel Development/Preview public-API runtime-variable scopes are masked,
+  point only to the exact non-production target, and contain no release or
+  private-grader credentials;
 - hosted security/E2E/smoke and performance baseline pass with synthetic data;
 - observability, alerts, owned runbooks, upgrade, rollback, and partial-failure
   drills work;
@@ -155,6 +160,8 @@ This is a mandatory component of G4 and every later gate:
 - production-only runtime/release scopes match the exact project, host, and
   registry;
 - reviewed migrations and approved image digest are deployed once;
+- Vercel Production runtime-variable names/scopes are bound only to the exact
+  approved production target without release or private-grader credentials;
 - the approved API/controller/sandbox/runtime digests are promoted unchanged;
 - Auth/client/email/MFA mode matches DEC-025/026/028/029/030/031 and contains no
   invented URLs or recovery bypass;

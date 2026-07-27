@@ -18,14 +18,13 @@ configuration.
 
 ## Current repository state
 
-Implementation is authorized and G0 has passed, but PLAN-004 must first add
-executable paths for the user's Vercel and local Gmail SMTP requirements. No
-local implementation task is permitted until that review succeeds. Planning
-files plus the separately requested root `.env`, `.env.example`, `.gitignore`,
-and `.dockerignore` safety files may exist. The existing hosted-project
-environment values do not authorize a schema or deployment action; every
-hosted, production, secret-dependent, and destructive task retains its explicit
-safeguards.
+Implementation is authorized; G0 and PLAN-004 have passed. ARC-TREE-002 is the
+first permitted local task and may establish only the implementation-report
+location and its first real report. Planning files plus the separately requested
+root `.env`, `.env.example`, `.gitignore`, and `.dockerignore` safety files may
+exist. The existing hosted-project environment values do not authorize a schema
+or deployment action; every hosted, production, secret-dependent, and
+destructive task retains its explicit safeguards.
 
 Implementation tracking starts in [TASKS.md](TASKS.md), [STATUS.md](STATUS.md),
 and [NEXT.md](NEXT.md). They name the single task currently permitted by the

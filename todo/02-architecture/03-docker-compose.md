@@ -8,6 +8,11 @@ test path selected by that ADR. The official Supabase CLI starts and owns the
 local Supabase containers. Do not add `postgres`, `auth`, `rest`, or a second
 Supabase stack to `compose.yaml`.
 
+Root Compose also does not own Auth SMTP. SUP-SMTP-LOCAL-001 configures the
+CLI-owned local Auth service through its current supported local configuration
+and ignored runtime secret injection. Gmail credentials must never become API
+container variables, image layers, root Compose values, or committed files.
+
 On macOS/Windows, the container can normally reach the CLI's host-published URL
 through `host.docker.internal`. A Linux host-gateway address does **not** reach a
 service published only on host loopback, so a host-gateway entry alone is not an

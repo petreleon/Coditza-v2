@@ -9,12 +9,12 @@ time. The authoritative per-task status is [TASKS.md](../TASKS.md); update it,
 1. [x] PLAN-001 — User accepts or amends fixed decisions and safe defaults.
 2. [x] PLAN-002 — User explicitly authorizes implementation.
 3. [x] PLAN-003 — Verify and record G0.
-4. [ ] PLAN-004 — Reconcile the user-required Vercel deployment, Vercel
+4. [x] PLAN-004 — Reconcile the user-required Vercel deployment, Vercel
    environment configuration, and local Gmail SMTP paths before implementation.
 
 No code, Supabase, Chrome, package installation, or Docker action before
-PLAN-002. No local implementation task may begin until PLAN-004 resolves the
-newly identified roadmap gaps.
+PLAN-002. PLAN-004 has resolved the newly identified task-path gaps; each
+future external action still retains its named approval and secret safeguards.
 
 ## PLAN-001 — Completion record
 
@@ -264,6 +264,100 @@ newly identified roadmap gaps.
 - `ARC-TREE-002` is the only unblocked next task because G0 has passed and it
   is the first local foundation task in the ordered roadmap.
 
+## PLAN-004 — Completion record
+
+- Outcome: COMPLETE
+- Environment: NONE
+- Date: 2026-07-27
+- Agent/person: Codex
+- Authorization checked: The user explicitly requested eventual Vercel
+  deployment/environment configuration and local Gmail SMTP delivery while
+  authorizing end-to-end implementation. No external action is authorized by
+  this review alone.
+- Prerequisites/gate checked: PLAN-003 and G0 are complete; PLAN-004 was the
+  sole `next` task; no local implementation artifact existed before this review.
+- Decisions/defaults used:
+
+- Vercel is the required future public API target, but OPS-VERCEL-001 now
+  verifies current capability and prevents Vercel/serverless assumptions from
+  becoming a private grader or outer sandbox decision.
+- A supplemental private grader host can be considered only after that review
+  and a separate explicit user approval; it cannot replace Vercel silently.
+- Local Gmail SMTP is an explicit SUP-SMTP-LOCAL-001 task through the
+  CLI-owned local Supabase Auth stack, never root Compose. It requires a Gmail
+  App Password supplied only when that task is active.
+- OPS-VERCEL-ENV-001 owns Vercel Development/Preview variable scopes, masking,
+  and target verification. ARC-ENV-PROD-001 retains production-only binding.
+- Romanian curriculum authoring remains independently controlled by its
+  CURR-PLAN tasks; the user's end-to-end objective supplies its later explicit
+  authorization evidence without mixing it into backend work.
+
+### Scope
+
+- Intended: repair every executable task/dependency path needed for the stated
+  Vercel, Gmail SMTP, and environment-variable requirements.
+- Explicitly excluded: application code, package installation, Docker/Supabase
+  startup, Chrome, Vercel project creation, SMTP configuration, credentials,
+  deployment, or billing changes.
+
+### Changed
+
+- `todo/03-supabase/14-local-smtp.md`: explicit local Auth SMTP task and
+  secret/delivery boundaries.
+- Supabase, Docker, architecture, release-credential, deployment, risk, and
+  decision plans: synchronized Vercel/Gmail ownership and stop conditions.
+- `todo/TASKS.md`, `todo/08-execution/00-roadmap.md`, and dependency map:
+  ordered OPS-VERCEL-001, SUP-SMTP-LOCAL-001, and OPS-VERCEL-ENV-001 paths.
+- `todo/STATUS.md`, `todo/NEXT.md`, `todo/README.md`, and scope control:
+  synchronized post-review state.
+
+### Verification
+
+- Reviewed the Docker ownership, local Supabase Auth, Python/WASM, release
+  credential, and hosted deployment contracts against the user's directions.
+  - Result: PASS
+  - Non-secret evidence: root Compose remains API/grader-only; SMTP, Vercel
+    topology, Vercel environment variables, and production bindings each have
+    one named owner task and no bypass path.
+- Task/dependency registry and relative-link validation.
+  - Result: PASS
+  - Non-secret evidence: every new task has an owner, ordered prerequisite,
+    and minimum evidence; ARC-TREE-002 is again the sole next local task.
+- `git diff --check`
+  - Result: PASS (exit 0)
+  - Non-secret evidence: the complete plan amendment has no whitespace errors.
+- Read-only repository-local Markdown relative-target check
+  - Result: PASS (exit 0; 77 Markdown files checked)
+  - Non-secret evidence: no new or existing plan link points to a missing local
+    target.
+
+### External actions
+
+- NONE.
+
+### Deviations/ADRs
+
+- NONE. OPS-VERCEL-001 owns the future topology ADR after current official
+  documentation is reviewed.
+
+### Risks/blockers
+
+- The future OPS-VERCEL-001 task may need the user's approval for a supplemental
+  private grader host if Vercel alone cannot meet the sandbox architecture.
+- SUP-SMTP-LOCAL-001 will stop until the user supplies a Gmail App Password
+  through an approved ignored local secret mechanism.
+
+### Secret-safety confirmation
+
+- No credential, token, connection string, private data, protected answer,
+  TOTP/QR/`otpauth`/factor/challenge material, or unsafe screenshot/log was
+  recorded.
+
+### Next
+
+- `ARC-TREE-002` is the sole next task because G0 and PLAN-004 are complete and
+  it creates only the first implementation-report location/report.
+
 ## Phase 1 — Foundation and API container
 
 Execute in this order:
@@ -297,38 +391,43 @@ Supabase schema, domain routes, or remote state exists.
 
 Execute in this order:
 
-1. [ ] Resolve DEC-032 and run ARC-WASM-001 — select, threat-model, and pin the
+1. [ ] OPS-VERCEL-001 — use current official Vercel documentation to verify the
+   required public-API/private-grader topology before selecting a hosted
+   Python/WASM launcher; do not create an external resource.
+2. [ ] Resolve DEC-032 and run ARC-WASM-001 — select, threat-model, and pin the
    exact Pyodide/Python assets plus compliant local/hosted outer-sandbox
    launcher; no in-process fallback.
-2. [ ] SUP-LOCAL-001 — initialize the CLI-owned local stack.
-3. [ ] SUP-LOCAL-002 — migration/reset/seed discipline.
-4. [ ] SUP-PRIMITIVES-001 — schemas, extensions, enums, common helpers.
-5. [ ] SUP-AUTH-001 — signup profile trigger.
-6. [ ] PRD-ROLE-001 — prove default learner creation.
-7. [ ] Confirm or amend the documented DEC-030 two-factor safe default and
+3. [ ] SUP-LOCAL-001 — initialize the CLI-owned local stack.
+4. [ ] SUP-LOCAL-002 — migration/reset/seed discipline.
+5. [ ] SUP-SMTP-LOCAL-001 — configure the CLI-owned local Auth SMTP path with a
+   user-provided Gmail App Password; do not alter root Compose or hosted SMTP.
+6. [ ] SUP-PRIMITIVES-001 — schemas, extensions, enums, common helpers.
+7. [ ] SUP-AUTH-001 — signup profile trigger.
+8. [ ] PRD-ROLE-001 — prove default learner creation.
+9. [ ] Confirm or amend the documented DEC-030 two-factor safe default and
    record it as resolved; do not start SUP-MFA-001 with this prerequisite open.
-8. [ ] SUP-MFA-001 — explicitly enable/prove local Authenticator TOTP and
+10. [ ] SUP-MFA-001 — explicitly enable/prove local Authenticator TOTP and
    sanitized AAL transitions.
-9. [ ] SUP-DATA-001 — module/chapter/theory hierarchy.
-10. [ ] SUP-DATA-002 — exercises/quizzes/private keys.
-11. [ ] SUP-DATA-003 — attempts/completions/progress/audit/idempotency.
-12. [ ] ARC-SEC-003 — audit contract acceptance.
-13. [ ] SUP-FUNCTIONS-001 — module-owned transactional workflows and helpers.
-14. [ ] SUP-WASM-001 — private Python definitions/jobs/evidence plus
+11. [ ] SUP-DATA-001 — module/chapter/theory hierarchy.
+12. [ ] SUP-DATA-002 — exercises/quizzes/private keys.
+13. [ ] SUP-DATA-003 — attempts/completions/progress/audit/idempotency.
+14. [ ] ARC-SEC-003 — audit contract acceptance.
+15. [ ] SUP-FUNCTIONS-001 — module-owned transactional workflows and helpers.
+16. [ ] SUP-WASM-001 — private Python definitions/jobs/evidence plus
     reserve/claim/finalize transactions.
-15. [ ] ARC-SEC-002 — database function security/atomicity acceptance.
-16. [ ] SUP-BOOTSTRAP-001 — serialized first-admin path.
-17. [ ] SUP-AUTH-002 — serialized role-control function.
-18. [ ] SUP-AUTH-003 — operator-only identity security hold and recovery-order
+17. [ ] ARC-SEC-002 — database function security/atomicity acceptance.
+18. [ ] SUP-BOOTSTRAP-001 — serialized first-admin path.
+19. [ ] SUP-AUTH-002 — serialized role-control function.
+20. [ ] SUP-AUTH-003 — operator-only identity security hold and recovery-order
     transaction.
-19. [ ] SUP-RLS-001 — direct-user denial for both AALs and server-path matrix.
-20. [ ] SUP-SEED-001 — deterministic local content/users; factors only through
+21. [ ] SUP-RLS-001 — direct-user denial for both AALs and server-path matrix.
+22. [ ] SUP-SEED-001 — deterministic local content/users; factors only through
    Auth test setup.
-21. [ ] SUP-TYPES-001 — generated database types.
-22. [ ] QA-DB-001 — clean reset/schema/type reproducibility.
-23. [ ] QA-RLS-001 — real-token direct Data API denial.
-24. [ ] QA-DB-002 — transaction/concurrency cases.
-25. [ ] Verify every explicitly listed `DB-*` case in the
+23. [ ] SUP-TYPES-001 — generated database types.
+24. [ ] QA-DB-001 — clean reset/schema/type reproducibility.
+25. [ ] QA-RLS-001 — real-token direct Data API denial.
+26. [ ] QA-DB-002 — transaction/concurrency cases.
+27. [ ] Verify every explicitly listed `DB-*` case in the
     [database test list](../03-supabase/09-database-tests.md) applicable to this
     phase and record G2.
 
@@ -429,9 +528,9 @@ Outcome: the exact commit and immutable image repeat all local evidence in CI.
 
 Execute only after each named external decision/approval:
 
-1. [ ] OPS-HOST-001 — resolve DEC-007 and record the exact portable deployment
-   boundary/provider, then create/confirm the approved empty development host
-   service before any credential binding.
+1. [ ] OPS-HOST-001 — confirm the reviewed Vercel public boundary and any
+   explicitly approved private grader host, then create/confirm the approved
+   empty development service boundary before any credential binding.
 2. [ ] SUP-CHROME-001 — create `Coditza-dev` in Chrome after DEC-018 approval.
 3. [ ] Reconfirm DEC-031 and resolve DEC-025 for the actual hosted signup/email
    mode; an earlier-deadline decision cannot be deferred to production.
@@ -439,31 +538,33 @@ Execute only after each named external decision/approval:
    TOTP; DEC-025 controls whether self-service email flows can be signed off.
 5. [ ] ARC-ENV-003 — bind development runtime/release identities to the real
    project reference and selected host.
-6. [ ] SUP-CHROME-003 — verify the exact development target/configuration
+6. [ ] OPS-VERCEL-ENV-001 — bind only the approved Vercel Development/Preview
+   runtime-variable names and scopes; production remains separately approved.
+7. [ ] SUP-CHROME-003 — verify the exact development target/configuration
    without applying migrations or deploying an image.
-7. [ ] OPS-DEPLOY-DEV-001 — alone apply development migrations, deploy the
+8. [ ] OPS-DEPLOY-DEV-001 — alone apply development migrations, deploy the
    candidate digests, prove the hosted AAL1-deny/TOTP-AAL2 flow, and run the
    synthetic Python verifier smoke in the approved no-network outer sandbox.
-8. [ ] Resolve DEC-027. If accepted, execute SUP-CHROME-STAGING-001,
+9. [ ] Resolve DEC-027. If accepted, execute SUP-CHROME-STAGING-001,
    ARC-ENV-STAGING-001, then OPS-DEPLOY-STAGING-001; otherwise record all three
    as not applicable and use development with isolated synthetic data as
    pre-production.
-9. [ ] OPS-REC-001 — confirm platform backup/PITR capability so the recovery
+10. [ ] OPS-REC-001 — confirm platform backup/PITR capability so the recovery
    runbook is provider-specific rather than guessed.
-10. [ ] Resolve DEC-029 identity-proof, first-factor-compromise, audit,
+11. [ ] Resolve DEC-029 identity-proof, first-factor-compromise, audit,
     notification and operator approvals, then run OPS-RUNBOOK-001 to author the
     exercise matrix and invoke the existing security-hold recovery executable.
-11. [ ] QA-PERF-001 — measure pre-production baselines.
-12. [ ] OPS-OBS-PREPROD-001 — bind and safely exercise hosted dashboards and
+12. [ ] QA-PERF-001 — measure pre-production baselines.
+13. [ ] OPS-OBS-PREPROD-001 — bind and safely exercise hosted dashboards and
     alerts for the selected pre-production environment.
-13. [ ] Reconfirm DEC-023, then run OPS-MAINT-001 for bounded
+14. [ ] Reconfirm DEC-023, then run OPS-MAINT-001 for bounded
     expiry/retention jobs and their alerts.
-14. [ ] OPS-UPGRADE-001 — previous-schema-to-candidate compatibility drill.
-15. [ ] OPS-ROLLBACK-001 — application rollback/partial rollout drill,
+15. [ ] OPS-UPGRADE-001 — previous-schema-to-candidate compatibility drill.
+16. [ ] OPS-ROLLBACK-001 — application rollback/partial rollout drill,
     including the first-release zero-traffic baseline when applicable.
-16. [ ] OPS-REC-002 — approved non-production restore drill.
-17. [ ] OPS-REC-003 — recurring backup freshness/restore schedule.
-18. [ ] Verify hosted security/smoke/observability evidence and record G7.
+17. [ ] OPS-REC-002 — approved non-production restore drill.
+18. [ ] OPS-REC-003 — recurring backup freshness/restore schedule.
+19. [ ] Verify hosted security/smoke/observability evidence and record G7.
 
 ## Phase 8 — Production approval and release
 

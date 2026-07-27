@@ -159,7 +159,8 @@ operation is implemented, proxied, or verified with Python/WASM.
 
 ## ARC-WASM-001 — Approve and pin the execution boundary
 
-Prerequisites: PRD-WASM-001, ARC-DESIGN-001, FOUND-001, and G1.
+Prerequisites: PRD-WASM-001, ARC-DESIGN-001, FOUND-001, G1, and
+OPS-VERCEL-001's reviewed public-API/private-grader topology.
 
 - [ ] Write an ADR selecting the exact Pyodide/Python build, exact
       browser/server asset bundle, and exact local/hosted outer-sandbox
