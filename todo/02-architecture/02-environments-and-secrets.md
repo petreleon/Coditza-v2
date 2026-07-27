@@ -32,8 +32,8 @@ Never point local automated tests at development, staging, or production.
 | `REQUEST_RECEIVE_TIMEOUT_MS` | No | integer 1000–120000; default `30000` | request-body receive bound |
 | `DEPENDENCY_TIMEOUT_MS` | No | integer 100–120000; default `10000` | each Supabase operation bound |
 | `HANDLER_TIMEOUT_MS` | No | integer 1000–120000; default `15000` | total route-operation deadline |
-| `KEEP_ALIVE_TIMEOUT_MS` | No | integer 1000–120000; default `65000` | idle keep-alive bound |
-| `HEADERS_TIMEOUT_MS` | No | integer greater than keep-alive; default `66000` | header receive bound |
+| `KEEP_ALIVE_TIMEOUT_MS` | No | integer 1000–119999; default `65000` | idle keep-alive bound; must remain below headers timeout |
+| `HEADERS_TIMEOUT_MS` | No | integer 1001–120000 and greater than keep-alive; default `66000` | header receive bound |
 | `READINESS_TIMEOUT_MS` | No | integer 100–10000; default `2000` | dependency probe bound |
 | `SHUTDOWN_TIMEOUT_MS` | No | integer 1000–60000; default `10000` | graceful stop bound |
 | `SWAGGER_UI_ENABLED` | No | strict boolean; true only local by default | interactive OpenAPI UI exposure |
@@ -121,31 +121,35 @@ development uses `development,local`; every hosted container uses
 
 ## Tasks
 
-### ARC-ENV-001 — Implement fail-fast configuration
+### ARC-ENV-001 — Accept API configuration and environment separation
 
-- [ ] Define one schema for all API environment variables.
-- [ ] Parse integers, strict booleans, and comma lists with small explicit
-      parsers; never coerce `"false"` with JavaScript truthiness.
-- [ ] Validate the parsed object with a TypeBox `ConfigSchema` using the
-      compatible `typebox/value` `Value.Check`/`Value.Errors` API
-      verified at implementation time; do not add a second schema library.
-- [ ] Parse and validate configuration before constructing Fastify.
-- [ ] Reject missing keys, invalid URLs/ports, HTTP hosted Supabase URLs/issuers,
-      wildcard production CORS, a hosted project-ref/URL/issuer mismatch, and
-      unsupported log levels.
-- [ ] Require at least one exact HTTPS CORS origin for a browser-enabled hosted
-      release; allow an empty list only when the release record explicitly says
-      API-only.
-- [ ] Default `PYTHON_GRADER_ENABLED` to `false`. While false, reject
-      `python_code` publication/reservation and do not construct a launcher.
-      While true, require the absolute manifest path, an allowlisted reviewed
-      launcher-profile ID, every bounded controller value, a manifest whose
-      wall limit fits inside the lease, and completed G-WASM evidence.
-- [ ] Give the API only the grader enabled/capacity projection. Parse the
-      manifest, launcher profile, claim/lease/retry, and sandbox-launch binding
-      only in the private grader-controller composition root.
-- [ ] Export an immutable typed configuration object.
-- [ ] Ensure validation errors name variables but never echo secret values.
+FAST-CONFIG-001 owns the one API parser and its TypeBox schema. Per
+[ADR 0004](../../docs/adr/0004-configuration-ownership-and-phase-one-api-parser.md),
+this task must reuse that parser rather than introduce another configuration
+contract. It is an acceptance/proof task, not a second implementation task.
+
+- [ ] Trace every API-owned variable in the table to the one `ConfigSchema`,
+      raw parser, immutable output, and focused test. Record any gap as a
+      FAST-CONFIG correction rather than adding a second source of truth.
+- [ ] Review the accepted local/hosted mode pairs, standard hosted
+      project-ref/URL/issuer relation, HTTPS rule, strict CORS behavior, and
+      safe defaults. Confirm that a hosted API-only release still has no
+      release-record mechanism and therefore fails closed.
+- [ ] Prove `SUPABASE_URL` and `SUPABASE_JWT_ISSUER` remain separate inputs,
+      and that errors, logs, and test artifacts do not expose supplied values.
+- [ ] Prove the API exposes only the grader enabled/capacity projection and
+      ignores controller-only manifest, launcher, queue-control, retry,
+      sandbox-binding, and hosted-test variables.
+- [ ] Publish an ARC-ENV-001 acceptance report with a fresh clean-install and
+      verification record. Do not construct Fastify, a Supabase client, a
+      Python controller, Docker, or hosted resources.
+
+The controller-only runtime manifest, launcher profile, claim/poll/lease/retry
+settings, sandbox binding, `python_code` publication/reservation behavior, and
+G-WASM gate belong to ARC-WASM-001/FAST-WASM-001. The protected remote-test
+guard, host/Compose proof, safe readiness logging, reviewed custom-domain
+mapping, and target distinctness belong to ARC-ENV-002 after its listed
+runtime prerequisites.
 
 ### ARC-ENV-002 — Prove separation
 

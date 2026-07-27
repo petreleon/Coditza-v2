@@ -373,8 +373,8 @@ Execute in this order:
 6. [x] FOUND-001 — pinned API runtime/tooling baseline.
 7. [x] ARC-BOUND-001 — enforce the dependency graph with failing negative
    fixtures before any external adapter exists.
-8. [ ] FAST-CONFIG-001 — typed fail-fast configuration.
-9. [ ] ARC-ENV-001 — configuration implementation acceptance.
+8. [x] FAST-CONFIG-001 — typed fail-fast configuration.
+9. [ ] ARC-ENV-001 — configuration/environment acceptance.
 10. [ ] FAST-BOOT-001 — canonical app/server/composition-root split.
 11. [ ] ARC-BOUND-002 — app/listener boundary acceptance.
 12. [ ] FAST-LIVE-001 — dependency-free liveness route.

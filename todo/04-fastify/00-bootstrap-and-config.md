@@ -82,7 +82,9 @@ framework, or validation framework unless an ADR proves it is necessary.
 
 Validate before constructing dependencies:
 
-- every variable in `../02-architecture/02-environments-and-secrets.md`;
+- every API-owned variable in
+  `../02-architecture/02-environments-and-secrets.md`, as delimited by
+  [ADR 0004](../../docs/adr/0004-configuration-ownership-and-phase-one-api-parser.md);
 - `SUPABASE_URL`, `SUPABASE_PUBLISHABLE_KEY`, `SUPABASE_SECRET_KEY`;
 - `SUPABASE_JWT_ISSUER`;
 - `CURSOR_HMAC_SECRET`;
@@ -106,5 +108,9 @@ Rules:
 Acceptance:
 
 - each missing/invalid variable has a focused test;
-- valid test config builds the app;
+- valid injected API configuration parses without constructing an app;
+  FAST-BOOT-001 exclusively owns the app factory;
 - no secret appears in logs, snapshots, thrown messages, or generated docs.
+
+Completion evidence: [FAST-CONFIG-001 report](../../docs/implementation/FAST-CONFIG-001.md)
+and [ADR 0004](../../docs/adr/0004-configuration-ownership-and-phase-one-api-parser.md).

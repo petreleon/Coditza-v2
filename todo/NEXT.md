@@ -2,10 +2,11 @@
 
 The next implementation task is:
 
-**FAST-CONFIG-001 — Fail-fast typed configuration.**
+**ARC-ENV-001 — Accept API configuration and environment separation.**
 
-Prerequisites already verified: G0, PLAN-004, FOUND-001, and ARC-BOUND-001 are
-complete. This is the sole task allowed to change implementation files now.
+Prerequisites already verified: G0, PLAN-004, FOUND-001, ARC-BOUND-001, and
+FAST-CONFIG-001 are complete. This is the sole task allowed to change
+implementation files now.
 
 Read first:
 
@@ -26,80 +27,49 @@ Read first:
 15. `08-execution/03-handoff-protocol.md`
 16. `../docs/adr/0001-modular-monolith-and-ports-adapters.md`
 17. `../docs/adr/0003-node-fastify-toolchain-baseline.md`
-18. `../docs/implementation/ARC-BOUND-001.md`
-19. `../docs/implementation/architecture-boundary-contract.md`
+18. `../docs/adr/0004-configuration-ownership-and-phase-one-api-parser.md`
+19. `../docs/implementation/FAST-CONFIG-001.md`
+20. `../docs/implementation/architecture-boundary-contract.md`
 
-Implement only a local, fail-fast API configuration parser and its tests.
+Perform a local acceptance and separation audit of the existing API parser;
+do not create a second configuration implementation.
 
-## Required design
+## Required work
 
-- Replace the type-only foundation configuration seam with one typed,
-  deeply immutable configuration object and one `ConfigSchema`. Use the already
-  installed `typebox` package and its compatible `typebox/value`
-  `Value.Check`/`Value.Errors` API. Do not add a second schema/validation
-  library.
-- Make the main parser accept an explicitly injected raw environment record,
-  such as `Readonly<Record<string, string | undefined>>`. Tests must call that
-  parser with local records and must not mutate `process.env`. A very small
-  production-only wrapper may pass `process.env`; it must not load `.env`,
-  construct a dependency, or create side effects.
-- Parse raw strings first with small explicit helpers, then validate the parsed
-  object with the one TypeBox schema. Never use JavaScript truthiness for a
-  numeric or boolean environment value.
-- Cover API-owned configuration from the environment contract: the
-  `NODE_ENV`/`APP_ENV` pair; host, port, prefix, log level, trusted-proxy mode,
-  request-ID header, Swagger switch; CORS; body/rate/readiness/shutdown and
-  request-timeout limits; Supabase URL/project ref/publishable key/secret
-  key/JWT issuer/audience; and the cursor HMAC secret.
-- Keep `SUPABASE_URL` and `SUPABASE_JWT_ISSUER` as separate validated values.
-  Validate syntax and local-versus-hosted safety that belongs to this parser,
-  but do not instantiate a Supabase client, make a network call, or derive one
-  from the other.
-- The API may expose only the Python grader enabled/capacity projection:
-  `PYTHON_GRADER_ENABLED`, `PYTHON_GRADER_CONCURRENCY`, and
-  `PYTHON_GRADER_QUEUE_LIMIT`. Do not parse or expose the controller-only
-  manifest, launcher-profile, claim/poll/lease/retry, sandbox binding, or
-  `ALLOW_HOSTED_TEST_TARGET` values here; ARC-ENV-001 and the private
-  controller path own their broader separation proof.
-- Implement strict integer and boolean parsing. Preserve the documented
-  inclusive numeric limits/defaults. Make `false` a real boolean false, never a
-  truthy string.
-- Parse `CORS_ORIGINS` as a comma-separated list of exact absolute `http` or
-  `https` origins. Reject credentials, paths, queries, fragments, malformed
-  values, duplicates after normalization, wildcard production values, and
-  localhost origins in production. Normalize scheme/host casing while
-  preserving an explicit port. Empty CORS remains valid only for the explicitly
-  recorded API-only mode; do not silently turn it into `*`.
-- Validation errors may identify variable names and safe validation reasons but
-  must never echo `SUPABASE_SECRET_KEY`, `CURSOR_HMAC_SECRET`, publishable key,
-  or another supplied value. Freeze every exported object/array deeply enough
-  that consumers cannot mutate configuration after parsing.
-- Update `.env.example` only if it needs a safe placeholder or documented
-  local default. Do not read, print, copy, edit, or stage `.env` or any other
-  real local environment file.
+- Build a traceable inventory from every API-owned environment variable in the
+  environment table to the existing `ConfigSchema`, parsing rule, immutable
+  output field, and focused test. If a real gap is found, make the smallest
+  correction in the existing configuration module and add a focused test; do
+  not introduce another schema or a parallel `process.env` reader.
+- Recheck and document the exact accepted mode pairs, local-versus-hosted
+  Supabase syntax/mapping rules, empty-CORS fail-closed behavior for hosted
+  releases, proxy/SWAGGER/Python-grader gates, and the effective timeout
+  relation. Verify that `SUPABASE_URL` and `SUPABASE_JWT_ISSUER` are separate
+  values rather than derived aliases.
+- Prove controller-only values are not parsed or exposed by the API:
+  runtime manifest, launcher profile, claim/poll/lease/retry settings,
+  sandbox binding, and `ALLOW_HOSTED_TEST_TARGET`. Keep all of them out of the
+  API test fixture except as inert injected unknown keys.
+- Prove errors and any test/report artifacts name fields/reasons only and do
+  not include supplied key, cursor, or other environment values. Do not read,
+  print, edit, or stage `.env` or another real local environment file.
+- Create `docs/implementation/ARC-ENV-001.md` with the inventory, scope,
+  decisions, checks, and explicit deferred controls. Then update the task
+  registry, status, roadmap, and this file only after all required local
+  verification passes.
 
-## Required tests and evidence
+## Required verification
 
-- Add focused Vitest tests for a valid injected record; every required missing
-  variable; each parser boundary/invalid value; strict `false`; valid and
-  rejected CORS normalization cases; safe mode pairs; secret-redacted errors;
-  and immutability. Use a non-secret sentinel in redaction tests and assert the
-  sentinel never reaches an error, snapshot, or log.
-- Assert parsing performs no network call and does not require Fastify or a
-  Supabase SDK client. Do not create an app factory merely to satisfy an older
-  wording about a valid config "building" an app: FAST-BOOT-001 exclusively
-  owns `buildApp`, routes, and listening.
-- Keep the existing BND-001 through BND-010 graph clean. If the parser creates
-  a new API source path, it must fit the ARC-BOUND-001 production-path contract
-  and pass the static scan; do not weaken a boundary rule or add an exemption.
-- Before trackers move, run a clean Node 24.18.0/npm 11.16.0 install plus
-  format check, lint, typecheck, tests, build, boundary checks, `git diff
-  --check`, and a scoped secret-safety review. Create a FAST-CONFIG-001 report,
-  then mark that task complete and make ARC-ENV-001 the sole next task only if
-  all evidence passes.
+- Use Node `24.18.0` and npm `11.16.0` for a clean `npm ci --ignore-scripts`,
+  `npm run format:check`, `npm run lint`, `npm run typecheck`, `npm test`, and
+  `npm run build`.
+- Run `git diff --check`, the full dependency-boundary verifier, and a scoped
+  secret-safety review of only intended tracked files.
+- Record the results in the report. Move ARC-ENV-001 to `complete` and make
+  FAST-BOOT-001 the sole `next` task only if all acceptance evidence passes.
 
 Do not add Fastify construction/plugins/routes/listening, a composition root,
 Supabase client/adapter, Docker/Compose, a Python runtime/controller, real
 business module, credential, Chrome action, SMTP configuration, Vercel
-resource, hosted state, or a frontend. Do not change production, staging, or
-development platform configuration.
+resource, hosted state, or a frontend. Do not create or alter a production,
+staging, or development platform configuration.
