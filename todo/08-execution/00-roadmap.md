@@ -6,12 +6,98 @@ time. The authoritative per-task status is [TASKS.md](../TASKS.md); update it,
 
 ## Phase 0 — Accept and authorize the plan
 
-1. [ ] PLAN-001 — User accepts or amends fixed decisions and safe defaults.
+1. [x] PLAN-001 — User accepts or amends fixed decisions and safe defaults.
 2. [ ] PLAN-002 — User explicitly authorizes implementation.
 3. [ ] PLAN-003 — Verify and record G0.
 
 No code, Supabase, Chrome, package installation, or Docker action before
 PLAN-002.
+
+## PLAN-001 — Completion record
+
+- Outcome: COMPLETE
+- Environment: NONE
+- Date: 2026-07-27
+- Agent/person: Codex, recording the user's direction
+- Authorization checked: Review-only task; no implementation action was taken.
+- Prerequisites/gate checked: Plan delivered; `PLAN-001` was the sole `next`
+  task; the repository had no tracked or untracked implementation changes.
+- Decisions/defaults used:
+
+- Product name remains `Coditza`; the public source repository is
+  `petreleon/Coditza-v2`.
+- Learner-facing course material is Romanian (`ro-RO`), beginning with
+  `Arhitectură software în Python`.
+- The backend remains a TypeScript/Fastify modular monolith with Supabase for
+  PostgreSQL and Auth, using the bounded contexts and ports/adapters rules in
+  the fixed decisions.
+- Password authentication is followed by mandatory Authenticator-app TOTP for
+  registration completion and every later login; Coditza domain routes require
+  `aal2`.
+- Python exercises use a pinned, self-hosted Python-on-WebAssembly runtime; a
+  server-side run in an independently hardened outer sandbox is authoritative.
+- Vercel is the requested eventual deployment destination. Its compatibility
+  with the public Fastify API and the separate private grader remains a later
+  deployment decision; this record creates no Vercel resource or commitment.
+- Local SMTP is intended to use `petreleonardos@gmail.com` when the dedicated
+  SMTP task is eligible. A Gmail App Password is required then and has not
+  been requested, stored, or recorded here.
+
+### Scope
+
+- Intended: record acceptance of the fixed architecture, MFA, language, WASM,
+  deployment-intent, and SMTP-safe-default decisions.
+- Explicitly excluded: application code, package installation, Docker,
+  Supabase, Chrome, Vercel, SMTP, or other external-state work.
+
+### Changed
+
+- `todo/08-execution/00-roadmap.md`: this planning-review record and task
+  checkbox.
+- `todo/TASKS.md`, `todo/STATUS.md`, and `todo/NEXT.md`: synchronized task
+  state.
+
+### Verification
+
+- Read the fixed decisions, open decisions, execution protocol, roadmap, G0
+  gate, architecture, MFA, and Python/WASM contracts.
+  - Result: PASS
+  - Non-secret evidence: the user's stated requirements agree with the
+    recorded defaults; undecided remote/cost-sensitive choices remain deferred.
+- `git status --short --branch`
+  - Result: PASS
+  - Non-secret evidence: `main...origin/main` with no user-owned working-tree
+    changes before this review record.
+
+### External actions
+
+- NONE. Earlier explicitly requested GitHub repository setup is outside this
+  review task and is not used as authorization for future hosted work.
+
+### Deviations/ADRs
+
+- This review record deliberately lives in the roadmap. ARC-TREE-002 remains
+  the first local task allowed to create `docs/implementation/` and its first
+  real implementation report.
+
+### Risks/blockers
+
+- `PLAN-002` must separately record the user's explicit implementation
+  authorization before any application, Docker, Supabase, package, or Chrome
+  work begins.
+- A Gmail App Password is still required only when SMTP configuration becomes
+  an eligible task; no credential has been requested or stored.
+
+### Secret-safety confirmation
+
+- No credential, token, connection string, private data, protected answer,
+  TOTP/QR/`otpauth`/factor/challenge material, or unsafe screenshot/log was
+  recorded.
+
+### Next
+
+- `PLAN-002` is the only unblocked next task because the user explicitly asked
+  to continue and complete the implementation after accepting these decisions.
 
 ## Phase 1 — Foundation and API container
 

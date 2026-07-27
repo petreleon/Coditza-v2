@@ -22,8 +22,8 @@ Modes:
 
 | ID | Mode | Hard prerequisite | Owner / permitted scope | Minimum evidence | Status |
 | --- | --- | --- | --- | --- | --- |
-| PLAN-001 | review | plan delivered | [roadmap](08-execution/00-roadmap.md) | accepted changes/defaults recorded | next |
-| PLAN-002 | review | PLAN-001 | [roadmap](08-execution/00-roadmap.md) | explicit implementation request | blocked |
+| PLAN-001 | review | plan delivered | [roadmap](08-execution/00-roadmap.md) | [accepted changes/defaults recorded](08-execution/00-roadmap.md#plan-001--completion-record) | complete |
+| PLAN-002 | review | PLAN-001 | [roadmap](08-execution/00-roadmap.md) | explicit implementation request | next |
 | PLAN-003 | review | PLAN-002 | [G0](08-execution/02-phase-gates.md) | G0 checklist + synchronized STATUS/NEXT | blocked |
 
 ## Phase 1

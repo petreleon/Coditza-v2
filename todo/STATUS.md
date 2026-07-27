@@ -2,16 +2,16 @@
 
 - Plan version: 3
 - Implementation authorization: **NOT GRANTED**
-- Current phase: Planning
+- Current phase: 0 — Plan acceptance and implementation authorization
 - Active implementation task: None
-- Last verified implementation task: None
+- Last verified implementation task: PLAN-001 (review)
 - Last updated: 2026-07-27
 
 ## Phase status
 
 | Phase | Status | Gate |
 | --- | --- | --- |
-| 0 — Plan acceptance | In progress until user accepts this plan | G0 |
+| 0 — Plan acceptance | PLAN-001 complete; PLAN-002 next | G0 |
 | 1 — Foundation and containers | Not started | G1 |
 | 2 — Local Supabase and schema | Not started | G2 |
 | 3 — Fastify identity/read slice | Not started | G3 |
@@ -23,7 +23,8 @@
 
 ## Blockers
 
-- Implementation has not been requested.
+- PLAN-002 must separately record the user's already received explicit
+  implementation request before code or infrastructure work begins.
 - Hosted environment region/tier/owner, client origins/email mode,
   source/CI/registry, optional staging, and API deployment provider are
   deliberately deferred to their decision deadlines.
@@ -42,7 +43,8 @@ to the deadlines in that file.
 
 ## Non-secret evidence
 
-- Planning files only; no implementation evidence yet.
+- [PLAN-001 review record](08-execution/00-roadmap.md#plan-001--completion-record);
+  no application implementation evidence yet.
 
 ## Update rule
 
