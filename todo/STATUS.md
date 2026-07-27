@@ -5,8 +5,8 @@
   implementation on 2026-07-27; only task-scoped local work is currently
   authorized.
 - Current phase: 1 — Foundation and API container
-- Active implementation task: PRD-AUTH-001 (next; not started)
-- Last verified implementation task: ARC-DESIGN-001
+- Active implementation task: PRD-WASM-001 (next; not started)
+- Last verified implementation task: PRD-AUTH-001
 - Last updated: 2026-07-27
 
 ## Phase status
@@ -14,7 +14,7 @@
 | Phase | Status | Gate |
 | --- | --- | --- |
 | 0 — Plan acceptance | Complete; G0 and PLAN-004 passed | G0 |
-| 1 — Foundation and containers | ARC-DESIGN-001 complete; PRD-AUTH-001 next | G1 |
+| 1 — Foundation and containers | PRD-AUTH-001 complete; PRD-WASM-001 next | G1 |
 | 2 — Local Supabase and schema | Not started | G2 |
 | 3 — Fastify identity/read slice | Not started | G3 |
 | 4 — Learning workflows | Not started | G4 |
@@ -25,9 +25,10 @@
 
 ## Blockers
 
-- No active Phase-1 blocker. PRD-AUTH-001 is a review task limited to a
-  provider-neutral mandatory-TOTP client contract; it must not claim an SDK
-  mapping, UI, or external configuration.
+- No active Phase-1 blocker. PRD-WASM-001 is limited to Python package,
+  verdict, deterministic-fixture, and Auth/TOTP-exclusion contracts; it must
+  not select a Pyodide runtime, outer-sandbox launcher, dependency, or hosted
+  topology.
 - Exact Vercel team/project/region/tier/owner, client origins/email mode,
   source/CI/registry, optional staging, and any supplemental private grader
   host remain deferred to their named decision deadlines and approvals.
@@ -46,10 +47,9 @@ to the deadlines in that file.
 
 ## Non-secret evidence
 
-- [ARC-DESIGN-001 report](../docs/implementation/ARC-DESIGN-001.md); the
-  accepted ADR, single-owner inventory, composition boundary, RPC coordinator
-  map, and negative-fixture strategy exist without application or
-  infrastructure artifacts.
+- [PRD-AUTH-001 report](../docs/implementation/PRD-AUTH-001.md); the direct
+  Supabase Auth mandatory-TOTP ADR and provider-neutral state/error/AAL2
+  contract exist without a client, SDK mapping, or external configuration.
 
 ## Update rule
 

@@ -112,29 +112,33 @@ presence of a session alone.
 
 Prerequisites: ARC-DESIGN-001 and current official Supabase Auth documentation.
 
-- [ ] Record an ADR stating mandatory TOTP, direct-to-Supabase Auth, and no
-      Fastify credential proxy.
-- [ ] Record the required provider operations and expected result categories
-      without pinning a package version that FOUND-001 has not selected.
-- [ ] Mark exact version-specific SDK calls/results as out of scope here and
-      assign them exclusively to SUP-MFA-001 after FOUND-001.
-- [ ] Define the provider-neutral client interface for signup, confirmation,
-      enrollment, challenge, verification, refresh, logout, and factor listing.
-- [ ] Define stable client states and safe error categories without exposing
-      whether an unrelated email account exists.
-- [ ] Define resume/cleanup behavior for unverified factors and multiple-factor
-      selection from verified factors only.
-- [ ] Define the `aal2` handoff to Fastify and prohibit domain calls with an
-      `aal1` token.
-- [ ] Freeze the conditional assurance rule without claiming a provider
-      observation: SUP-MFA-001 must test the pinned signed `amr`; require its
-      TOTP method when reliable, otherwise use the reviewed TOTP-only
-      configuration/AAL2 fallback.
-- [ ] Record that no UI is implemented in this backend repository and list the
-      later frontend acceptance requirements without selecting a framework.
-- [ ] Resolve or explicitly block DEC-029 before production self-service signup.
+- [x] Record an ADR stating mandatory TOTP, direct-to-Supabase Auth, and no
+     Fastify credential proxy.
+- [x] Record the required provider operations and expected result categories
+     without pinning a package version that FOUND-001 has not selected.
+- [x] Mark exact version-specific SDK calls/results as out of scope here and
+     assign them exclusively to SUP-MFA-001 after FOUND-001.
+- [x] Define the provider-neutral client interface for signup, confirmation,
+     enrollment, challenge, verification, refresh, logout, and factor listing.
+- [x] Define stable client states and safe error categories without exposing
+     whether an unrelated email account exists.
+- [x] Define resume/cleanup behavior for unverified factors and multiple-factor
+     selection from verified factors only.
+- [x] Define the `aal2` handoff to Fastify and prohibit domain calls with an
+     `aal1` token.
+- [x] Freeze the conditional assurance rule without claiming a provider
+     observation: SUP-MFA-001 must test the pinned signed `amr`; require its
+     TOTP method when reliable, otherwise use the reviewed TOTP-only
+     configuration/AAL2 fallback.
+- [x] Record that no UI is implemented in this backend repository and list the
+     later frontend acceptance requirements without selecting a framework.
+- [x] Resolve or explicitly block DEC-029 before production self-service signup.
 
 Evidence is the approved ADR, provider-operation/state-transition contract,
 safe error model, conditional assurance rule, threat review, and
 client-contract fixtures without real credentials or enrollment material. It
 contains no pinned SDK mapping or observed JWT claim.
+
+Accepted evidence: [ADR 0002](../../docs/adr/0002-mandatory-totp-direct-supabase-auth.md),
+[provider-neutral client contract](../../docs/implementation/auth-mfa-client-contract.md),
+and [PRD-AUTH-001 report](../../docs/implementation/PRD-AUTH-001.md).

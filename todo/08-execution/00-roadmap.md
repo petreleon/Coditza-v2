@@ -366,7 +366,7 @@ Execute in this order:
 2. [x] ARC-TREE-001 — minimal root workspace metadata, no version guesses.
 3. [x] ARC-DESIGN-001 — freeze bounded-context ownership, ports/adapters,
    composition root and rule authority.
-4. [ ] PRD-AUTH-001 — freeze the mandatory TOTP registration/login/factor
+4. [x] PRD-AUTH-001 — freeze the mandatory TOTP registration/login/factor
    client contract without claiming a UI.
 5. [ ] PRD-WASM-001 — freeze `python_code` package, authoritative grading,
    deterministic verdict, and Auth/TOTP exclusion rules.

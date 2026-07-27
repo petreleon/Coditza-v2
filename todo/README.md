@@ -20,10 +20,11 @@ configuration.
 
 Implementation is authorized; G0 and PLAN-004 have passed. ARC-TREE-002 created
 the implementation-report location, ARC-TREE-001 added only private ESM
-workspace metadata, and ARC-DESIGN-001 accepted the modular-monolith ADR,
-single-owner inventory, dependency graph, and composition boundaries.
-PRD-AUTH-001 is next to freeze the provider-neutral mandatory-TOTP client
-contract without implementation.
+workspace metadata, ARC-DESIGN-001 accepted the modular-monolith ADR,
+single-owner inventory, dependency graph, and composition boundaries, and
+PRD-AUTH-001 accepted the provider-neutral mandatory-TOTP client contract
+without a UI or SDK mapping. PRD-WASM-001 is next to freeze Python exercise
+semantics and golden vectors without a runtime/launcher selection.
 Planning files plus the separately requested root `.env`, `.env.example`,
 `.gitignore`, and `.dockerignore` safety files may exist. The existing
 hosted-project environment values do not authorize a schema or deployment action;
