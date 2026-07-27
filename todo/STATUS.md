@@ -4,17 +4,17 @@
 - Implementation authorization: **GRANTED** — user explicitly requested
   implementation on 2026-07-27; only task-scoped local work is currently
   authorized.
-- Current phase: 0 — G0 verification
-- Active implementation task: None
-- Last verified implementation task: PLAN-002 (review)
+- Current phase: 1 — Foundation and API container
+- Active implementation task: ARC-TREE-002 (next; not started)
+- Last verified implementation task: PLAN-003 (G0 review)
 - Last updated: 2026-07-27
 
 ## Phase status
 
 | Phase | Status | Gate |
 | --- | --- | --- |
-| 0 — Plan acceptance | PLAN-001 and PLAN-002 complete; PLAN-003 next | G0 |
-| 1 — Foundation and containers | Not started | G1 |
+| 0 — Plan acceptance | Complete; G0 passed | G0 |
+| 1 — Foundation and containers | ARC-TREE-002 next | G1 |
 | 2 — Local Supabase and schema | Not started | G2 |
 | 3 — Fastify identity/read slice | Not started | G3 |
 | 4 — Learning workflows | Not started | G4 |
@@ -25,8 +25,8 @@
 
 ## Blockers
 
-- G0 must be verified and recorded before `ARC-TREE-002` may create the first
-  local implementation files.
+- No active Phase-1 blocker. `ARC-TREE-002` is limited to creating the first
+  implementation-report location and report.
 - Hosted environment region/tier/owner, client origins/email mode,
   source/CI/registry, optional staging, and API deployment provider are
   deliberately deferred to their decision deadlines.
@@ -45,9 +45,9 @@ to the deadlines in that file.
 
 ## Non-secret evidence
 
-- [PLAN-001 and PLAN-002 review records](08-execution/00-roadmap.md#plan-001--completion-record);
-  implementation is authorized but no application implementation evidence
-  exists yet.
+- [G0 completion record](08-execution/00-roadmap.md#plan-003--completion-record);
+  implementation is authorized, G0 is passed, and no application implementation
+  evidence exists yet.
 
 ## Update rule
 

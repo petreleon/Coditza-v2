@@ -8,7 +8,7 @@ time. The authoritative per-task status is [TASKS.md](../TASKS.md); update it,
 
 1. [x] PLAN-001 — User accepts or amends fixed decisions and safe defaults.
 2. [x] PLAN-002 — User explicitly authorizes implementation.
-3. [ ] PLAN-003 — Verify and record G0.
+3. [x] PLAN-003 — Verify and record G0.
 
 No code, Supabase, Chrome, package installation, or Docker action before
 PLAN-002.
@@ -175,6 +175,91 @@ PLAN-002.
 
 - `PLAN-003` is the only unblocked next task because it can now formally check
   G0 and select `ARC-TREE-002` without inferring any external authority.
+
+## PLAN-003 — Completion record
+
+- Outcome: COMPLETE
+- Environment: NONE
+- Date: 2026-07-27
+- Agent/person: Codex
+- Authorization checked: `PLAN-002` records the user's explicit
+  implementation authorization; this task creates no external authority.
+- Prerequisites/gate checked: `PLAN-001` and `PLAN-002` are complete;
+  `PLAN-003` was the sole `next` task; the working tree was clean before this
+  review.
+- Decisions/defaults used:
+
+- The fixed decisions are reviewed and remain the authority for the modular
+  monolith, Fastify/Supabase split, mandatory TOTP `aal2`, no selected frontend,
+  and authoritative isolated Python-on-WASM execution.
+- The fixed product/repository wording now distinguishes product `Coditza` from
+  the public repository `Coditza-v2` requested by the user.
+- DEC-029 remains an explicit production blocker. The user-requested eventual
+  Vercel release and Gmail SMTP configuration remain task-scoped future work;
+  neither implies provider compatibility, a hosted resource, production
+  permission, billing approval, nor a secret.
+
+### Scope
+
+- Intended: verify every G0 condition and advance the single permitted task to
+  `ARC-TREE-002`.
+- Explicitly excluded: application code, package installation, Docker,
+  Supabase, Chrome, Vercel, SMTP, credentials, or other external-state work.
+
+### Changed
+
+- `todo/00-control/01-fixed-decisions.md`: corrected the product/repository
+  naming distinction from the user's public-repository direction.
+- `todo/08-execution/00-roadmap.md`: this G0 record and task checkbox.
+- `todo/TASKS.md`, `todo/STATUS.md`, `todo/NEXT.md`, `todo/README.md`, and
+  `todo/00-control/00-scope-and-non-goals.md`: synchronized post-G0 state.
+
+### Verification
+
+- G0 fixed-decision/default review.
+  - Result: PASS
+  - Non-secret evidence: PLAN-001 records the accepted architecture, Romanian
+    course direction, mandatory TOTP, and Python/WASM authority; DEC-029 is
+    visibly retained as a production blocker.
+- G0 implementation-authorization review.
+  - Result: PASS
+  - Non-secret evidence: PLAN-002 records the explicit user request to continue
+    and complete Coditza.
+- G0 task-state synchronization preflight.
+  - Result: PASS
+  - Non-secret evidence: PLAN-001/002 are complete, no prior local task is
+    incomplete, and `ARC-TREE-002` is the first roadmap task after G0.
+- `git status --short --branch` and `test ! -e docs`
+  - Result: PASS
+  - Non-secret evidence: clean `main...origin/main`; no implementation-report
+    directory exists before its owning task.
+
+### External actions
+
+- NONE. No external or production authority is inferred from G0.
+
+### Deviations/ADRs
+
+- NONE.
+
+### Risks/blockers
+
+- `ARC-TREE-002` may now create only `docs/implementation/` and its first real
+  report. It must not create application files, dependencies, Docker artifacts,
+  or empty documentation folders.
+- Hosted targets, SMTP credentials, Vercel capability/cost validation, and
+  production release remain deferred to their named tasks and approvals.
+
+### Secret-safety confirmation
+
+- No credential, token, connection string, private data, protected answer,
+  TOTP/QR/`otpauth`/factor/challenge material, or unsafe screenshot/log was
+  recorded.
+
+### Next
+
+- `ARC-TREE-002` is the only unblocked next task because G0 has passed and it
+  is the first local foundation task in the ordered roadmap.
 
 ## Phase 1 — Foundation and API container
 

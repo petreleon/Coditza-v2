@@ -24,13 +24,13 @@ Modes:
 | --- | --- | --- | --- | --- | --- |
 | PLAN-001 | review | plan delivered | [roadmap](08-execution/00-roadmap.md) | [accepted changes/defaults recorded](08-execution/00-roadmap.md#plan-001--completion-record) | complete |
 | PLAN-002 | review | PLAN-001 | [roadmap](08-execution/00-roadmap.md) | [explicit implementation request](08-execution/00-roadmap.md#plan-002--completion-record) | complete |
-| PLAN-003 | review | PLAN-002 | [G0](08-execution/02-phase-gates.md) | G0 checklist + synchronized STATUS/NEXT | next |
+| PLAN-003 | review | PLAN-002 | [G0](08-execution/02-phase-gates.md) | [G0 checklist + synchronized STATUS/NEXT](08-execution/00-roadmap.md#plan-003--completion-record) | complete |
 
 ## Phase 1
 
 | ID | Mode | Hard prerequisite | Owner / permitted scope | Minimum evidence | Status |
 | --- | --- | --- | --- | --- | --- |
-| ARC-TREE-002 | local | G0 | [target tree](02-architecture/01-target-project-structure.md) — first report/location only | report exists, no empty docs folders | not started |
+| ARC-TREE-002 | local | G0 | [target tree](02-architecture/01-target-project-structure.md) — first report/location only | report exists, no empty docs folders | next |
 | ARC-TREE-001 | local | ARC-TREE-002 | [target tree](02-architecture/01-target-project-structure.md) — minimal root metadata | name/private/workspace/type, no version guesses | not started |
 | ARC-DESIGN-001 | local | ARC-TREE-001 + G0 | [modular architecture](02-architecture/06-modular-hexagonal-architecture.md) — ADR/ownership/dependency contracts | accepted ownership + composition/RPC maps | not started |
 | PRD-AUTH-001 | review | ARC-DESIGN-001 | [mandatory MFA](01-product/04-authentication-and-mfa.md) — provider-neutral Auth contract only | ADR + operations/state/error/conditional assurance, no SDK/UI claim | not started |

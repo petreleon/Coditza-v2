@@ -5,7 +5,8 @@ approved ADR supersedes one.
 
 ## Product and language
 
-- The product and repository name is `Coditza`.
+- The product name is `Coditza`; its public GitHub source repository is
+  `Coditza-v2`.
 - Learner-facing authored content is initially Romanian (`ro-RO`) with correct
   diacritics. Python/code identifiers remain in English.
 - The first real course module is titled `Arhitectură software în Python` and is

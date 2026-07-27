@@ -18,10 +18,10 @@ configuration.
 
 ## Current repository state
 
-Implementation is authorized, but application work has not begun: `PLAN-003`
-must first record G0, then `ARC-TREE-002` may establish the first local
-implementation-report location. Planning files plus the separately requested
-root `.env`, `.env.example`, `.gitignore`, and `.dockerignore` safety files may
+Implementation is authorized and G0 has passed. `ARC-TREE-002` is the first
+permitted local task and may establish only the implementation-report location
+and its first real report. Planning files plus the separately requested root
+`.env`, `.env.example`, `.gitignore`, and `.dockerignore` safety files may
 exist. The existing hosted-project environment values do not authorize a schema
 or deployment action; every hosted, production, secret-dependent, and
 destructive task retains its explicit safeguards.

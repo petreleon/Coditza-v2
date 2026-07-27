@@ -1,8 +1,8 @@
 # Next task
 
-The next planning/authorization task is:
+The next implementation task is:
 
-**PLAN-003 — Verify and record G0.**
+**ARC-TREE-002 — Establish documentation locations.**
 
 Read first:
 
@@ -10,16 +10,13 @@ Read first:
 2. `TASKS.md`
 3. `STATUS.md`
 4. `00-control/01-fixed-decisions.md`
-5. `00-control/02-open-decisions.md`
-6. `00-control/03-execution-protocol.md`
-7. `01-product/04-authentication-and-mfa.md`
-8. `02-architecture/06-modular-hexagonal-architecture.md`
-9. `01-product/05-python-code-exercises.md`
-10. `02-architecture/07-python-wasm-verification.md`
-11. `08-execution/00-roadmap.md`
-12. `08-execution/02-phase-gates.md`
+5. `00-control/03-execution-protocol.md`
+6. `02-architecture/01-target-project-structure.md`
+7. `09-templates/00-task-report-template.md`
+8. `08-execution/00-roadmap.md`
+9. `08-execution/02-phase-gates.md`
 
-Implementation is authorized within the roadmap, but `PLAN-003` must verify all
-G0 conditions and synchronize `TASKS.md`, `STATUS.md`, and this file before
-any code or infrastructure task begins. Only then may it change NEXT to
-`ARC-TREE-002`; no external authority is implied.
+G0 is passed. Create only `docs/implementation/` together with the first real
+`ARC-TREE-002` report; do not create empty sibling documentation folders,
+application code, package metadata, dependencies, Docker artifacts, Supabase
+files, or external resources.

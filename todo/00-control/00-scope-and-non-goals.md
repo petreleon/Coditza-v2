@@ -55,14 +55,13 @@ environment-level operations.
 - Production deployment before the selected hosted pre-production environment
   passes G7 and the user explicitly approves the exact production action.
 
-## Phase-0 restriction
+## Execution restriction
 
 - Product/backend plan changes live under `todo/`; Romanian curriculum plan
   changes live under `todo-curriculum-ro/`.
-- Until `PLAN-003` records G0, do not run `npm init`, install dependencies,
-  create implementation Docker files, initialize Supabase, create a hosted
-  project, open Chrome, or generate credentials. After G0, the sole active
-  task defines the permitted implementation scope.
+- The sole active task defines the permitted implementation scope. G0 has
+  passed; `ARC-TREE-002` may create only the first implementation-report
+  location and report, not application or infrastructure artifacts.
 - A hosted, production, billing-sensitive, destructive, or secret-dependent
   action still needs its own task-specific authority; broad implementation
   authorization does not authorize it.
