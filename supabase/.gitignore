@@ -1,0 +1,13 @@
+# Supabase CLI internal state
+.branches/
+.temp/
+
+# Local-only database backup artifacts
+backups/
+*.dump
+*.backup
+
+# dotenvx
+.env.keys
+.env.local
+.env.*.local

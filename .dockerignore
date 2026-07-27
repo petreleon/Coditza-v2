@@ -8,6 +8,7 @@
 .DS_Store
 .agents/
 .codex/
+.supabase/
 
 # The API image never owns Supabase, course plans, or implementation reports.
 supabase/

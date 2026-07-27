@@ -71,10 +71,12 @@ environment-level operations.
   review: ADR 0005 retains Vercel as the future public API boundary and leaves
   the private execution provider/launcher unselected. ARC-WASM-001 completed a
   local public-proof boundary under ADR 0006 without a controller or hosted
-  selection. SUP-LOCAL-001 is now the sole active local task; it may initialize
-  only the CLI-owned local Supabase stack and must not create/configure a hosted
-  resource, authenticate a CLI, enter a secret, select a provider/region/tier/
-  cost/owner, or change public API deployment behavior.
+  selection. SUP-LOCAL-001 completed the CLI-owned local stack initialization.
+  SUP-LOCAL-002 is now the sole active local task; it may establish and prove
+  only the local migration/reset/seed discipline through that stack, without
+  adding domain schema beyond workflow proof. It must not create/configure a
+  hosted resource, authenticate a CLI, enter a secret, select a provider/
+  region/tier/cost/owner, or change public API deployment behavior.
 - A hosted, production, billing-sensitive, destructive, or secret-dependent
   action still needs its own task-specific authority; broad implementation
   authorization does not authorize it.

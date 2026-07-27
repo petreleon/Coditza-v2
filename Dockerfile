@@ -28,7 +28,10 @@ ENV NODE_ENV=test
 HEALTHCHECK NONE
 
 COPY --chown=node:node tsconfig.base.json eslint.config.js .dependency-cruiser.cjs ./
+COPY --chown=node:node python-wasm-runtime.lock.json ./
 COPY --chown=node:node apps/api apps/api
+COPY --chown=node:node scripts/python-wasm scripts/python-wasm
+COPY --chown=node:node scripts/supabase scripts/supabase
 
 FROM dependencies AS development
 

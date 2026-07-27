@@ -1,0 +1,2 @@
+-- SUP-LOCAL-001 intentionally defines no schema or data seed content.
+-- SUP-LOCAL-002 owns deterministic seed data after migration discipline exists.

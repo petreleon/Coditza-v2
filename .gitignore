@@ -3,8 +3,14 @@
 .env.*
 !.env.example
 
-# Supabase CLI state
+# Supabase CLI local-only state and captures
+.supabase/
 supabase/.temp/
+supabase/.branches/
+supabase/backups/
+supabase/*.dump
+supabase/*.backup
+.env.supabase.local
 
 # Node.js build and test output
 node_modules/

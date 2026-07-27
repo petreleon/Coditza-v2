@@ -437,7 +437,8 @@ Execute in this order:
    the exact Pyodide/Python assets and proves a hardened Docker public-proof
    launcher. It does not select a hosted launcher or establish authoritative
    grading; no in-process fallback is accepted.
-3. [ ] SUP-LOCAL-001 — initialize the CLI-owned local stack.
+3. [x] SUP-LOCAL-001 — initialize the CLI-owned local stack; see the
+   [local completion report](../../docs/implementation/SUP-LOCAL-001.md).
 4. [ ] SUP-LOCAL-002 — migration/reset/seed discipline.
 5. [ ] SUP-SMTP-LOCAL-001 — configure the CLI-owned local Auth SMTP path with a
    user-provided Gmail App Password; do not alter root Compose or hosted SMTP.

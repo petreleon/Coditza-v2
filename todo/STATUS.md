@@ -5,8 +5,9 @@
   implementation on 2026-07-27; only task-scoped local work is currently
   authorized.
 - Current phase: 2 — Local Supabase and database security
-- Active implementation task: SUP-LOCAL-001 (next; local Supabase CLI setup)
-- Last verified implementation task: ARC-WASM-001 local Python/WASM public proof
+- Active implementation task: SUP-LOCAL-002 (next; local migration/reset
+  discipline)
+- Last verified implementation task: SUP-LOCAL-001 local Supabase CLI setup
 - Last updated: 2026-07-27
 
 ## Phase status
@@ -15,7 +16,7 @@
 | --- | --- | --- |
 | 0 — Plan acceptance | Complete; G0 and PLAN-004 passed | G0 |
 | 1 — Foundation and containers | Complete; QA-STRAT-001 and G1 passed | G1 |
-| 2 — Local Supabase and schema | SUP-LOCAL-001 next; ARC-WASM-001 local public proof complete | G2 |
+| 2 — Local Supabase and schema | SUP-LOCAL-001 complete; SUP-LOCAL-002 next | G2 |
 | 3 — Fastify identity/read slice | Not started | G3 |
 | 4 — Learning workflows | Not started | G4 |
 | 5 — Authoring/admin workflows | Not started | G5 |
@@ -106,6 +107,11 @@ to the deadlines in that file.
   Pyodide/image assets and a hardened Docker public-proof runner passed local
   adversarial checks. It creates neither a controller nor an authoritative
   private-test/finalization path, and it selects no hosted provider.
+- [SUP-LOCAL-001 report](../docs/implementation/SUP-LOCAL-001.md); a pinned
+  project-local Supabase CLI completed isolated local start, status, credential
+  capture, and stop checks. Its published services were loopback-only, captured
+  credentials remained ignored and mode-0600, and no hosted resource, schema,
+  Auth flow, SMTP setting, or root Compose value changed.
 - [G1 completion record](08-execution/00-roadmap.md#g1-completion-record);
   Foundation reproducibility is recorded from the accepted architecture/product
   contracts, current checks, Docker evidence, and scope review.

@@ -4,18 +4,22 @@
 
 Prerequisites: FOUND-001 workspace baseline; Docker runtime available.
 
-- [ ] Add a pinned, reviewed Supabase CLI dependency or an equally reproducible
+- [x] Add a pinned, reviewed Supabase CLI dependency or an equally reproducible
       project-local invocation.
-- [ ] Initialize `supabase/config.toml`.
-- [ ] Commit `config.toml`, migrations, seed configuration, and database tests.
-- [ ] Keep non-secret TOTP configuration explicit in `config.toml`; exact
-      settings and proof belong to SUP-MFA-001 rather than a SQL migration.
-- [ ] Ignore `.temp/`, branch state, local backups, and environment secrets.
-- [ ] Start the local Supabase stack through the CLI.
-- [ ] Record its non-secret URL/port mapping; obtain keys only into ignored local
+- [x] Initialize `supabase/config.toml`.
+- [x] Commit `config.toml` and the intentionally empty `seed.sql` path.
+      Schema migrations and database tests are deliberately deferred to
+      SUP-LOCAL-002.
+- [x] Keep the non-secret TOTP policy explicit in `config.toml`: the maximum
+      enrolled-factor count is two, while activation and flow proof remain owned
+      by SUP-MFA-001 rather than a SQL migration.
+- [x] Ignore `.temp/`, branch state, local backups, and environment secrets.
+- [x] Start the local Supabase stack through the CLI.
+- [x] Record its non-secret URL/port mapping; obtain keys only into ignored local
       environment storage.
-- [ ] Confirm local Studio opens in Chrome only when visual inspection is useful.
-- [ ] Confirm no local service is publicly exposed.
+- [x] Determine that visual Studio inspection was unnecessary; Chrome was not
+      opened.
+- [x] Confirm no local service is publicly exposed.
 
 ## SUP-LOCAL-002 — Establish migration discipline
 
