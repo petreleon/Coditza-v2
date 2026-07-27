@@ -39,8 +39,8 @@ Modes:
 | FOUND-001 | local | tree + architecture/Auth/Python contracts | [bootstrap](04-fastify/00-bootstrap-and-config.md) — API package/tool versions | [version ADR + install/typecheck/build](../docs/implementation/FOUND-001.md) | complete |
 | ARC-BOUND-001 | local | FOUND-001 + ARC-DESIGN-001 | [boundaries](02-architecture/00-system-boundaries.md) — import matrix/negative fixtures | [63 isolated negative fixtures, four positive controls, clean production scan, and report](../docs/implementation/ARC-BOUND-001.md) | complete |
 | FAST-CONFIG-001 | local | FOUND-001 | [bootstrap](04-fastify/00-bootstrap-and-config.md) — config module/tests | [valid/missing/secret-redaction tests and report](../docs/implementation/FAST-CONFIG-001.md) | complete |
-| ARC-ENV-001 | local | FAST-CONFIG-001 | [environment contract](02-architecture/02-environments-and-secrets.md) | one-parser inventory plus local/hosted/separation acceptance report | next |
-| FAST-BOOT-001 | local | typed config | [bootstrap](04-fastify/00-bootstrap-and-config.md) — app/server/tests | inject test + signal-safe startup/shutdown | not started |
+| ARC-ENV-001 | local | FAST-CONFIG-001 | [environment contract](02-architecture/02-environments-and-secrets.md) | [one-parser inventory plus local/hosted/separation acceptance report](../docs/implementation/ARC-ENV-001.md) | complete |
+| FAST-BOOT-001 | local | typed config | [bootstrap](04-fastify/00-bootstrap-and-config.md) — app/server/tests | inject test + signal-safe startup/shutdown | next |
 | ARC-BOUND-002 | local | FAST-BOOT-001 | [boundaries](02-architecture/00-system-boundaries.md) | single factory/listener proof | not started |
 | FAST-LIVE-001 | local | app factory | [health](04-fastify/05-openapi-health-and-readiness.md) | no-dependency 200 schema test | not started |
 | ARC-DOCKER-001 | local | liveness | [Compose](02-architecture/03-docker-compose.md) — Dockerfile/compose/.dockerignore | config + host liveness + shutdown | not started |

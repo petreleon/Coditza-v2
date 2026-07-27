@@ -180,8 +180,34 @@ function parseOptionalBoolean(
   );
 }
 
-function normalizeOrigin(url: URL): string {
-  return `${url.protocol.toLowerCase()}//${url.host.toLowerCase()}`;
+function explicitPortFromOriginInput(value: string): string | undefined {
+  const authority = value.match(/^[a-z][a-z\d+.-]*:\/\/([^/?#]+)/i)?.[1];
+
+  if (authority === undefined || authority.includes("@")) {
+    return undefined;
+  }
+
+  const portText = authority.startsWith("[")
+    ? authority.slice(authority.indexOf("]") + 1).replace(/^:/, "")
+    : authority.slice(authority.lastIndexOf(":") + 1);
+
+  if (
+    portText.length === 0 ||
+    !/^\d+$/.test(portText) ||
+    (authority.startsWith("[") && !authority.includes("]:")) ||
+    (!authority.startsWith("[") && !authority.includes(":"))
+  ) {
+    return undefined;
+  }
+
+  return String(Number(portText));
+}
+
+function normalizeOrigin(url: URL, explicitPort?: string): string {
+  const port = explicitPort ?? url.port;
+  const authority = `${url.hostname.toLowerCase()}${port.length > 0 ? `:${port}` : ""}`;
+
+  return `${url.protocol.toLowerCase()}//${authority}`;
 }
 
 function parseSupabaseEndpoint(
@@ -372,9 +398,13 @@ function parseCorsOrigins(
         continue;
       }
 
-      const normalized = normalizeOrigin(url);
+      const normalized = normalizeOrigin(
+        url,
+        explicitPortFromOriginInput(value),
+      );
+      const duplicateKey = url.origin.toLowerCase();
 
-      if (seenOrigins.has(normalized)) {
+      if (seenOrigins.has(duplicateKey)) {
         addIssue(
           issues,
           "CORS_ORIGINS",
@@ -383,7 +413,7 @@ function parseCorsOrigins(
         continue;
       }
 
-      seenOrigins.add(normalized);
+      seenOrigins.add(duplicateKey);
       origins.push(normalized);
     } catch {
       addIssue(issues, "CORS_ORIGINS", "must contain exact HTTP(S) origins");
@@ -393,15 +423,45 @@ function parseCorsOrigins(
   return origins;
 }
 
+function isIpv4Loopback(host: string): boolean {
+  const octets = host.split(".");
+
+  return (
+    octets.length === 4 &&
+    octets.every((octet) => /^\d{1,3}$/.test(octet)) &&
+    Number(octets[0]) === 127 &&
+    octets.every((octet) => Number(octet) <= 255)
+  );
+}
+
+function isIpv4MappedIpv6Loopback(host: string): boolean {
+  if (!host.startsWith("::ffff:")) {
+    return false;
+  }
+
+  const mapped = host.slice("::ffff:".length);
+
+  if (isIpv4Loopback(mapped)) {
+    return true;
+  }
+
+  const hexadecimalPair = mapped.match(/^([0-9a-f]{1,4}):([0-9a-f]{1,4})$/);
+  const highWord = hexadecimalPair?.[1];
+
+  return highWord !== undefined && Number.parseInt(highWord, 16) >> 8 === 127;
+}
+
 function isLocalhostOrLoopback(hostname: string): boolean {
-  const host = hostname.toLowerCase();
+  const host = hostname.toLowerCase().replace(/\.$/, "");
+  const ipv6 =
+    host.startsWith("[") && host.endsWith("]") ? host.slice(1, -1) : host;
 
   return (
     host === "localhost" ||
     host.endsWith(".localhost") ||
-    /^127(?:\.\d{1,3}){3}$/.test(host) ||
-    host === "[::1]" ||
-    host === "::1"
+    isIpv4Loopback(host) ||
+    ipv6 === "::1" ||
+    isIpv4MappedIpv6Loopback(ipv6)
   );
 }
 
@@ -441,6 +501,14 @@ function validateRelationships(
 
   for (const origin of config.cors.origins) {
     const url = new URL(origin);
+
+    if (appEnv !== "local" && url.protocol !== "https:") {
+      addIssue(
+        issues,
+        "CORS_ORIGINS",
+        "must contain HTTPS origins in a hosted environment",
+      );
+    }
 
     if (appEnv === "production" && isLocalhostOrLoopback(url.hostname)) {
       addIssue(

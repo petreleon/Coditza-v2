@@ -21,7 +21,7 @@ Never point local automated tests at development, staging, or production.
 | `PORT` | No | integer 1–65535; local default `3000` | listen port |
 | `API_PREFIX` | No | exactly `/api/v1` in MVP | route/OpenAPI base |
 | `LOG_LEVEL` | No | validated Pino level; default `info` | log threshold |
-| `CORS_ORIGINS` | No | comma-separated exact origins; empty only for an explicitly recorded API-only release mode | CORS allowlist |
+| `CORS_ORIGINS` | No | comma-separated exact origins; HTTPS in hosted modes; empty only for an explicitly recorded API-only release mode | CORS allowlist |
 | `TRUST_PROXY` | No | `false` or reviewed hop/address policy; default `false` | proxy trust |
 | `BODY_LIMIT_BYTES` | No | positive integer; default `1048576` | global body ceiling |
 | `RATE_LIMIT_MAX` | No | positive integer; default `100` | global requests/window |
@@ -128,19 +128,19 @@ FAST-CONFIG-001 owns the one API parser and its TypeBox schema. Per
 this task must reuse that parser rather than introduce another configuration
 contract. It is an acceptance/proof task, not a second implementation task.
 
-- [ ] Trace every API-owned variable in the table to the one `ConfigSchema`,
+- [x] Trace every API-owned variable in the table to the one `ConfigSchema`,
       raw parser, immutable output, and focused test. Record any gap as a
       FAST-CONFIG correction rather than adding a second source of truth.
-- [ ] Review the accepted local/hosted mode pairs, standard hosted
+- [x] Review the accepted local/hosted mode pairs, standard hosted
       project-ref/URL/issuer relation, HTTPS rule, strict CORS behavior, and
       safe defaults. Confirm that a hosted API-only release still has no
       release-record mechanism and therefore fails closed.
-- [ ] Prove `SUPABASE_URL` and `SUPABASE_JWT_ISSUER` remain separate inputs,
+- [x] Prove `SUPABASE_URL` and `SUPABASE_JWT_ISSUER` remain separate inputs,
       and that errors, logs, and test artifacts do not expose supplied values.
-- [ ] Prove the API exposes only the grader enabled/capacity projection and
+- [x] Prove the API exposes only the grader enabled/capacity projection and
       ignores controller-only manifest, launcher, queue-control, retry,
       sandbox-binding, and hosted-test variables.
-- [ ] Publish an ARC-ENV-001 acceptance report with a fresh clean-install and
+- [x] Publish an ARC-ENV-001 acceptance report with a fresh clean-install and
       verification record. Do not construct Fastify, a Supabase client, a
       Python controller, Docker, or hosted resources.
 
@@ -150,6 +150,8 @@ G-WASM gate belong to ARC-WASM-001/FAST-WASM-001. The protected remote-test
 guard, host/Compose proof, safe readiness logging, reviewed custom-domain
 mapping, and target distinctness belong to ARC-ENV-002 after its listed
 runtime prerequisites.
+
+Completion evidence: [ARC-ENV-001 report](../../docs/implementation/ARC-ENV-001.md).
 
 ### ARC-ENV-002 — Prove separation
 

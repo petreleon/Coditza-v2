@@ -5,8 +5,8 @@
   implementation on 2026-07-27; only task-scoped local work is currently
   authorized.
 - Current phase: 1 — Foundation and API container
-- Active implementation task: ARC-ENV-001 (next; not started)
-- Last verified implementation task: FAST-CONFIG-001
+- Active implementation task: FAST-BOOT-001 (next; not started)
+- Last verified implementation task: ARC-ENV-001
 - Last updated: 2026-07-27
 
 ## Phase status
@@ -14,7 +14,7 @@
 | Phase | Status | Gate |
 | --- | --- | --- |
 | 0 — Plan acceptance | Complete; G0 and PLAN-004 passed | G0 |
-| 1 — Foundation and containers | FAST-CONFIG-001 complete; ARC-ENV-001 next | G1 |
+| 1 — Foundation and containers | ARC-ENV-001 complete; FAST-BOOT-001 next | G1 |
 | 2 — Local Supabase and schema | Not started | G2 |
 | 3 — Fastify identity/read slice | Not started | G3 |
 | 4 — Learning workflows | Not started | G4 |
@@ -25,10 +25,10 @@
 
 ## Blockers
 
-- No active Phase-1 blocker. ARC-ENV-001 may accept the one API configuration
-  parser through local inventory and separation evidence. It must not add a
-  second parser, construct Fastify, routes, a listener, a Supabase client,
-  Docker artifact, Python runtime/controller, credentials, or hosted state.
+- No active Phase-1 blocker. FAST-BOOT-001 may introduce only the canonical
+  Fastify app/server split with injected configuration and dependencies. It
+  must not add routes/plugins, a Supabase client, Docker artifact, Python
+  runtime/controller, credentials, or hosted state.
 - Exact Vercel team/project/region/tier/owner, client origins/email mode,
   source/CI/registry, optional staging, and any supplemental private grader
   host remain deferred to their named decision deadlines and approvals.
@@ -66,6 +66,10 @@ to the deadlines in that file.
   injected, immutable TypeBox API configuration parser validates all API-owned
   settings with safe error redaction, 136 focused tests, and no Fastify,
   Supabase-client, network, or hosted behavior.
+- [ARC-ENV-001 report](../docs/implementation/ARC-ENV-001.md); all 33
+  API-owned values are traced to one parser/schema/output/test contract, with
+  hardened hosted CORS/loopback behavior, controller-only exclusion, 147 tests,
+  and no external state.
 
 ## Update rule
 

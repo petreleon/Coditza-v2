@@ -29,8 +29,11 @@ FOUND-001 established the checksum-verified Node 24.18.0/npm 11.16.0 strict
 ESM Fastify/TypeScript workspace with only type-level seams. ARC-BOUND-001 now
 enforces the accepted import graph with exact BND-001 through BND-010 rules,
 63 isolated negative fixtures, four positive controls, and a clean complete
-API source scan. FAST-CONFIG-001 is next to replace the type-only configuration
-seam before Fastify construction or real application modules/adapters exist.
+API source scan. FAST-CONFIG-001 replaced the type-only configuration seam
+with an injected, immutable, TypeBox-validated API parser and focused tests.
+ARC-ENV-001 accepted its ownership, separation, and environment-safety
+evidence. FAST-BOOT-001 is next to introduce only the canonical injected
+Fastify app/server split before real application modules/adapters exist.
 Planning files plus the separately requested root `.env`, `.env.example`,
 `.gitignore`, and `.dockerignore` safety files may exist. The existing
 hosted-project environment values do not authorize a schema or deployment action;

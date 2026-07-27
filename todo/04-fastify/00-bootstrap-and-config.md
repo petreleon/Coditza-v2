@@ -98,8 +98,8 @@ Rules:
   `ConfigSchema` and `Value.Check`/`Value.Errors`;
 - production rejects wildcard CORS and localhost origins;
 - every CORS entry is an absolute `http`/`https` origin with no credentials,
-  path, query, or fragment; normalize scheme/host casing, preserve explicit
-  port, and reject duplicates;
+  path, query, or fragment; hosted entries must use `https`; normalize
+  scheme/host casing, preserve explicit port, and reject duplicates;
 - tests pass config explicitly rather than repeatedly mutating global env;
 - validation errors name fields but never echo secret values;
 - the exported configuration object is immutable;

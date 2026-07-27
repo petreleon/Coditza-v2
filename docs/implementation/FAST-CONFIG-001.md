@@ -95,9 +95,9 @@ or changed.
 
 ## Risks/blockers
 
-- ARC-ENV-001 must add deployment-target evidence, protected hosted-test
-  separation, and approved custom-domain mapping proof while reusing this one
-  schema; it must not create a second API configuration source of truth.
+- ARC-ENV-001 accepts the one-parser ownership/separation evidence. ARC-ENV-002
+  later owns protected hosted-test separation, remote-target guards,
+  target-distinctness evidence, and approved custom-domain/host-Compose proof.
 - A reviewed proxy topology, a recorded API-only hosted release mechanism, and
   G-WASM/private-controller evidence are required before their currently
   fail-closed settings can be enabled.

@@ -136,6 +136,7 @@ describe("parseApiConfig", () => {
       PYTHON_GRADER_LEASE_MS: "not-an-api-value",
       PYTHON_GRADER_MAX_RETRIES: "not-an-api-value",
       ALLOW_HOSTED_TEST_TARGET: "controller-only-target",
+      PYTHON_SANDBOX_BINDING: "controller-only-binding",
     });
     const before = { ...raw };
 
@@ -187,6 +188,10 @@ describe("parseApiConfig", () => {
     expectField(environment({ [variable]: undefined }), variable);
   });
 
+  it("rejects an invalid host independently of other validation failures", () => {
+    expectField(environment({ HOST: " " }), "HOST");
+  });
+
   it.each([
     ["test", "local"],
     ["development", "local"],
@@ -235,6 +240,14 @@ describe("parseApiConfig", () => {
   it("requires an explicit port in hosted modes while preserving the local default", () => {
     expect(parseApiConfig(validLocalEnvironment).server.port).toBe(3000);
     expectField(hostedEnvironment("production", { PORT: undefined }), "PORT");
+  });
+
+  it("defaults Swagger UI to false in hosted modes", () => {
+    expect(
+      parseApiConfig(
+        hostedEnvironment("production", { SWAGGER_UI_ENABLED: undefined }),
+      ).server.swaggerUiEnabled,
+    ).toBe(false);
   });
 
   it("keeps local Supabase endpoint and issuer inputs separate", () => {
@@ -332,6 +345,7 @@ describe("parseApiConfig", () => {
     ["SUPABASE_SECRET_KEY", "service-role-legacy-key"],
     ["SUPABASE_JWT_AUDIENCE", "anon"],
     ["CURSOR_HMAC_SECRET", "A".repeat(42)],
+    ["CURSOR_HMAC_SECRET", `${"A".repeat(42)}B`],
   ] as const)(
     "rejects an invalid Supabase credential or JWT setting: %s",
     (variable, value) => {
@@ -491,6 +505,32 @@ describe("parseApiConfig", () => {
     );
   });
 
+  it.each(["development", "staging", "production"] as const)(
+    "requires HTTPS CORS origins in hosted %s mode",
+    (appEnv) => {
+      expectField(
+        hostedEnvironment(appEnv, {
+          CORS_ORIGINS: "http://app.coditza.example",
+        }),
+        "CORS_ORIGINS",
+      );
+    },
+  );
+
+  it("preserves an explicitly supplied default CORS port while detecting its semantic duplicate", () => {
+    expect(
+      parseApiConfig(
+        environment({ CORS_ORIGINS: "HTTPS://APP.Local.Test:443" }),
+      ).cors.origins,
+    ).toEqual(["https://app.local.test:443"]);
+    expectField(
+      environment({
+        CORS_ORIGINS: "HTTPS://duplicate.example:443,https://duplicate.example",
+      }),
+      "CORS_ORIGINS",
+    );
+  });
+
   it.each([
     "*",
     "https://*.coditza.example",
@@ -501,15 +541,18 @@ describe("parseApiConfig", () => {
     "ftp://coditza.example",
     "not an absolute URL",
     "https://first.example,,https://second.example",
-    "HTTPS://duplicate.example:443,https://duplicate.example",
   ])("rejects unsafe or duplicate CORS input: %s", (corsOrigins) => {
     expectField(environment({ CORS_ORIGINS: corsOrigins }), "CORS_ORIGINS");
   });
 
   it.each([
     "http://localhost:5173",
+    "https://localhost.:5173",
+    "https://app.localhost.:8443",
     "https://127.0.0.1:8443",
     "http://[::1]:5173",
+    "https://[::ffff:127.0.0.1]:5173",
+    "https://[::ffff:7f00:1]:5173",
   ])("rejects a production loopback CORS origin: %s", (corsOrigins) => {
     expectField(
       hostedEnvironment("production", { CORS_ORIGINS: corsOrigins }),
@@ -524,6 +567,8 @@ describe("parseApiConfig", () => {
     const consoleError = vi.spyOn(console, "error");
     const consoleWarn = vi.spyOn(console, "warn");
     const consoleInfo = vi.spyOn(console, "info");
+    const consoleLog = vi.spyOn(console, "log");
+    const consoleDebug = vi.spyOn(console, "debug");
 
     try {
       const error = configurationError(
@@ -549,10 +594,39 @@ describe("parseApiConfig", () => {
       expect(consoleError).not.toHaveBeenCalled();
       expect(consoleWarn).not.toHaveBeenCalled();
       expect(consoleInfo).not.toHaveBeenCalled();
+      expect(consoleLog).not.toHaveBeenCalled();
+      expect(consoleDebug).not.toHaveBeenCalled();
     } finally {
       consoleError.mockRestore();
       consoleWarn.mockRestore();
       consoleInfo.mockRestore();
+      consoleLog.mockRestore();
+      consoleDebug.mockRestore();
+    }
+  });
+
+  it("does not disclose valid sensitive values when another field is invalid", () => {
+    const publishableCanary = "sb_publishable_VALID_PUBLISHABLE_CANARY";
+    const secretCanary = "sb_secret_VALID_SECRET_CANARY";
+    const cursorCanary = HMAC_32_BYTES;
+    const error = configurationError(
+      environment({
+        HOST: " ",
+        SUPABASE_PUBLISHABLE_KEY: publishableCanary,
+        SUPABASE_SECRET_KEY: secretCanary,
+        CURSOR_HMAC_SECRET: cursorCanary,
+      }),
+    );
+    const rendered = [
+      String(error),
+      error.message,
+      error.stack ?? "",
+      JSON.stringify(error),
+      inspect(error),
+    ].join("\n");
+
+    for (const canary of [publishableCanary, secretCanary, cursorCanary]) {
+      expect(rendered).not.toContain(canary);
     }
   });
 });

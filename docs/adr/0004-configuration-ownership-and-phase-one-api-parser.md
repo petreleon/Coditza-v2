@@ -55,17 +55,22 @@ They are introduced only with the private controller composition root and its
 WASM security evidence.
 
 FAST-CONFIG-001 validates safe local-versus-hosted syntax and the standard
-hosted Supabase URL/project-reference/issuer relationship. ARC-ENV-001 does
-not add a second schema; it reuses this API parser while adding deployment
-target evidence, protected hosted-test controls, custom-domain mapping proof,
-and separation tests. ARC-ENV-002 proves those controls in host and Compose
-paths.
+hosted Supabase URL/project-reference/issuer relationship. ARC-ENV-001 is a
+local acceptance task: it inventories and proves this one parser's ownership,
+redaction, and controller separation without adding a second schema.
+ARC-ENV-002, after its runtime prerequisites, owns the protected hosted-test
+control, remote-target guard, custom-domain mapping proof, target-distinctness
+evidence, and host/Compose separation tests.
 
 There is no configuration field or tracked deployment artifact that can prove
 an API-only hosted release today. Therefore an empty CORS list is accepted
 only for the documented local/test API-only mode and is rejected in hosted
 environments until a later deployment task supplies an auditable release
-record. It is never rewritten to `*`.
+record. Hosted allowlist origins must use HTTPS. The parser normalizes scheme
+and host casing while preserving every explicitly supplied port (including a
+default port); duplicate detection remains semantic, so an explicit default
+port and its omitted equivalent cannot appear together. The list is never
+rewritten to `*`.
 
 `TRUST_PROXY` has no reviewed hop/address-policy grammar yet. The parser
 accepts only the explicit safe value `false`; a later task must add a narrow,

@@ -2,11 +2,11 @@
 
 The next implementation task is:
 
-**ARC-ENV-001 — Accept API configuration and environment separation.**
+**FAST-BOOT-001 — App/server split.**
 
-Prerequisites already verified: G0, PLAN-004, FOUND-001, ARC-BOUND-001, and
-FAST-CONFIG-001 are complete. This is the sole task allowed to change
-implementation files now.
+Prerequisites already verified: G0, PLAN-004, FOUND-001, ARC-BOUND-001,
+FAST-CONFIG-001, and ARC-ENV-001 are complete. This is the sole task allowed
+to change implementation files now.
 
 Read first:
 
@@ -28,35 +28,38 @@ Read first:
 16. `../docs/adr/0001-modular-monolith-and-ports-adapters.md`
 17. `../docs/adr/0003-node-fastify-toolchain-baseline.md`
 18. `../docs/adr/0004-configuration-ownership-and-phase-one-api-parser.md`
-19. `../docs/implementation/FAST-CONFIG-001.md`
-20. `../docs/implementation/architecture-boundary-contract.md`
+19. `../docs/implementation/ARC-BOUND-001.md`
+20. `../docs/implementation/FAST-CONFIG-001.md`
+21. `../docs/implementation/ARC-ENV-001.md`
+22. `../docs/implementation/architecture-boundary-contract.md`
 
-Perform a local acceptance and separation audit of the existing API parser;
-do not create a second configuration implementation.
+Implement only a minimal canonical Fastify factory/server split using the
+existing injected `ApiConfig` contract. Do not add endpoint behavior.
 
 ## Required work
 
-- Build a traceable inventory from every API-owned environment variable in the
-  environment table to the existing `ConfigSchema`, parsing rule, immutable
-  output field, and focused test. If a real gap is found, make the smallest
-  correction in the existing configuration module and add a focused test; do
-  not introduce another schema or a parallel `process.env` reader.
-- Recheck and document the exact accepted mode pairs, local-versus-hosted
-  Supabase syntax/mapping rules, empty-CORS fail-closed behavior for hosted
-  releases, proxy/SWAGGER/Python-grader gates, and the effective timeout
-  relation. Verify that `SUPABASE_URL` and `SUPABASE_JWT_ISSUER` are separate
-  values rather than derived aliases.
-- Prove controller-only values are not parsed or exposed by the API:
-  runtime manifest, launcher profile, claim/poll/lease/retry settings,
-  sandbox binding, and `ALLOW_HOSTED_TEST_TARGET`. Keep all of them out of the
-  API test fixture except as inert injected unknown keys.
-- Prove errors and any test/report artifacts name fields/reasons only and do
-  not include supplied key, cursor, or other environment values. Do not read,
-  print, edit, or stage `.env` or another real local environment file.
-- Create `docs/implementation/ARC-ENV-001.md` with the inventory, scope,
-  decisions, checks, and explicit deferred controls. Then update the task
-  registry, status, roadmap, and this file only after all required local
-  verification passes.
+- Define exactly one `buildApp({ config, dependencies }: BuildAppOptions)` app
+  factory. Both properties are required; it creates and returns a Fastify
+  instance but never calls `listen`.
+- Define the minimum typed dependency/composition contract needed for this
+  foundation. The production `server.ts` is the only network entry point and
+  constructs configuration/dependencies explicitly; tests pass explicit fakes.
+  Do not make a service locator, repository bag, raw-client decoration, or
+  mutable request-global state.
+- Keep `bootstrap/composition-root.ts` as the sole future production wiring
+  point. At this foundation stage it may return a typed empty/no-op composition
+  boundary only; it must not construct a Supabase client, business module,
+  controller, or external dependency.
+- Make the server wait for `app.ready()` before listen, fail startup without
+  exposing configuration, and handle `SIGTERM`/`SIGINT` by closing Fastify
+  exactly once within the injected shutdown timeout. Keep `process.exit()` out
+  of services/routes/plugins.
+- Add focused tests using `buildApp` and `fastify.inject`; use fake injected
+  dependencies and never mutate `process.env`. Test no listener from the app
+  factory, ready-before-listen ordering, startup error safety, and idempotent
+  signal shutdown without opening a real network port where a fake is enough.
+- Create `docs/implementation/FAST-BOOT-001.md`, then synchronize the tracker
+  only after all acceptance evidence passes.
 
 ## Required verification
 
@@ -64,12 +67,10 @@ do not create a second configuration implementation.
   `npm run format:check`, `npm run lint`, `npm run typecheck`, `npm test`, and
   `npm run build`.
 - Run `git diff --check`, the full dependency-boundary verifier, and a scoped
-  secret-safety review of only intended tracked files.
-- Record the results in the report. Move ARC-ENV-001 to `complete` and make
-  FAST-BOOT-001 the sole `next` task only if all acceptance evidence passes.
+  secret/scope review of intended tracked files.
 
-Do not add Fastify construction/plugins/routes/listening, a composition root,
-Supabase client/adapter, Docker/Compose, a Python runtime/controller, real
-business module, credential, Chrome action, SMTP configuration, Vercel
-resource, hosted state, or a frontend. Do not create or alter a production,
-staging, or development platform configuration.
+Do not add routes, Fastify plugins, health behavior, Supabase client/adapters,
+Docker/Compose, Python/WASM runtime/controller, real business module,
+credential, Chrome action, SMTP configuration, Vercel resource, hosted state,
+or a frontend. Do not create or alter a production, staging, or development
+platform configuration.
