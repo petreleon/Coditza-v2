@@ -376,7 +376,7 @@ Execute in this order:
 8. [x] FAST-CONFIG-001 — typed fail-fast configuration.
 9. [x] ARC-ENV-001 — configuration/environment acceptance.
 10. [x] FAST-BOOT-001 — canonical app/server/composition-root split.
-11. [ ] ARC-BOUND-002 — app/listener boundary acceptance.
+11. [x] ARC-BOUND-002 — app/listener boundary acceptance.
 12. [ ] FAST-LIVE-001 — dependency-free liveness route.
 13. [ ] ARC-DOCKER-001 — local Compose API service.
 14. [ ] ARC-DOCKER-002 — disposable container check path.

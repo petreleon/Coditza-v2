@@ -66,11 +66,14 @@ Completion evidence: [ARC-BOUND-001 report](../../docs/implementation/ARC-BOUND-
 
 ### ARC-BOUND-002 — Separate app construction from listening
 
-- [ ] `buildApp({ config, dependencies }: BuildAppOptions)` is the single app
+- [x] `buildApp({ config, dependencies }: BuildAppOptions)` is the single app
       factory signature and creates/returns a Fastify instance.
-- [ ] `server.ts` is the only file that listens on a network port.
-- [ ] Tests use `buildApp` and `fastify.inject`.
-- [ ] Shutdown closes Fastify and dependency resources exactly once.
+- [x] `server.ts` is the only file that listens on a network port.
+- [x] Tests use `buildApp` and `fastify.inject`.
+- [x] Shutdown closes Fastify exactly once; the accepted no-op composition has
+      no resource to close yet.
+
+Completion evidence: [ARC-BOUND-002 report](../../docs/implementation/ARC-BOUND-002.md).
 
 ### ARC-BOUND-003 — Fail closed
 

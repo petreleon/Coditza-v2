@@ -60,12 +60,11 @@ environment-level operations.
 - Product/backend plan changes live under `todo/`; Romanian curriculum plan
   changes live under `todo-curriculum-ro/`.
 - The sole active task defines the permitted implementation scope. G0 and
-  PLAN-004 have passed; ARC-BOUND-002 may accept the one Fastify app-factory/
-  one server-listener boundary through local source and focused-test evidence.
-  It may make only the smallest correction to a proven boundary defect. It
-  must not add routes or plugins, create a Supabase client or adapter, add
-  Docker/Compose artifacts, create a Python runtime/controller, use
-  credentials, or change external state.
+  PLAN-004 have passed; FAST-LIVE-001 may add only the dependency-free
+  `GET /health/live` foundation route, its schema, focused inject test, local
+  report, and synchronized task evidence. It must not add a Fastify plugin,
+  Auth, a Supabase client or adapter, readiness behavior, Docker/Compose
+  artifacts, a Python runtime/controller, credentials, or external state.
 - A hosted, production, billing-sensitive, destructive, or secret-dependent
   action still needs its own task-specific authority; broad implementation
   authorization does not authorize it.

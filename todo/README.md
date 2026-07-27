@@ -34,8 +34,9 @@ with an injected, immutable, TypeBox-validated API parser and focused tests.
 ARC-ENV-001 accepted its ownership, separation, and environment-safety
 evidence. FAST-BOOT-001 introduced the canonical injected Fastify app/server
 split with a listener-free factory and bounded server lifecycle. ARC-BOUND-002
-is next to accept that one-factory/one-listener boundary before real
-application modules/adapters exist.
+accepted the one-factory/one-listener boundary with an AST-backed regression
+guard. FAST-LIVE-001 is next to add only the dependency-free foundation
+liveness route before Docker/Compose or real application modules/adapters.
 Planning files plus the separately requested root `.env`, `.env.example`,
 `.gitignore`, and `.dockerignore` safety files may exist. The existing
 hosted-project environment values do not authorize a schema or deployment action;
