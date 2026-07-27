@@ -2,7 +2,33 @@
   "name": "coditza",
   "private": true,
   "type": "module",
+  "packageManager": "npm@11.16.0",
+  "engines": {
+    "node": ">=24.18.0 <25",
+    "npm": ">=11.16.0 <12"
+  },
   "workspaces": [
     "apps/*"
-  ]
+  ],
+  "scripts": {
+    "format": "prettier --write package.json tsconfig.base.json eslint.config.js apps/api/package.json apps/api/tsconfig.json apps/api/src apps/api/test",
+    "format:check": "prettier --check package.json tsconfig.base.json eslint.config.js apps/api/package.json apps/api/tsconfig.json apps/api/src apps/api/test",
+    "lint": "eslint apps/api/src",
+    "typecheck": "npm run typecheck --workspace=@coditza/api",
+    "build": "npm run build --workspace=@coditza/api",
+    "dev": "npm run dev --workspace=@coditza/api",
+    "start": "npm run start --workspace=@coditza/api",
+    "test": "vitest run --passWithNoTests"
+  },
+  "devDependencies": {
+    "@eslint/js": "10.0.1",
+    "@types/node": "24.13.3",
+    "@vitest/coverage-v8": "4.1.10",
+    "eslint": "10.8.0",
+    "prettier": "3.9.6",
+    "tsx": "4.23.1",
+    "typescript": "6.0.3",
+    "typescript-eslint": "8.65.0",
+    "vitest": "4.1.10"
+  }
 }

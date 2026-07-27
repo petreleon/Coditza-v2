@@ -5,8 +5,8 @@
   implementation on 2026-07-27; only task-scoped local work is currently
   authorized.
 - Current phase: 1 — Foundation and API container
-- Active implementation task: FOUND-001 (next; not started)
-- Last verified implementation task: PRD-WASM-001
+- Active implementation task: ARC-BOUND-001 (next; not started)
+- Last verified implementation task: FOUND-001
 - Last updated: 2026-07-27
 
 ## Phase status
@@ -14,7 +14,7 @@
 | Phase | Status | Gate |
 | --- | --- | --- |
 | 0 — Plan acceptance | Complete; G0 and PLAN-004 passed | G0 |
-| 1 — Foundation and containers | PRD-WASM-001 complete; FOUND-001 next | G1 |
+| 1 — Foundation and containers | FOUND-001 complete; ARC-BOUND-001 next | G1 |
 | 2 — Local Supabase and schema | Not started | G2 |
 | 3 — Fastify identity/read slice | Not started | G3 |
 | 4 — Learning workflows | Not started | G4 |
@@ -25,10 +25,10 @@
 
 ## Blockers
 
-- No active Phase-1 blocker. FOUND-001 may select current compatible
-  API/tooling versions and create the minimal strict TypeScript/Fastify
-  workspace; it must not initialize Supabase, create Docker artifacts, choose a
-  Python runtime/outer sandbox, or change hosted state.
+- No active Phase-1 blocker. ARC-BOUND-001 may add only import-boundary
+  enforcement plus positive/negative fixture evidence; it must not add runtime
+  application behavior, configuration parsing, Supabase, Docker artifacts,
+  Python runtime/outer-sandbox work, credentials, or hosted state.
 - Exact Vercel team/project/region/tier/owner, client origins/email mode,
   source/CI/registry, optional staging, and any supplemental private grader
   host remain deferred to their named decision deadlines and approvals.
@@ -54,6 +54,10 @@ to the deadlines in that file.
   Python source-package/verdict vectors, authoritative grading semantics, and
   Auth/TOTP exclusion contract exist without a runtime, launcher, or external
   configuration.
+- [FOUND-001 report](../docs/implementation/FOUND-001.md); the checksum-verified
+  Node 24.18.0/npm 11.16.0 private Fastify/TypeScript workspace, exact lockfile,
+  strict ESM seams, and clean-install/typecheck/test/build evidence exist
+  without application behavior or external state.
 
 ## Update rule
 

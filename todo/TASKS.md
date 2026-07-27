@@ -36,8 +36,8 @@ Modes:
 | ARC-DESIGN-001 | local | ARC-TREE-001 + G0 | [modular architecture](02-architecture/06-modular-hexagonal-architecture.md) — ADR/ownership/dependency contracts | accepted ownership + composition/RPC maps | complete |
 | PRD-AUTH-001 | review | ARC-DESIGN-001 | [mandatory MFA](01-product/04-authentication-and-mfa.md) — provider-neutral Auth contract only | ADR + operations/state/error/conditional assurance, no SDK/UI claim | complete |
 | PRD-WASM-001 | local | ARC-DESIGN-001 + G0 | [Python exercises](01-product/05-python-code-exercises.md) — package/verdict/determinism contract | [canonical package/verdict vectors + server-authority/Auth-exclusion proof](../docs/implementation/PRD-WASM-001.md) | complete |
-| FOUND-001 | local | tree + architecture/Auth/Python contracts | [bootstrap](04-fastify/00-bootstrap-and-config.md) — API package/tool versions | version ADR + install/typecheck/build | next |
-| ARC-BOUND-001 | local | FOUND-001 + ARC-DESIGN-001 | [boundaries](02-architecture/00-system-boundaries.md) — import matrix/negative fixtures | every forbidden edge demonstrably fails | not started |
+| FOUND-001 | local | tree + architecture/Auth/Python contracts | [bootstrap](04-fastify/00-bootstrap-and-config.md) — API package/tool versions | [version ADR + install/typecheck/build](../docs/implementation/FOUND-001.md) | complete |
+| ARC-BOUND-001 | local | FOUND-001 + ARC-DESIGN-001 | [boundaries](02-architecture/00-system-boundaries.md) — import matrix/negative fixtures | every forbidden edge demonstrably fails | next |
 | FAST-CONFIG-001 | local | FOUND-001 | [bootstrap](04-fastify/00-bootstrap-and-config.md) — config module/tests | valid/missing/secret-redaction tests | not started |
 | ARC-ENV-001 | local | FAST-CONFIG-001 | [environment contract](02-architecture/02-environments-and-secrets.md) | every variable parsed/typed/frozen | not started |
 | FAST-BOOT-001 | local | typed config | [bootstrap](04-fastify/00-bootstrap-and-config.md) — app/server/tests | inject test + signal-safe startup/shutdown | not started |

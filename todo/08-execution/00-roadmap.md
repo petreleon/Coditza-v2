@@ -370,7 +370,7 @@ Execute in this order:
    client contract without claiming a UI.
 5. [x] PRD-WASM-001 — freeze `python_code` package, authoritative grading,
    deterministic verdict, and Auth/TOTP exclusion rules.
-6. [ ] FOUND-001 — pinned API runtime/tooling baseline.
+6. [x] FOUND-001 — pinned API runtime/tooling baseline.
 7. [ ] ARC-BOUND-001 — enforce the dependency graph with failing negative
    fixtures before any external adapter exists.
 8. [ ] FAST-CONFIG-001 — typed fail-fast configuration.

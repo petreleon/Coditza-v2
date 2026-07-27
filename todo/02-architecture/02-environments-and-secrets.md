@@ -127,7 +127,7 @@ development uses `development,local`; every hosted container uses
 - [ ] Parse integers, strict booleans, and comma lists with small explicit
       parsers; never coerce `"false"` with JavaScript truthiness.
 - [ ] Validate the parsed object with a TypeBox `ConfigSchema` using the
-      compatible `@sinclair/typebox/value` `Value.Check`/`Value.Errors` API
+      compatible `typebox/value` `Value.Check`/`Value.Errors` API
       verified at implementation time; do not add a second schema library.
 - [ ] Parse and validate configuration before constructing Fastify.
 - [ ] Reject missing keys, invalid URLs/ports, HTTP hosted Supabase URLs/issuers,

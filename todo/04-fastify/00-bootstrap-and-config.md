@@ -17,18 +17,21 @@ Planned files:
 
 Tasks:
 
-- [ ] Recheck current Fastify LTS and official-plugin compatibility.
-- [ ] Choose the compatible active Node LTS and record exact Node, npm, Fastify,
+- [x] Recheck current Fastify LTS and official-plugin compatibility.
+- [x] Choose the compatible active Node LTS and record exact Node, npm, Fastify,
       TypeScript, and plugin versions in an ADR.
-- [ ] Create a private npm workspace with strict TypeScript and ESM.
-- [ ] Create the composition-root seam and module-boundary test locations
+- [x] Create a private npm workspace with strict TypeScript and ESM.
+- [x] Create the composition-root seam and module-boundary test locations
       without empty business-module placeholders.
-- [ ] Set `"type":"module"`, NodeNext module/resolution, `src` -> `dist`, and
+- [x] Set `"type":"module"`, NodeNext module/resolution, `src` -> `dist`, and
       `.js` relative import suffixes exactly as specified by ARC-TREE-001.
-- [ ] Install only the dependencies required by the active foundation task.
-- [ ] Commit a reproducible lockfile; do not use floating versions in CI/images.
-- [ ] Add format, lint, typecheck, build, dev, start, and test scripts.
-- [ ] Prove clean install, typecheck, empty test command, and build.
+- [x] Install only the dependencies required by the active foundation task.
+- [x] Commit a reproducible lockfile; do not use floating versions in CI/images.
+- [x] Add format, lint, typecheck, build, dev, start, and test scripts.
+- [x] Prove clean install, typecheck, empty test command, and build.
+
+Completion evidence: [FOUND-001 report](../../docs/implementation/FOUND-001.md)
+and [ADR 0003](../../docs/adr/0003-node-fastify-toolchain-baseline.md).
 
 Do not initialize Supabase, add domain routes, or create Docker/Compose artifacts
 in FOUND-001; ARC-DOCKER-001/002/003 own those files.

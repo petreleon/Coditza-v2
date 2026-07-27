@@ -1,0 +1,25 @@
+{
+  "name": "@coditza/api",
+  "private": true,
+  "type": "module",
+  "main": "./dist/server.js",
+  "types": "./dist/server.d.ts",
+  "files": [
+    "dist"
+  ],
+  "engines": {
+    "node": ">=24.18.0 <25",
+    "npm": ">=11.16.0 <12"
+  },
+  "scripts": {
+    "dev": "tsx watch src/server.ts",
+    "start": "node dist/server.js",
+    "typecheck": "tsc --project tsconfig.json --noEmit",
+    "build": "tsc --project tsconfig.json"
+  },
+  "dependencies": {
+    "@fastify/type-provider-typebox": "6.1.0",
+    "fastify": "5.10.0",
+    "typebox": "1.0.13"
+  }
+}

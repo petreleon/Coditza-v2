@@ -60,11 +60,11 @@ environment-level operations.
 - Product/backend plan changes live under `todo/`; Romanian curriculum plan
   changes live under `todo-curriculum-ro/`.
 - The sole active task defines the permitted implementation scope. G0 and
-  PLAN-004 have passed; FOUND-001 may select documented compatible API/tooling
-  versions and add only the minimal private strict TypeScript/Fastify workspace
-  and its version evidence. It must not initialize Supabase, add Docker/Compose
-  artifacts, select a Python runtime/launcher, use credentials, or change
-  external state.
+  PLAN-004 have passed; ARC-BOUND-001 may add only dependency-graph enforcement
+  and isolated positive/negative import fixtures before real business modules
+  or adapters exist. It must not add application behavior, configuration
+  parsing, Supabase, Docker/Compose artifacts, a Python runtime/launcher, use
+  credentials, or change external state.
 - A hosted, production, billing-sensitive, destructive, or secret-dependent
   action still needs its own task-specific authority; broad implementation
   authorization does not authorize it.
