@@ -6,8 +6,9 @@ dependencies; a task also requires its prior phase gate and its exact row in
 
 | Task/group | Hard prerequisites | Unlocks |
 | --- | --- | --- |
-| PLAN-001/002/003 | this plan, user direction | local implementation |
-| ARC-TREE-001/002 | G0 | FOUND-001 and evidence locations |
+| PLAN-001/002/003 | this plan, user direction | G0 |
+| PLAN-004 | G0 + explicit user Vercel/Gmail-SMTP direction | an executable local/hosted operational path |
+| ARC-TREE-001/002 | G0 + PLAN-004 | FOUND-001 and evidence locations |
 | ARC-DESIGN-001 + PRD-AUTH-001 + PRD-WASM-001 | tree + G0 | module design + provider-neutral Auth and Python-verifier product contracts |
 | FOUND-001 | tree + architecture/Auth/Python contracts | config, boundary tests, app, containers |
 | ARC-BOUND-001 | FOUND-001 + architecture matrix | all production module/adapters |

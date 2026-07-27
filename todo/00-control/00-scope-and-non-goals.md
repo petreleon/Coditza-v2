@@ -59,9 +59,9 @@ environment-level operations.
 
 - Product/backend plan changes live under `todo/`; Romanian curriculum plan
   changes live under `todo-curriculum-ro/`.
-- The sole active task defines the permitted implementation scope. G0 has
-  passed; `ARC-TREE-002` may create only the first implementation-report
-  location and report, not application or infrastructure artifacts.
+- The sole active task defines the permitted implementation scope. Although G0
+  has passed, PLAN-004 must reconcile the user-required Vercel and Gmail SMTP
+  paths before any local implementation artifact is created.
 - A hosted, production, billing-sensitive, destructive, or secret-dependent
   action still needs its own task-specific authority; broad implementation
   authorization does not authorize it.

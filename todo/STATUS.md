@@ -4,8 +4,8 @@
 - Implementation authorization: **GRANTED** — user explicitly requested
   implementation on 2026-07-27; only task-scoped local work is currently
   authorized.
-- Current phase: 1 — Foundation and API container
-- Active implementation task: ARC-TREE-002 (next; not started)
+- Current phase: 0.5 — Operational-directive reconciliation
+- Active implementation task: PLAN-004 (review; next)
 - Last verified implementation task: PLAN-003 (G0 review)
 - Last updated: 2026-07-27
 
@@ -13,8 +13,8 @@
 
 | Phase | Status | Gate |
 | --- | --- | --- |
-| 0 — Plan acceptance | Complete; G0 passed | G0 |
-| 1 — Foundation and containers | ARC-TREE-002 next | G1 |
+| 0 — Plan acceptance | G0 passed; PLAN-004 reconciliation next | G0 |
+| 1 — Foundation and containers | Blocked until PLAN-004 | G1 |
 | 2 — Local Supabase and schema | Not started | G2 |
 | 3 — Fastify identity/read slice | Not started | G3 |
 | 4 — Learning workflows | Not started | G4 |
@@ -25,8 +25,9 @@
 
 ## Blockers
 
-- No active Phase-1 blocker. `ARC-TREE-002` is limited to creating the first
-  implementation-report location and report.
+- The roadmap lacks an executable local Gmail SMTP task and resolves Vercel
+  feasibility too late for the required hosted Python/WASM sandbox. PLAN-004
+  must correct both paths before any local implementation task starts.
 - Hosted environment region/tier/owner, client origins/email mode,
   source/CI/registry, optional staging, and API deployment provider are
   deliberately deferred to their decision deadlines.
@@ -46,8 +47,8 @@ to the deadlines in that file.
 ## Non-secret evidence
 
 - [G0 completion record](08-execution/00-roadmap.md#plan-003--completion-record);
-  implementation is authorized, G0 is passed, and no application implementation
-  evidence exists yet.
+  implementation is authorized, but PLAN-004 must reconcile user-required
+  operational paths before application implementation begins.
 
 ## Update rule
 

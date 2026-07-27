@@ -1,8 +1,8 @@
 # Next task
 
-The next implementation task is:
+The next review task is:
 
-**ARC-TREE-002 — Establish documentation locations.**
+**PLAN-004 — Reconcile explicit Vercel and local Gmail SMTP directives.**
 
 Read first:
 
@@ -10,13 +10,17 @@ Read first:
 2. `TASKS.md`
 3. `STATUS.md`
 4. `00-control/01-fixed-decisions.md`
-5. `00-control/03-execution-protocol.md`
-6. `02-architecture/01-target-project-structure.md`
-7. `09-templates/00-task-report-template.md`
-8. `08-execution/00-roadmap.md`
-9. `08-execution/02-phase-gates.md`
+5. `00-control/02-open-decisions.md`
+6. `00-control/03-execution-protocol.md`
+7. `02-architecture/03-docker-compose.md`
+8. `02-architecture/05-release-credentials.md`
+9. `02-architecture/07-python-wasm-verification.md`
+10. `03-supabase/01-local-cli-and-migrations.md`
+11. `07-operations/01-deployment-environments.md`
+12. `08-execution/00-roadmap.md`
+13. `08-execution/01-dependency-map.md`
 
-G0 is passed. Create only `docs/implementation/` together with the first real
-`ARC-TREE-002` report; do not create empty sibling documentation folders,
-application code, package metadata, dependencies, Docker artifacts, Supabase
-files, or external resources.
+Do not create application, Docker, Supabase, Vercel, SMTP, or documentation
+implementation artifacts. Add only the missing explicit task paths and their
+dependencies, then revalidate the sole next task. Gmail credentials remain
+unrequested and must not be stored in planning files.

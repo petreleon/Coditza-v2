@@ -9,9 +9,12 @@ time. The authoritative per-task status is [TASKS.md](../TASKS.md); update it,
 1. [x] PLAN-001 — User accepts or amends fixed decisions and safe defaults.
 2. [x] PLAN-002 — User explicitly authorizes implementation.
 3. [x] PLAN-003 — Verify and record G0.
+4. [ ] PLAN-004 — Reconcile the user-required Vercel deployment, Vercel
+   environment configuration, and local Gmail SMTP paths before implementation.
 
 No code, Supabase, Chrome, package installation, or Docker action before
-PLAN-002.
+PLAN-002. No local implementation task may begin until PLAN-004 resolves the
+newly identified roadmap gaps.
 
 ## PLAN-001 — Completion record
 
