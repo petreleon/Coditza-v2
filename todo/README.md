@@ -26,9 +26,12 @@ PRD-AUTH-001 accepted the provider-neutral mandatory-TOTP client contract
 without a UI or SDK mapping, and PRD-WASM-001 accepted the canonical Python
 exercise semantics and golden vectors without a runtime/launcher selection.
 FOUND-001 established the checksum-verified Node 24.18.0/npm 11.16.0 strict
-ESM Fastify/TypeScript workspace with only type-level seams. ARC-BOUND-001 is
-next to enforce the dependency graph before real application modules or
-adapters exist. Planning files plus the separately requested root `.env`, `.env.example`,
+ESM Fastify/TypeScript workspace with only type-level seams. ARC-BOUND-001 now
+enforces the accepted import graph with exact BND-001 through BND-010 rules,
+63 isolated negative fixtures, four positive controls, and a clean complete
+API source scan. FAST-CONFIG-001 is next to replace the type-only configuration
+seam before Fastify construction or real application modules/adapters exist.
+Planning files plus the separately requested root `.env`, `.env.example`,
 `.gitignore`, and `.dockerignore` safety files may exist. The existing
 hosted-project environment values do not authorize a schema or deployment action;
 every hosted, production, secret-dependent, and destructive task retains its

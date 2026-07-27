@@ -371,7 +371,7 @@ Execute in this order:
 5. [x] PRD-WASM-001 — freeze `python_code` package, authoritative grading,
    deterministic verdict, and Auth/TOTP exclusion rules.
 6. [x] FOUND-001 — pinned API runtime/tooling baseline.
-7. [ ] ARC-BOUND-001 — enforce the dependency graph with failing negative
+7. [x] ARC-BOUND-001 — enforce the dependency graph with failing negative
    fixtures before any external adapter exists.
 8. [ ] FAST-CONFIG-001 — typed fail-fast configuration.
 9. [ ] ARC-ENV-001 — configuration implementation acceptance.

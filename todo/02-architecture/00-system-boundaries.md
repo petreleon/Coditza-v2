@@ -47,20 +47,22 @@ cannot enter a Coditza domain HTTP adapter.
 
 ### ARC-BOUND-001 — Enforce module boundaries
 
-- [ ] Implement the import matrix from
+- [x] Implement the import matrix from
       [the selected architecture](06-modular-hexagonal-architecture.md) before
       any Supabase adapter is added.
-- [ ] Domain/application code cannot import Fastify, TypeBox,
+- [x] Domain/application code cannot import Fastify, TypeBox,
       `@supabase/supabase-js`, generated database types, or adapters.
-- [ ] Inbound HTTP adapters cannot access Supabase or outbound adapter internals.
-- [ ] Cross-module imports resolve only to the target module's `public.ts`;
+- [x] Inbound HTTP adapters cannot access Supabase or outbound adapter internals.
+- [x] Cross-module imports resolve only to the target module's `public.ts`;
       deep imports fail.
-- [ ] `shared` imports no module, and adapters cannot import another module's
+- [x] `shared` imports no module, and adapters cannot import another module's
       private adapter internals.
-- [ ] Add one negative fixture for every forbidden edge and prove lint/test
+- [x] Add one negative fixture for every forbidden edge and prove lint/test
       fails when each edge is enabled.
-- [ ] Re-run the rules against every real module slice; no allowlist may name an
+- [x] Re-run the rules against every real module slice; no allowlist may name an
       individual production file merely to bypass the graph.
+
+Completion evidence: [ARC-BOUND-001 report](../../docs/implementation/ARC-BOUND-001.md).
 
 ### ARC-BOUND-002 — Separate app construction from listening
 

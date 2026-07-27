@@ -5,8 +5,8 @@
   implementation on 2026-07-27; only task-scoped local work is currently
   authorized.
 - Current phase: 1 — Foundation and API container
-- Active implementation task: ARC-BOUND-001 (next; not started)
-- Last verified implementation task: FOUND-001
+- Active implementation task: FAST-CONFIG-001 (next; not started)
+- Last verified implementation task: ARC-BOUND-001
 - Last updated: 2026-07-27
 
 ## Phase status
@@ -14,7 +14,7 @@
 | Phase | Status | Gate |
 | --- | --- | --- |
 | 0 — Plan acceptance | Complete; G0 and PLAN-004 passed | G0 |
-| 1 — Foundation and containers | FOUND-001 complete; ARC-BOUND-001 next | G1 |
+| 1 — Foundation and containers | ARC-BOUND-001 complete; FAST-CONFIG-001 next | G1 |
 | 2 — Local Supabase and schema | Not started | G2 |
 | 3 — Fastify identity/read slice | Not started | G3 |
 | 4 — Learning workflows | Not started | G4 |
@@ -25,10 +25,11 @@
 
 ## Blockers
 
-- No active Phase-1 blocker. ARC-BOUND-001 may add only import-boundary
-  enforcement plus positive/negative fixture evidence; it must not add runtime
-  application behavior, configuration parsing, Supabase, Docker artifacts,
-  Python runtime/outer-sandbox work, credentials, or hosted state.
+- No active Phase-1 blocker. FAST-CONFIG-001 may replace only the type-level
+  configuration seam with a tested, immutable API configuration parser and
+  safe example defaults. It must not construct Fastify, routes, a listener,
+  Supabase client, Docker artifact, Python runtime/controller, credentials, or
+  hosted state.
 - Exact Vercel team/project/region/tier/owner, client origins/email mode,
   source/CI/registry, optional staging, and any supplemental private grader
   host remain deferred to their named decision deadlines and approvals.
@@ -58,6 +59,10 @@ to the deadlines in that file.
   Node 24.18.0/npm 11.16.0 private Fastify/TypeScript workspace, exact lockfile,
   strict ESM seams, and clean-install/typecheck/test/build evidence exist
   without application behavior or external state.
+- [ARC-BOUND-001 report](../docs/implementation/ARC-BOUND-001.md); exact
+  dependency-cruiser 18.1.0 rules enforce BND-001 through BND-010, with 63
+  independently failing negative fixtures, four legal positive controls, and
+  a clean complete API source scan under Node 24.18.0/npm 11.16.0.
 
 ## Update rule
 
