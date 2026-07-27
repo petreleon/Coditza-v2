@@ -23,15 +23,23 @@ Prerequisites: FOUND-001 workspace baseline; Docker runtime available.
 
 ## SUP-LOCAL-002 — Establish migration discipline
 
-- [ ] Create one named migration per coherent schema step.
-- [ ] Put schemas, tables, types, functions, triggers, indexes, grants, and RLS
-      in migrations.
-- [ ] Never edit a migration already applied to a shared environment.
-- [ ] Add a forward migration for each subsequent change.
-- [ ] Review generated diffs; do not commit unrelated extension/system changes.
-- [ ] Use explicit `--local`/`--linked` target flags where supported.
-- [ ] Never use a destructive linked reset.
-- [ ] Use an expand/migrate/contract sequence for breaking changes.
+- [x] Create one named migration per coherent schema step. The completed
+      workflow-only baseline has no application schema effect; each later
+      coherent schema change must receive its own named forward migration.
+- [x] Require schemas, tables, types, functions, triggers, indexes, grants,
+      and RLS to be introduced through reviewed migrations. None exists yet;
+      their named owner tasks retain implementation responsibility.
+- [x] Record the forward-only rule: never edit a migration after it has been
+      applied to a shared environment.
+- [x] Require a new forward migration for every subsequent change.
+- [x] Review the generated local public-schema diff after each reset; the
+      baseline is empty and unrelated extension or system drift is rejected.
+- [x] Use the protected fixed commands with explicit `--local` targeting for
+      reset, history, diff, and lint. Linking, remote URLs, and linked-target
+      flags are outside this workflow and are rejected by its fixed interface.
+- [x] Never use a destructive linked reset; the workflow has no linked target.
+- [x] Record expand/migrate/contract as the required sequence for a future
+      breaking change.
 
 After SUP-LOCAL-001/002 and PRD-AUTH-001, SUP-SMTP-LOCAL-001 owns optional
 user-requested Gmail SMTP delivery for the CLI-owned local Auth service. It is
@@ -71,11 +79,14 @@ After every migration task:
 3. load deterministic seed data
 4. run database lint
 5. run pgTAP/RLS tests
-6. regenerate TypeScript database types
-7. verify generation creates no unexplained diff
+6. record whether a changed type surface exists; generate TypeScript database
+   types only when the final-migrations task SUP-TYPES-001 is active
+7. during SUP-TYPES-001, verify generation creates no unexplained diff
 8. run affected API integration tests
 ```
 
+For a workflow-only migration with no owned database object or generated type
+surface, record why steps 5–8 are not applicable; never claim them as passed.
 These are planned steps, not commands to run during plan creation.
 
 ## Logical migration order

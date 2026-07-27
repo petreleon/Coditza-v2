@@ -1,2 +1,8 @@
--- SUP-LOCAL-001 intentionally defines no schema or data seed content.
--- SUP-LOCAL-002 owns deterministic seed data after migration discipline exists.
+-- SUP-LOCAL-002 executes this deterministic, non-persistent seed baseline.
+-- Real users, curriculum content, and application fixtures remain owned by
+-- their named later tasks.
+DO $seed$
+BEGIN
+  RAISE NOTICE 'CODITZA_LOCAL_SEED_V1';
+END;
+$seed$;

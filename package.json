@@ -31,6 +31,7 @@
     "supabase:start:local": "node scripts/supabase/local-stack.mjs start",
     "supabase:status:local": "node scripts/supabase/local-stack.mjs status",
     "supabase:capture-env:local": "node scripts/supabase/local-stack.mjs capture-env",
+    "supabase:verify-resets:local": "node scripts/supabase/local-stack.mjs verify-resets",
     "supabase:stop:local": "node scripts/supabase/local-stack.mjs stop",
     "build:wasm-local": "node scripts/python-wasm/build-local-sandbox.mjs --update-lock",
     "test:wasm": "node apps/api/test/wasm/require-approved-outer-sandbox.mjs",

@@ -1,6 +1,7 @@
 import { spawn } from "node:child_process";
-import { randomUUID } from "node:crypto";
+import { createHash, randomUUID } from "node:crypto";
 import { promises as fs } from "node:fs";
+import { createServer } from "node:net";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -10,6 +11,8 @@ const repositoryRoot = path.resolve(
 );
 const supabaseDirectory = path.join(repositoryRoot, "supabase");
 const configPath = path.join(supabaseDirectory, "config.toml");
+const migrationsDirectory = path.join(supabaseDirectory, "migrations");
+const seedPath = path.join(supabaseDirectory, "seed.sql");
 const localEnvironmentPath = path.join(repositoryRoot, ".env.supabase.local");
 const localCliStateRoot = path.join(repositoryRoot, ".supabase", "local-cli");
 const cliEntrypoint = path.join(
@@ -27,7 +30,13 @@ const dockerCandidates = [
 const projectId = "coditza-local";
 const networkName = "coditza-supabase-local";
 const maxCapturedOutputBytes = 8 * 1024 * 1024;
-const actions = new Set(["start", "status", "capture-env", "stop"]);
+const actions = new Set([
+  "start",
+  "status",
+  "capture-env",
+  "verify-resets",
+  "stop",
+]);
 const dangerousDockerEnvironmentNames = [
   "CONTAINER_HOST",
   "DOCKER_CERT_PATH",
@@ -38,6 +47,8 @@ const dangerousDockerEnvironmentNames = [
   "DOCKER_TLS_VERIFY",
 ];
 const localStateDirectoryNames = new Set([".branches", ".temp", "backups"]);
+const migrationFilenamePattern = /^(\d{14})_[a-z0-9][a-z0-9_-]*\.sql$/u;
+const seedExecutionMarker = "CODITZA_LOCAL_SEED_V1";
 
 class LocalStackError extends Error {
   constructor(message) {
@@ -58,7 +69,9 @@ function assertInvocation() {
   const [, , action, ...extraArguments] = process.argv;
 
   if (!actions.has(action) || extraArguments.length > 0) {
-    fail("Use one fixed local action: start, status, capture-env, or stop.");
+    fail(
+      "Use one fixed local action: start, status, capture-env, verify-resets, or stop.",
+    );
   }
 
   return action;
@@ -158,8 +171,13 @@ function runCaptured(command, argumentsList, failureMessage, options) {
 
       // CLI output can contain local keys. It remains only in private process
       // memory and is discarded after a bounded amount during noisy image pulls.
-      void stderr;
       void outputTruncated;
+      if (options.returnResult === true) {
+        resolve(Object.freeze({ stderr, stdout }));
+        return;
+      }
+
+      void stderr;
       resolve(stdout);
     });
   });
@@ -304,6 +322,9 @@ function assertApprovedConfiguration(config) {
   }
 
   const api = readSection(config, "api");
+  const database = readSection(config, "db");
+  const dbMigrations = readSection(config, "db.migrations");
+  const dbSeed = readSection(config, "db.seed");
   const studio = readSection(config, "studio");
   const localSmtp = readSection(config, "local_smtp");
   const mfa = readSection(config, "auth.mfa");
@@ -313,6 +334,8 @@ function assertApprovedConfiguration(config) {
   if (
     !hasExactBoolean(api, "enabled", "true") ||
     !hasExactInteger(api, "port", 54321) ||
+    !hasExactInteger(database, "port", 54322) ||
+    !hasExactInteger(database, "shadow_port", 54320) ||
     !hasExactBoolean(studio, "enabled", "true") ||
     !hasExactInteger(studio, "port", 54323) ||
     !hasExactBoolean(localSmtp, "enabled", "true") ||
@@ -320,6 +343,17 @@ function assertApprovedConfiguration(config) {
   ) {
     fail(
       "The local Supabase URL/port configuration is not the approved loopback mapping.",
+    );
+  }
+
+  if (
+    !hasExactBoolean(dbMigrations, "enabled", "true") ||
+    !/^schema_paths\s*=\s*\[\]\s*$/mu.test(dbMigrations) ||
+    !hasExactBoolean(dbSeed, "enabled", "true") ||
+    !/^sql_paths\s*=\s*\["\.\/seed\.sql"\]\s*$/mu.test(dbSeed)
+  ) {
+    fail(
+      "The local Supabase migration or seed configuration is not deterministic.",
     );
   }
 
@@ -342,6 +376,90 @@ async function readApprovedConfiguration() {
     "The local Supabase configuration is missing or unsafe.",
   );
   assertApprovedConfiguration(config);
+}
+
+function sha256(value) {
+  return createHash("sha256").update(value, "utf8").digest("hex");
+}
+
+async function readApprovedResetInputs() {
+  let directoryMetadata;
+
+  try {
+    directoryMetadata = await fs.lstat(migrationsDirectory);
+  } catch {
+    fail("The reviewed local migration directory is missing.");
+  }
+
+  if (!directoryMetadata.isDirectory() || directoryMetadata.isSymbolicLink()) {
+    fail("The reviewed local migration directory is unsafe.");
+  }
+
+  let entries;
+
+  try {
+    entries = await fs.readdir(migrationsDirectory, { withFileTypes: true });
+  } catch {
+    fail("The reviewed local migration directory cannot be read.");
+  }
+
+  const migrations = [];
+
+  for (const entry of entries) {
+    const match = entry.name.match(migrationFilenamePattern);
+
+    if (
+      !match ||
+      !entry.isFile() ||
+      entry.isSymbolicLink() ||
+      entry.isDirectory()
+    ) {
+      fail("The reviewed local migration directory contains an unsafe file.");
+    }
+
+    const content = await readRegularFile(
+      path.join(migrationsDirectory, entry.name),
+      "A reviewed local migration is missing or unsafe.",
+    );
+    migrations.push(
+      Object.freeze({
+        digest: sha256(content),
+        version: match[1],
+      }),
+    );
+  }
+
+  migrations.sort((left, right) => left.version.localeCompare(right.version));
+
+  if (migrations.length === 0) {
+    fail("The local reset workflow requires at least one reviewed migration.");
+  }
+
+  for (let index = 1; index < migrations.length; index += 1) {
+    if (migrations[index - 1].version === migrations[index].version) {
+      fail("The reviewed local migration versions are not unique.");
+    }
+  }
+
+  const seed = await readRegularFile(
+    seedPath,
+    "The reviewed deterministic local seed is missing or unsafe.",
+  );
+  const manifestLines = [
+    "coditza-local-reset-v1",
+    ...migrations.map(
+      (migration) => "migration=" + migration.version + ":" + migration.digest,
+    ),
+    "seed=" + sha256(seed),
+  ];
+
+  return Object.freeze({
+    manifest: sha256(manifestLines.join("\n")),
+    migrationCount: migrations.length,
+    migrationVersions: Object.freeze(
+      migrations.map((migration) => migration.version),
+    ),
+  });
 }
 
 async function assertCliEntrypoint() {
@@ -578,6 +696,56 @@ async function assertProjectStopped(docker) {
   if ((await runningProjectContainerIds(docker)).length !== 0) {
     fail("The local Supabase stack did not stop cleanly.");
   }
+}
+
+async function assertLocalShadowPortAvailable() {
+  await new Promise((resolve, reject) => {
+    const server = createServer();
+    let settled = false;
+
+    function rejectUnavailable() {
+      if (settled) {
+        return;
+      }
+
+      settled = true;
+      server.close(() => {
+        reject(
+          new LocalStackError(
+            "The reviewed local database shadow port is unavailable.",
+          ),
+        );
+      });
+    }
+
+    server.once("error", rejectUnavailable);
+    server.listen(
+      {
+        exclusive: true,
+        host: "127.0.0.1",
+        port: 54320,
+      },
+      () => {
+        if (settled) {
+          return;
+        }
+
+        settled = true;
+        server.close((error) => {
+          if (error) {
+            reject(
+              new LocalStackError(
+                "The reviewed local database shadow port cannot be released.",
+              ),
+            );
+            return;
+          }
+
+          resolve();
+        });
+      },
+    );
+  });
 }
 
 async function assertLocalAuthHealth() {
@@ -826,6 +994,239 @@ function runSupabase(workspace, argumentsList, failureMessage) {
   );
 }
 
+function runSupabaseResult(workspace, argumentsList, failureMessage) {
+  return runCaptured(
+    process.execPath,
+    [cliEntrypoint, "--workdir", workspace.workspace, ...argumentsList],
+    failureMessage,
+    {
+      cwd: workspace.workspace,
+      environment: cliEnvironment(workspace.cliHome),
+      returnResult: true,
+    },
+  );
+}
+
+function localResetFailure({ stdout, stderr }) {
+  const output = (stdout + "\n" + stderr).toLowerCase();
+
+  if (/not running|cannot connect|connection refused/u.test(output)) {
+    return "The reviewed local Supabase stack must be running before reset.";
+  }
+
+  if (/migration.*(failed|error)|seed.*(failed|error)/u.test(output)) {
+    return "The reviewed local migration or seed baseline could not be reset.";
+  }
+
+  return "The reviewed local database reset did not complete.";
+}
+
+function localSchemaDiffFailure({ stdout, stderr }) {
+  const output = (stdout + "\n" + stderr).toLowerCase();
+
+  if (/permission denied|operation not permitted/u.test(output)) {
+    return "The local migration schema diff could not access the local Docker engine.";
+  }
+
+  if (/pull access denied|failed to pull|manifest unknown/u.test(output)) {
+    return "The local migration schema diff could not retrieve its local diff image.";
+  }
+
+  if (/shadow|migra|pg-schema|pg-delta/u.test(output)) {
+    return "The local migration schema diff engine did not initialize.";
+  }
+
+  if (
+    /connection refused|database system is starting|cannot connect/u.test(
+      output,
+    )
+  ) {
+    return "The local migration schema diff could not reach the local database.";
+  }
+
+  return "The local migration schema diff could not be verified.";
+}
+
+function parseJsonOutput(output, failureMessage) {
+  try {
+    return JSON.parse(output);
+  } catch {
+    fail(failureMessage);
+  }
+}
+
+function assertExpectedMigrationHistory(output, expectedVersions) {
+  const migrationHistory = parseJsonOutput(
+    output,
+    "The local migration history format is unsupported.",
+  );
+  const reviewedVersions = [...expectedVersions].sort();
+
+  if (
+    !migrationHistory ||
+    typeof migrationHistory !== "object" ||
+    Array.isArray(migrationHistory) ||
+    !Array.isArray(migrationHistory.migrations) ||
+    migrationHistory.migrations.length !== reviewedVersions.length
+  ) {
+    fail(
+      "The local database migration history does not match the reviewed baseline.",
+    );
+  }
+
+  for (const [index, migration] of migrationHistory.migrations.entries()) {
+    const expectedVersion = reviewedVersions[index];
+
+    if (
+      !migration ||
+      typeof migration !== "object" ||
+      Array.isArray(migration) ||
+      migration.local !== expectedVersion ||
+      migration.remote !== expectedVersion
+    ) {
+      fail(
+        "The local database migration history does not match the reviewed baseline.",
+      );
+    }
+  }
+
+  return reviewedVersions;
+}
+
+function assertSeedExecution({ stdout, stderr }) {
+  if (
+    !stdout.includes(seedExecutionMarker) &&
+    !stderr.includes(seedExecutionMarker)
+  ) {
+    fail("The reviewed deterministic local seed did not execute.");
+  }
+}
+
+function assertEmptySchemaDiff(output) {
+  const schemaDiff = parseJsonOutput(
+    output,
+    "The local migration schema diff format is unsupported.",
+  );
+
+  if (
+    !schemaDiff ||
+    typeof schemaDiff !== "object" ||
+    typeof schemaDiff.diff !== "string" ||
+    !Array.isArray(schemaDiff.dropStatements) ||
+    schemaDiff.diff.trim().length > 0 ||
+    schemaDiff.dropStatements.length > 0
+  ) {
+    fail(
+      "The local database has public-schema drift outside reviewed migrations.",
+    );
+  }
+
+  return sha256(schemaDiff.diff);
+}
+
+function assertEmptyLintResult(output) {
+  const lint = parseJsonOutput(
+    output,
+    "The local public-schema lint format is unsupported.",
+  );
+
+  if (
+    !lint ||
+    typeof lint !== "object" ||
+    !Array.isArray(lint.results) ||
+    lint.results.length > 0
+  ) {
+    fail("The local public-schema lint did not pass.");
+  }
+
+  return lint.results.length;
+}
+
+async function resetAndVerifyLocalDatabase(workspace, resetInputs) {
+  const resetOutput = await runSupabaseResult(
+    workspace,
+    ["--network-id", networkName, "--yes", "db", "reset", "--local"],
+    localResetFailure,
+  );
+  assertSeedExecution(resetOutput);
+  const migrationHistory = await runSupabase(
+    workspace,
+    [
+      "--network-id",
+      networkName,
+      "--output-format",
+      "json",
+      "migration",
+      "list",
+      "--local",
+    ],
+    "The local migration history could not be verified.",
+  );
+  const appliedVersions = assertExpectedMigrationHistory(
+    migrationHistory,
+    resetInputs.migrationVersions,
+  );
+  await assertLocalShadowPortAvailable();
+  const schemaDiff = await runSupabase(
+    workspace,
+    [
+      "--network-id",
+      networkName,
+      "--output-format",
+      "json",
+      "db",
+      "diff",
+      "--local",
+      "--use-migra",
+      "--schema",
+      "public",
+    ],
+    localSchemaDiffFailure,
+  );
+  const schemaDiffDigest = assertEmptySchemaDiff(schemaDiff);
+  await assertLocalShadowPortAvailable();
+  const lintOutput = await runSupabase(
+    workspace,
+    [
+      "--network-id",
+      networkName,
+      "--output-format",
+      "json",
+      "db",
+      "lint",
+      "--local",
+      "--schema",
+      "public",
+      "--fail-on",
+      "warning",
+    ],
+    "The local public-schema lint did not pass.",
+  );
+  const lintIssueCount = assertEmptyLintResult(lintOutput);
+
+  return sha256(
+    JSON.stringify({
+      appliedVersions,
+      lintIssueCount,
+      manifest: resetInputs.manifest,
+      schemaDiffDigest,
+      seedExecuted: true,
+    }),
+  );
+}
+
+function printResetVerification(resetInputs, fingerprint) {
+  writeLine("Two clean local database resets and migration discipline passed.");
+  writeLine("Reviewed migration count: " + resetInputs.migrationCount);
+  writeLine(
+    "Deterministic migration-and-seed manifest SHA-256: " +
+      resetInputs.manifest,
+  );
+  writeLine("Verified reset fingerprint SHA-256: " + fingerprint);
+  writeLine("Applied local migration history matches the reviewed baseline.");
+  writeLine("Public schema diff is empty; local public-schema lint passed.");
+}
+
 function parseEnvironmentOutput(output) {
   const entries = new Map();
 
@@ -1072,6 +1473,27 @@ async function main() {
     await assertNoPublicBindings(docker);
     await assertLocalAuthHealth();
     printSafeMapping();
+    return;
+  }
+
+  if (action === "verify-resets") {
+    await inspectNetwork(docker);
+    const resetInputs = await readApprovedResetInputs();
+    const firstFingerprint = await withIsolatedCliWorkspace(true, (workspace) =>
+      resetAndVerifyLocalDatabase(workspace, resetInputs),
+    );
+    const secondFingerprint = await withIsolatedCliWorkspace(
+      true,
+      (workspace) => resetAndVerifyLocalDatabase(workspace, resetInputs),
+    );
+
+    if (firstFingerprint !== secondFingerprint) {
+      fail("The two clean local database resets were not identical.");
+    }
+
+    await assertNoPublicBindings(docker);
+    await assertLocalAuthHealth();
+    printResetVerification(resetInputs, firstFingerprint);
     return;
   }
 
