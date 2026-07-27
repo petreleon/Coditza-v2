@@ -420,18 +420,20 @@ Supabase schema, domain routes, or remote state exists.
     focused support tests, reports, and tracker state. It starts no Supabase
     service, builds no client, reads no real environment file, and creates no
     remote/domain implementation.
-- Next: OPS-VERCEL-001 is the sole next review task. It may research the
-  required Vercel public API and private grader topology but may not create or
-  configure an external resource.
+- OPS-VERCEL-001 complete: ADR 0005 accepts Vercel as the future public Fastify
+  API boundary and records that private controller/sandbox capability remains
+  unselected and separately approval-gated. ARC-WASM-001 is now the sole next
+  local task; it may not create or configure an external resource.
 
 ## Phase 2 — Local Supabase and database security
 
 Execute in this order:
 
-1. [ ] OPS-VERCEL-001 — use current official Vercel documentation to verify the
-   required public-API/private-grader topology before selecting a hosted
-   Python/WASM launcher; do not create an external resource.
-2. [ ] Resolve DEC-032 and run ARC-WASM-001 — select, threat-model, and pin the
+1. [x] OPS-VERCEL-001 — official Vercel review recorded the required
+   public-API/private-grader topology in ADR 0005 and a five-plane capability
+   matrix; Vercel remains public API only and the private execution plane is
+   unselected pending later approval.
+2. [ ] Resolve DEC-032 through ARC-WASM-001 — select, threat-model, and pin the
    exact Pyodide/Python assets plus compliant local/hosted outer-sandbox
    launcher; no in-process fallback.
 3. [ ] SUP-LOCAL-001 — initialize the CLI-owned local stack.

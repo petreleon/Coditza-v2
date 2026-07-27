@@ -5,8 +5,8 @@
   implementation on 2026-07-27; only task-scoped local work is currently
   authorized.
 - Current phase: 2 — Local Supabase and database security
-- Active implementation task: OPS-VERCEL-001 (next; read-only deployment-topology review)
-- Last verified implementation task: QA-STRAT-001 and G1
+- Active implementation task: ARC-WASM-001 (next; local Python/WASM execution-boundary proof)
+- Last verified implementation task: OPS-VERCEL-001 (topology review) and G1
 - Last updated: 2026-07-27
 
 ## Phase status
@@ -15,7 +15,7 @@
 | --- | --- | --- |
 | 0 — Plan acceptance | Complete; G0 and PLAN-004 passed | G0 |
 | 1 — Foundation and containers | Complete; QA-STRAT-001 and G1 passed | G1 |
-| 2 — Local Supabase and schema | OPS-VERCEL-001 next; review only | G2 |
+| 2 — Local Supabase and schema | ARC-WASM-001 next; local execution-boundary proof only | G2 |
 | 3 — Fastify identity/read slice | Not started | G3 |
 | 4 — Learning workflows | Not started | G4 |
 | 5 — Authoring/admin workflows | Not started | G5 |
@@ -26,8 +26,9 @@
 ## Blockers
 
 - Exact Vercel team/project/region/tier/owner, client origins/email mode,
-  source/CI/registry, optional staging, and any supplemental private grader
-  host remain deferred to their named decision deadlines and approvals.
+  source/CI/registry, optional staging, and the provider for the required
+  private execution plane remain deferred to their named decision deadlines and
+  approvals. ADR 0005 does not select any of them.
 - Actual registration/login screens remain outside this backend plan until
   DEC-006 is changed by a later client request.
 - DEC-032 must be resolved by ARC-WASM-001 with a demonstrably hardened
@@ -94,6 +95,11 @@ to the deadlines in that file.
   local-target guard, sanitized ignored reports, 177 unit tests, and a
   read-only/no-network Compose checks proof now exist without Supabase or
   hosted state.
+- [OPS-VERCEL-001 report](../docs/implementation/OPS-VERCEL-001.md) and
+  [ADR 0005](../docs/adr/0005-vercel-public-api-and-private-grader-topology.md);
+  official Vercel evidence now accepts Vercel for the public Fastify API while
+  requiring an unselected, later-approved private execution plane. No hosted
+  resource, secret, or billing action occurred.
 - [G1 completion record](08-execution/00-roadmap.md#g1-completion-record);
   Foundation reproducibility is recorded from the accepted architecture/product
   contracts, current checks, Docker evidence, and scope review.

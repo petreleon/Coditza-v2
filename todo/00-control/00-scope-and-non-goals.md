@@ -66,11 +66,13 @@ environment-level operations.
   disposable foundation container-check path and guide. ARC-DOCKER-003
   accepted the final non-root/read-only production image, its excluded-content
   proof, liveness, and shutdown behavior. QA-STRAT-001 is complete and G1 has
-  passed. OPS-VERCEL-001 may now perform only read-only official documentation
-  research and write a local capability matrix/topology ADR. It must not create
-  a Vercel project, authenticate a CLI, enter a secret, configure a hosted
-  resource, deploy, choose a supplemental private host, or change application
-  behavior.
+  passed. OPS-VERCEL-001 has completed its read-only official-documentation
+  review: ADR 0005 retains Vercel as the future public API boundary and leaves
+  the private execution provider/launcher unselected. ARC-WASM-001 is now the
+  sole active local task. It may establish and prove a local Python/WASM outer
+  boundary, but it must not create/configure a Vercel or private-host resource,
+  authenticate a CLI, enter a secret, select a provider/region/tier/cost/owner,
+  or change public API deployment behavior.
 - A hosted, production, billing-sensitive, destructive, or secret-dependent
   action still needs its own task-specific authority; broad implementation
   authorization does not authorize it.

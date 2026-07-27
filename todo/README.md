@@ -47,9 +47,11 @@ a read-only filesystem, bounded temporary storage, loopback liveness, graceful
 SIGTERM shutdown, and no excluded application inputs. QA-STRAT-001 added
 explicit test layers, deterministic in-memory identity/Auth helpers, a
 no-network local target guard, sanitized ignored reports, and a reproducible
-read-only/no-network checks-container loop. G1 is now passed; the next task is
-the read-only OPS-VERCEL-001 topology review. Real application modules,
-Supabase, and all hosted configuration remain deferred.
+read-only/no-network checks-container loop. OPS-VERCEL-001 then completed the
+read-only official Vercel topology review: ADR 0005 retains Vercel for the
+future public Fastify API and leaves the required private execution plane
+unselected. G1 remains passed; ARC-WASM-001 is the sole next local task. Real
+application modules, Supabase, and all hosted configuration remain deferred.
 Planning files plus the separately requested root `.env`, `.env.example`,
 `.gitignore`, and `.dockerignore` safety files may exist. The existing
 hosted-project environment values do not authorize a schema or deployment action;

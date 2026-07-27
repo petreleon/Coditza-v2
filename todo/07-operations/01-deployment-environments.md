@@ -10,31 +10,34 @@ only the approved external boundaries.
 
 Prerequisites: G1, ARC-DESIGN-001, and PRD-WASM-001.
 
-- [ ] Recheck current official Vercel documentation for the public Fastify API
+- [x] Recheck current official Vercel documentation for the public Fastify API
       deployment model, request/body/time limits, streaming/shutdown behavior,
       environment scopes, health/proxy behavior, immutable artifact support,
       and available isolation boundaries. This is read-only research; do not
       create a Vercel project, deploy, authenticate a CLI, or enter a secret.
-- [ ] Map the public Fastify API, private grader controller, immutable Pyodide
+- [x] Map the public Fastify API, private grader controller, immutable Pyodide
       assets, one-off migration/release job, and disposable no-network sandbox
       to concrete capabilities. The controller must not become a public Vercel
       function, and no function/runtime is presumed to be a hardened sandbox.
-- [ ] Decide whether the documented Vercel capability can serve the public API
+- [x] Decide whether the documented Vercel capability can serve the public API
       while a separately approved provider/launcher is required for the private
       grader. If a supplemental host is needed, state the minimal capabilities
       and stop for explicit user approval before selecting or creating it.
-- [ ] Record a topology ADR and capability matrix with current documentation
+- [x] Record a topology ADR and capability matrix with current documentation
       dates, limitations, ownership, variable scopes, cost/egress implications,
       deployment/rollback implications, and the exact handoff to ARC-WASM-001
       and OPS-HOST-001.
-- [ ] Reject any topology that makes the controller public, gives Vercel/API a
+- [x] Reject any topology that makes the controller public, gives Vercel/API a
       general Docker socket, weakens the required outer sandbox, combines
       development and production scopes, or silently substitutes a non-Vercel
       public host.
 
-Evidence is a reviewed Vercel/supplemental-host topology ADR and capability
-matrix, or a concise blocker asking for the smallest user decision. No external
-resource, secret, billing, or deployment occurs in this task.
+Evidence: [ADR 0005](../../docs/adr/0005-vercel-public-api-and-private-grader-topology.md),
+the [five-plane capability matrix](../../docs/implementation/OPS-VERCEL-001-capability-matrix.md),
+and the [completion report](../../docs/implementation/OPS-VERCEL-001.md).
+They accept Vercel for the future public Fastify API and require an unselected,
+later-approved private execution plane. No external resource, secret, billing,
+or deployment occurred in this task.
 
 ## OPS-HOST-001 — Select the API host and create the development boundary
 
