@@ -18,17 +18,17 @@ configuration.
 
 ## Current repository state
 
-Implementation remains absent after this planning task. Planning files plus the
-separately requested root `.env`, `.env.example`, `.gitignore`, and
-`.dockerignore` safety files may exist. Do **not** treat those files, a code
-block, or a command in this directory as permission to implement the product.
-Application code, package manifests, migrations, containers, and runtime
-assets are future deliverables; the existing hosted-project environment values
-do not authorize a schema or deployment action.
+Implementation is authorized, but application work has not begun: `PLAN-003`
+must first record G0, then `ARC-TREE-002` may establish the first local
+implementation-report location. Planning files plus the separately requested
+root `.env`, `.env.example`, `.gitignore`, and `.dockerignore` safety files may
+exist. The existing hosted-project environment values do not authorize a schema
+or deployment action; every hosted, production, secret-dependent, and
+destructive task retains its explicit safeguards.
 
 Implementation tracking starts in [TASKS.md](TASKS.md), [STATUS.md](STATUS.md),
-and [NEXT.md](NEXT.md). They intentionally state that implementation has not
-yet been authorized.
+and [NEXT.md](NEXT.md). They name the single task currently permitted by the
+execution protocol.
 
 The separate Romanian content-production plan starts at
 [todo-curriculum-ro](../todo-curriculum-ro/README.md). Its first real module is

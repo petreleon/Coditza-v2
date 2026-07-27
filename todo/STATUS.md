@@ -1,17 +1,19 @@
 # Coditza implementation status
 
 - Plan version: 3
-- Implementation authorization: **NOT GRANTED**
-- Current phase: 0 — Plan acceptance and implementation authorization
+- Implementation authorization: **GRANTED** — user explicitly requested
+  implementation on 2026-07-27; only task-scoped local work is currently
+  authorized.
+- Current phase: 0 — G0 verification
 - Active implementation task: None
-- Last verified implementation task: PLAN-001 (review)
+- Last verified implementation task: PLAN-002 (review)
 - Last updated: 2026-07-27
 
 ## Phase status
 
 | Phase | Status | Gate |
 | --- | --- | --- |
-| 0 — Plan acceptance | PLAN-001 complete; PLAN-002 next | G0 |
+| 0 — Plan acceptance | PLAN-001 and PLAN-002 complete; PLAN-003 next | G0 |
 | 1 — Foundation and containers | Not started | G1 |
 | 2 — Local Supabase and schema | Not started | G2 |
 | 3 — Fastify identity/read slice | Not started | G3 |
@@ -23,8 +25,8 @@
 
 ## Blockers
 
-- PLAN-002 must separately record the user's already received explicit
-  implementation request before code or infrastructure work begins.
+- G0 must be verified and recorded before `ARC-TREE-002` may create the first
+  local implementation files.
 - Hosted environment region/tier/owner, client origins/email mode,
   source/CI/registry, optional staging, and API deployment provider are
   deliberately deferred to their decision deadlines.
@@ -43,8 +45,9 @@ to the deadlines in that file.
 
 ## Non-secret evidence
 
-- [PLAN-001 review record](08-execution/00-roadmap.md#plan-001--completion-record);
-  no application implementation evidence yet.
+- [PLAN-001 and PLAN-002 review records](08-execution/00-roadmap.md#plan-001--completion-record);
+  implementation is authorized but no application implementation evidence
+  exists yet.
 
 ## Update rule
 

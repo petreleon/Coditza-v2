@@ -2,7 +2,7 @@
 
 The next planning/authorization task is:
 
-**PLAN-002 — Record the user's explicit implementation authorization.**
+**PLAN-003 — Verify and record G0.**
 
 Read first:
 
@@ -19,8 +19,7 @@ Read first:
 11. `08-execution/00-roadmap.md`
 12. `08-execution/02-phase-gates.md`
 
-The user has explicitly instructed Coditza to continue and complete the work.
-PLAN-002 must record that authorization separately; it still does not write
-application code, initialize Supabase, create Docker artifacts, install
-packages, or open Chrome. Only PLAN-003 may change NEXT to ARC-TREE-002 after
-it verifies G0.
+Implementation is authorized within the roadmap, but `PLAN-003` must verify all
+G0 conditions and synchronize `TASKS.md`, `STATUS.md`, and this file before
+any code or infrastructure task begins. Only then may it change NEXT to
+`ARC-TREE-002`; no external authority is implied.

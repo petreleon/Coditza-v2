@@ -7,7 +7,7 @@ time. The authoritative per-task status is [TASKS.md](../TASKS.md); update it,
 ## Phase 0 — Accept and authorize the plan
 
 1. [x] PLAN-001 — User accepts or amends fixed decisions and safe defaults.
-2. [ ] PLAN-002 — User explicitly authorizes implementation.
+2. [x] PLAN-002 — User explicitly authorizes implementation.
 3. [ ] PLAN-003 — Verify and record G0.
 
 No code, Supabase, Chrome, package installation, or Docker action before
@@ -98,6 +98,83 @@ PLAN-002.
 
 - `PLAN-002` is the only unblocked next task because the user explicitly asked
   to continue and complete the implementation after accepting these decisions.
+
+## PLAN-002 — Completion record
+
+- Outcome: COMPLETE
+- Environment: NONE
+- Date: 2026-07-27
+- Agent/person: Codex, recording the user's direction
+- Authorization checked: The user explicitly directed Coditza to continue and
+  complete the work, and the active goal expressly requests end-to-end
+  implementation and shipping.
+- Prerequisites/gate checked: `PLAN-001` is complete and recorded in this
+  roadmap; `PLAN-002` was the sole `next` task; `main` was clean at commit
+  `501a2f8` before this task.
+- Decisions/defaults used:
+
+- Implementation is authorized only within the approved roadmap and one-task
+  execution protocol.
+- Local implementation may begin only after `PLAN-003` verifies G0.
+- Each later hosted, billing-sensitive, production, secret-dependent, or
+  destructive action still requires the task-specific approval and safeguards;
+  this authorization does not infer them.
+- The requested Vercel release remains a post-implementation hosted task, and
+  Gmail SMTP remains blocked until the required Gmail App Password is supplied
+  to the eligible configuration task.
+
+### Scope
+
+- Intended: record the received implementation authorization and update the
+  planning-control state.
+- Explicitly excluded: application code, package installation, Docker,
+  Supabase, Chrome, Vercel, SMTP, or other external-state work.
+
+### Changed
+
+- `todo/08-execution/00-roadmap.md`: this authorization record and task
+  checkbox.
+- `todo/TASKS.md`, `todo/STATUS.md`, `todo/NEXT.md`, `todo/README.md`, and
+  `todo/00-control/00-scope-and-non-goals.md`: synchronized authorization
+  state and G0 restriction.
+
+### Verification
+
+- Reviewed the user's explicit requests to continue and complete Coditza and
+  the active goal objective.
+  - Result: PASS
+  - Non-secret evidence: both authorize implementation rather than only
+    planning or review.
+- `git log -1 --oneline`
+  - Result: PASS
+  - Non-secret evidence: `501a2f8 Record Coditza plan acceptance` confirms the
+    prerequisite review was committed before this task.
+
+### External actions
+
+- NONE.
+
+### Deviations/ADRs
+
+- NONE.
+
+### Risks/blockers
+
+- `PLAN-003` must verify the complete G0 checklist and synchronize task state
+  before `ARC-TREE-002` may create the first local implementation files.
+- SMTP, Vercel resource creation, production deployment, and missing secrets
+  retain their task-specific stop conditions.
+
+### Secret-safety confirmation
+
+- No credential, token, connection string, private data, protected answer,
+  TOTP/QR/`otpauth`/factor/challenge material, or unsafe screenshot/log was
+  recorded.
+
+### Next
+
+- `PLAN-003` is the only unblocked next task because it can now formally check
+  G0 and select `ARC-TREE-002` without inferring any external authority.
 
 ## Phase 1 — Foundation and API container
 
