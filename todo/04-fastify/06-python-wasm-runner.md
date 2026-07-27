@@ -7,6 +7,12 @@ The `assessment` module owns `ReservePythonGrading`, `ClaimPythonGrading`, and
 and owner-status HTTP adapters. A private grader-controller entrypoint consumes
 the claim/finalize ports and has no Fastify registration or public listener.
 
+ADR 0006's `scripts/python-wasm/local-launch-broker.mjs` is evidence for a
+developer-local outer boundary only. It must not implement `PythonSandboxPort`,
+be imported by this future controller, or lend Docker CLI/socket authority to
+application runtime. A `local_public_proof` result is not a valid controller
+result and must fail before any attempt/finalization path.
+
 Required narrow ports:
 
 - `PythonGradingQueuePort` for reserve, owner-status, claim, retry, and finalize

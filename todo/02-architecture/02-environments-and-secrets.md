@@ -66,6 +66,13 @@ state required to accept or reject reservations. Sandbox-launch credentials, if
 the approved platform requires them, use a controller-only least-privilege
 secret binding and are never inherited by the disposable worker.
 
+ADR 0006's local proof adds no application environment variable and reads no
+`.env` file. Its fixed, secret-free runner environment is created with `env -i`
+inside the disposable container and its manifest is a checked-in reference
+artifact. The listed `PYTHON_GRADER_*` configuration remains future
+controller-only configuration; no local proof script is permitted to silently
+interpret it as Docker authority or a hosted target.
+
 `SUPABASE_URL` and `SUPABASE_JWT_ISSUER` are deliberately separate inputs. In
 local Compose the URL may use a container-reachable host while the JWT still
 contains the CLI's canonical host-published issuer. Never derive one local

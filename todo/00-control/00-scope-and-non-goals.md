@@ -26,8 +26,9 @@ environment-level operations.
 - Draft, published, and archived content lifecycle.
 - Versioned SQL migrations, seed data, generated database types, and RLS tests.
 - Fastify REST API under `/api/v1`, with OpenAPI output.
-- Docker images and a Docker Compose development workflow for the API plus the
-  private grader-controller/isolation test path after ARC-WASM-001.
+- Docker images and a Docker Compose development workflow for the API. The
+  completed ARC-WASM-001 local Python/WASM proof is a standalone Docker harness;
+  a future private controller/isolation integration remains separately owned.
 - Local Supabase through the official CLI and Docker runtime.
 - Separate development and production configuration; add a separately billed
   staging environment only when DEC-027 explicitly approves it.
@@ -68,11 +69,12 @@ environment-level operations.
   proof, liveness, and shutdown behavior. QA-STRAT-001 is complete and G1 has
   passed. OPS-VERCEL-001 has completed its read-only official-documentation
   review: ADR 0005 retains Vercel as the future public API boundary and leaves
-  the private execution provider/launcher unselected. ARC-WASM-001 is now the
-  sole active local task. It may establish and prove a local Python/WASM outer
-  boundary, but it must not create/configure a Vercel or private-host resource,
-  authenticate a CLI, enter a secret, select a provider/region/tier/cost/owner,
-  or change public API deployment behavior.
+  the private execution provider/launcher unselected. ARC-WASM-001 completed a
+  local public-proof boundary under ADR 0006 without a controller or hosted
+  selection. SUP-LOCAL-001 is now the sole active local task; it may initialize
+  only the CLI-owned local Supabase stack and must not create/configure a hosted
+  resource, authenticate a CLI, enter a secret, select a provider/region/tier/
+  cost/owner, or change public API deployment behavior.
 - A hosted, production, billing-sensitive, destructive, or secret-dependent
   action still needs its own task-specific authority; broad implementation
   authorization does not authorize it.

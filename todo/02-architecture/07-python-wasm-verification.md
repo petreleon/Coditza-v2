@@ -8,6 +8,12 @@ an immutable runtime manifest; no task may use `latest`, a semver range, or a
 third-party CDN. Browser and server adapters consume the same manifest and
 asset digests.
 
+ADR 0006 records the completed **developer-local public-proof** implementation:
+it locks the server-side bundle and proves a disposable Docker boundary against
+synthetic public cases. It does not select a hosted launcher, create a controller
+or private test channel, or make `local_public_proof` an authoritative learner
+verdict. Those remaining capabilities retain the future constraints below.
+
 Browser execution is a future client contract only. When a client is later
 approved, it may run public tests in a module-type Web Worker so provisional
 feedback cannot block the UI. This plan does not select or implement a
@@ -105,8 +111,7 @@ Python verifier and its deployment gate remain blocked.
 
 ## Runtime and protocol pinning
 
-The repository will contain a reviewed `python-wasm-runtime.lock.json` (exact
-location fixed by ARC-WASM-001) containing:
+The repository contains a reviewed `python-wasm-runtime.lock.json` containing:
 
 - exact Pyodide and embedded CPython versions;
 - SHA-256 for the loader, WebAssembly binary, standard-library archive, package
@@ -172,21 +177,27 @@ operation is implemented, proxied, or verified with Python/WASM.
 Prerequisites: PRD-WASM-001, ARC-DESIGN-001, FOUND-001, G1, and
 OPS-VERCEL-001's reviewed public-API/private-grader topology.
 
-- [ ] Write an ADR selecting the exact Pyodide/Python build, exact
-      browser/server asset bundle, and exact local/hosted outer-sandbox
-      launcher.
-- [ ] Commit the complete runtime lock manifest with immutable hashes and prove
-      an offline clean install/load.
-- [ ] Add the grader-controller execution plane to the ownership,
-      composition, deployment, data-flow, and threat-model inventories without
-      creating a public service or generic job framework.
-- [ ] Prove the launcher enforces every network, secret, privilege, filesystem,
-      process, resource, IPC, and teardown rule above; reject worker-thread-only
-      designs.
-- [ ] Specify the versioned runner request/result schemas and strict unknown
-      field rejection.
-- [ ] Specify lease, retry, shutdown, overload, and deterministic-mismatch
-      behavior.
-- [ ] Prove the runner contract contains no Auth/TOTP or database capability.
+- [x] Write ADR 0006 selecting the exact Pyodide/Python server bundle and
+      developer-local outer proof launcher. Hosted launcher selection remains
+      explicitly deferred to OPS-HOST-001 and user approval.
+- [x] Commit the immutable local runtime lock manifest and prove a warm-cache
+      offline local install/load. Full clean-cache provenance/SBOM/promotion is
+      deliberately deferred to OPS-WASM-001.
+- [x] Add the future grader-controller and the completed local proof harness to
+      the ownership, composition, deployment, data-flow, and threat-model
+      inventories without creating a public service or generic job framework.
+- [x] Prove the local public-proof launcher enforces the reviewed network,
+      secret, privilege, filesystem, process, resource, IPC, and teardown
+      controls; worker-thread-only isolation remains rejected.
+- [x] Specify and test the closed versioned public-proof request/result schema,
+      including strict unknown-field and forged-digest rejection. The future
+      authoritative schema remains governed by the protected contract above.
+- [x] Specify future lease, retry, shutdown, overload, and
+      deterministic-mismatch behavior; no job or finalization implementation is
+      implied by this local proof.
+- [x] Prove the local runner protocol contains no Auth/TOTP or database
+      capability.
 
-No Python code exercise may be published or accepted until this task passes.
+No Python code exercise may be published, accepted, or finalized from the local
+proof. G-WASM remains closed until the later database, controller, API, QA, and
+hosted-equivalence tasks pass.

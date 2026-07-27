@@ -433,9 +433,10 @@ Execute in this order:
    public-API/private-grader topology in ADR 0005 and a five-plane capability
    matrix; Vercel remains public API only and the private execution plane is
    unselected pending later approval.
-2. [ ] Resolve DEC-032 through ARC-WASM-001 — select, threat-model, and pin the
-   exact Pyodide/Python assets plus compliant local/hosted outer-sandbox
-   launcher; no in-process fallback.
+2. [x] Complete ARC-WASM-001's local DEC-032 reference proof — ADR 0006 pins
+   the exact Pyodide/Python assets and proves a hardened Docker public-proof
+   launcher. It does not select a hosted launcher or establish authoritative
+   grading; no in-process fallback is accepted.
 3. [ ] SUP-LOCAL-001 — initialize the CLI-owned local stack.
 4. [ ] SUP-LOCAL-002 — migration/reset/seed discipline.
 5. [ ] SUP-SMTP-LOCAL-001 — configure the CLI-owned local Auth SMTP path with a

@@ -190,6 +190,7 @@ operations or an isolated identity operator.
 | Artifact | Sole semantic owner | Invocation and hard boundary |
 | --- | --- | --- |
 | Python grader-controller claim/run/finalize loop | assessment | Private process from the reviewed release. No public listener; no Auth/TOTP or raw-client escape. |
+| ARC-WASM-001 local public-proof harness | architecture/developer evidence | Standalone fixed Docker invocation. No Fastify/controller import, listener, database/queue/lease, private test plan, or finalization; Docker authority stays outside application runtime. |
 | Expired quiz finalization | assessment | Scheduled invocation of assessment_finalize_expired_quiz_attempts. Operations may schedule it but cannot change its business behavior. |
 | Idempotency purge | operations | Bounded scheduled invocation of operations_purge_expired_idempotency. |
 | Supabase migration/reset/seed/type-generation commands | platform database kernel | Supabase CLI/developer or CI commands; never imported by Fastify. |

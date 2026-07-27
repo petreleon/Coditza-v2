@@ -16,7 +16,7 @@ dependencies; a task also requires its prior phase gate and its exact row in
 | FAST-BOOT + ARC-BOUND-002 + FAST-LIVE | typed config | Compose API |
 | ARC-DOCKER-001/002/003 + QA-STRAT-001 | liveness + app factory + local test harness | G1/local runtime |
 | OPS-VERCEL-001 | G1 + architecture/Python contracts + user Vercel direction | [ADR 0005](../../docs/adr/0005-vercel-public-api-and-private-grader-topology.md): Vercel public API + unselected private execution plane |
-| ARC-WASM-001 | G1 + PRD-WASM-001 + FOUND-001 + OPS-VERCEL-001; owns DEC-032 resolution | exact runtime manifest + compliant local sandbox boundary; hosted provider remains approval-gated |
+| ARC-WASM-001 | G1 + PRD-WASM-001 + FOUND-001 + OPS-VERCEL-001; owns DEC-032's local-proof portion | [ADR 0006](../../docs/adr/0006-local-python-wasm-reference-proof.md): exact runtime manifest + compliant local public-proof sandbox boundary; hosted provider remains approval-gated |
 | SUP-LOCAL-001/002 | G1 + Docker engine | migrations/schema |
 | SUP-SMTP-LOCAL-001 | CLI local stack + Auth contract + user-provided Gmail App Password | local Auth delivery proof; no root Compose SMTP |
 | SUP-PRIMITIVES-001 | local migration discipline | Auth/content objects |

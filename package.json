@@ -11,8 +11,8 @@
     "apps/*"
   ],
   "scripts": {
-    "format": "prettier --write package.json tsconfig.base.json eslint.config.js .dependency-cruiser.cjs apps/api/package.json apps/api/tsconfig.json apps/api/tsconfig.test.json apps/api/vitest.config.ts apps/api/src apps/api/test",
-    "format:check": "prettier --check package.json tsconfig.base.json eslint.config.js .dependency-cruiser.cjs apps/api/package.json apps/api/tsconfig.json apps/api/tsconfig.test.json apps/api/vitest.config.ts apps/api/src apps/api/test",
+    "format": "prettier --write package.json python-wasm-runtime.lock.json tsconfig.base.json eslint.config.js .dependency-cruiser.cjs apps/api/package.json apps/api/tsconfig.json apps/api/tsconfig.test.json apps/api/vitest.config.ts apps/api/src apps/api/test scripts/python-wasm",
+    "format:check": "prettier --check package.json python-wasm-runtime.lock.json tsconfig.base.json eslint.config.js .dependency-cruiser.cjs apps/api/package.json apps/api/tsconfig.json apps/api/tsconfig.test.json apps/api/vitest.config.ts apps/api/src apps/api/test scripts/python-wasm",
     "lint": "eslint apps/api/src apps/api/test/support apps/api/vitest.config.ts && npm run boundaries",
     "boundaries": "depcruise --config .dependency-cruiser.cjs -- apps/api/src",
     "typecheck:api": "npm run typecheck --workspace=@coditza/api",
@@ -28,6 +28,7 @@
     "test:db": "vitest run --configLoader runner --config apps/api/vitest.config.ts --project db",
     "test:e2e": "vitest run --configLoader runner --config apps/api/vitest.config.ts --project e2e",
     "test:security": "vitest run --configLoader runner --config apps/api/vitest.config.ts --project security",
+    "build:wasm-local": "node scripts/python-wasm/build-local-sandbox.mjs --update-lock",
     "test:wasm": "node apps/api/test/wasm/require-approved-outer-sandbox.mjs",
     "test:coverage": "CODITZA_TEST_REPORTS=1 vitest run --configLoader runner --config apps/api/vitest.config.ts --project unit --coverage && node apps/api/test/support/verify-sanitized-reports.mjs apps/api/coverage",
     "test": "npm run test:unit && npm run test:boundaries",
@@ -44,5 +45,8 @@
     "typescript": "6.0.3",
     "typescript-eslint": "8.65.0",
     "vitest": "4.1.10"
+  },
+  "dependencies": {
+    "pyodide": "314.0.3"
   }
 }

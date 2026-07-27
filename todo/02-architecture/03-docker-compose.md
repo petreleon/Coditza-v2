@@ -2,11 +2,12 @@
 
 ## Required design
 
-Docker Compose initially runs the Fastify API. After ARC-WASM-001, it also
-provides the exact private grader-controller and hardened disposable-sandbox
-test path selected by that ADR. The official Supabase CLI starts and owns the
-local Supabase containers. Do not add `postgres`, `auth`, `rest`, or a second
-Supabase stack to `compose.yaml`.
+Docker Compose runs the Fastify API. ADR 0006's completed ARC-WASM-001 proof
+uses a standalone, fixed-argument Docker invocation for a local Pyodide
+public-proof runner; it intentionally does not add a controller or sandbox
+service to Compose. The official Supabase CLI starts and owns the local Supabase
+containers. Do not add `postgres`, `auth`, `rest`, or a second Supabase stack to
+`compose.yaml`.
 
 Root Compose also does not own Auth SMTP. SUP-SMTP-LOCAL-001 configures the
 CLI-owned local Auth service through its current supported local configuration
@@ -37,9 +38,10 @@ work, and never hard-code a developer-specific IP.
 - Root `compose.yaml`.
 - Linux-local connectivity override when required by the verified CLI bind.
 - Optional later deployment override only after a host is selected.
-- After ARC-WASM-001, immutable grader-controller/sandbox build definitions and
-  a local no-network policy verification path; do not invent them in the
-  foundation Docker task.
+- `Dockerfile.python-wasm-sandbox`, `scripts/python-wasm/`, and the immutable
+  local proof lock created by ARC-WASM-001. They are not Compose services or
+  application runtime configuration. FAST-WASM-001 must add any future
+  controller integration without giving that controller a broad Docker socket.
 - Operations guide with host and Compose workflows.
 
 ## Image stages
@@ -115,8 +117,9 @@ readiness route exist.
 
 ## Python sandbox extension
 
-FAST-WASM-001 extends the already verified Compose workflow without weakening
-ARC-DOCKER-001:
+FAST-WASM-001 may extend the already verified Compose workflow without weakening
+ARC-DOCKER-001. It must preserve the ADR 0006 separation: the existing local
+proof harness is developer-invoked only and is not a controller adapter.
 
 - the controller has no public port and no container-engine socket;
 - each learner run uses the ARC-WASM-001 disposable outer boundary, not merely
@@ -127,8 +130,9 @@ ARC-DOCKER-001:
 - `docker compose down` and failed tests leave no worker, scratch volume, or
   lease that can be mistaken for a completed attempt.
 
-If the selected local launcher cannot meet these rules without granting the API
-or controller broad host/container authority, ARC-WASM-001 remains blocked.
+If a future selected launcher cannot meet these rules without granting the API
+or controller broad host/container authority, that future controller/host task
+remains blocked. ADR 0006 does not authorize an exception.
 
 ## Planned local sequence
 

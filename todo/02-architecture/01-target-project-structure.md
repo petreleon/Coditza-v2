@@ -47,6 +47,7 @@ Coditza/
 │   ├── operations/
 │   └── implementation/
 ├── scripts/
+│   └── python-wasm/              # ARC-WASM-001 developer-local proof only
 ├── todo/
 ├── .dockerignore
 ├── .env.example
@@ -54,6 +55,7 @@ Coditza/
 ├── .nvmrc
 ├── compose.yaml
 ├── Dockerfile
+├── Dockerfile.python-wasm-sandbox # locked local proof image, not API runtime
 ├── package.json
 ├── package-lock.json
 ├── python-wasm-runtime.lock.json
@@ -87,6 +89,11 @@ approves the isolated execution architecture. It is an internal worker
 entrypoint from the same release, not a public Fastify service. Exact runtime
 assets live in a content-addressed, lock-manifest-verified location selected by
 ARC-WASM-001; they are not downloaded by a running application.
+
+The existing `scripts/python-wasm/` and `Dockerfile.python-wasm-sandbox` are
+the ADR 0006 developer-local reference harness. They have no Fastify import,
+listener, database configuration, or controller lifecycle, and must not be
+relocated into `apps/grader-controller` merely because a later controller exists.
 
 ## TypeScript/ESM contract
 

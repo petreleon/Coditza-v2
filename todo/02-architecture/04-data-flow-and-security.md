@@ -35,6 +35,21 @@
 6. Use case translates known outcomes; the inbound adapter maps them to stable
    public problem codes without recomputing score/status.
 
+## ARC-WASM-001 local reference flow (not grading)
+
+```text
+developer command
+  -> fixed local launch broker
+  -> one inspected, auto-removed Docker container
+  -> pinned Pyodide worker executes public synthetic cases
+  -> local_public_proof result
+```
+
+This flow has no Fastify request, Supabase client, database row, Auth/TOTP
+material, learner identity, private case plan, score, attempt, or finalization.
+The broker's Docker CLI authority is scoped to this developer-local evidence
+command and cannot be reused by a future API/controller process.
+
 ## Threats and required controls
 
 | Threat | Required control |
@@ -55,6 +70,8 @@
 | Resource exhaustion | payload limits, pagination, timeouts, rate limits |
 | Secret adapter overreach | narrow ports, explicit selects, actor checks, import rules |
 | Module ownership drift | one-owner inventory, `public.ts` imports, negative boundary fixtures |
+| Local proof mistaken for grading | `local_public_proof` result kind, no private plan/score/finalization path, later controller validation |
+| Docker authority enters application runtime | standalone developer harness only; Fastify/controller import and socket authority forbidden |
 
 ## Tasks
 

@@ -5,8 +5,8 @@
   implementation on 2026-07-27; only task-scoped local work is currently
   authorized.
 - Current phase: 2 — Local Supabase and database security
-- Active implementation task: ARC-WASM-001 (next; local Python/WASM execution-boundary proof)
-- Last verified implementation task: OPS-VERCEL-001 (topology review) and G1
+- Active implementation task: SUP-LOCAL-001 (next; local Supabase CLI setup)
+- Last verified implementation task: ARC-WASM-001 local Python/WASM public proof
 - Last updated: 2026-07-27
 
 ## Phase status
@@ -15,7 +15,7 @@
 | --- | --- | --- |
 | 0 — Plan acceptance | Complete; G0 and PLAN-004 passed | G0 |
 | 1 — Foundation and containers | Complete; QA-STRAT-001 and G1 passed | G1 |
-| 2 — Local Supabase and schema | ARC-WASM-001 next; local execution-boundary proof only | G2 |
+| 2 — Local Supabase and schema | SUP-LOCAL-001 next; ARC-WASM-001 local public proof complete | G2 |
 | 3 — Fastify identity/read slice | Not started | G3 |
 | 4 — Learning workflows | Not started | G4 |
 | 5 — Authoring/admin workflows | Not started | G5 |
@@ -31,9 +31,10 @@
   approvals. ADR 0005 does not select any of them.
 - Actual registration/login screens remain outside this backend plan until
   DEC-006 is changed by a later client request.
-- DEC-032 must be resolved by ARC-WASM-001 with a demonstrably hardened
-  outer-sandbox launcher; an in-process/worker-thread/WASI-only fallback is
-  forbidden.
+- DEC-032 has an accepted local public-proof boundary in ADR 0006. The
+  authoritative protected controller/hosted-equivalence portion remains
+  deferred to its named database/controller/QA/OPS tasks; an
+  in-process/worker-thread/WASI-only fallback remains forbidden.
 - Production self-service signup remains blocked until DEC-029 defines and
   approves lost-all-factors recovery.
 
@@ -100,6 +101,11 @@ to the deadlines in that file.
   official Vercel evidence now accepts Vercel for the public Fastify API while
   requiring an unselected, later-approved private execution plane. No hosted
   resource, secret, or billing action occurred.
+- [ARC-WASM-001 report](../docs/implementation/ARC-WASM-001.md) and
+  [ADR 0006](../docs/adr/0006-local-python-wasm-reference-proof.md); exact
+  Pyodide/image assets and a hardened Docker public-proof runner passed local
+  adversarial checks. It creates neither a controller nor an authoritative
+  private-test/finalization path, and it selects no hosted provider.
 - [G1 completion record](08-execution/00-roadmap.md#g1-completion-record);
   Foundation reproducibility is recorded from the accepted architecture/product
   contracts, current checks, Docker evidence, and scope review.

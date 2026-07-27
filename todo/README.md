@@ -50,8 +50,10 @@ no-network local target guard, sanitized ignored reports, and a reproducible
 read-only/no-network checks-container loop. OPS-VERCEL-001 then completed the
 read-only official Vercel topology review: ADR 0005 retains Vercel for the
 future public Fastify API and leaves the required private execution plane
-unselected. G1 remains passed; ARC-WASM-001 is the sole next local task. Real
-application modules, Supabase, and all hosted configuration remain deferred.
+unselected. ARC-WASM-001 then completed a local public-proof Docker boundary
+with pinned Pyodide assets; it did not create a controller, hidden-test path, or
+hosted selection. G1 remains passed and SUP-LOCAL-001 is the sole next local
+task. Real application modules and all hosted configuration remain deferred.
 Planning files plus the separately requested root `.env`, `.env.example`,
 `.gitignore`, and `.dockerignore` safety files may exist. The existing
 hosted-project environment values do not authorize a schema or deployment action;
@@ -135,9 +137,10 @@ permission to start an unscheduled parallel task.
 - Published assessed content is immutable in the MVP. Archive and replace it
   rather than editing history under existing attempts.
 - The local Supabase stack is owned by the Supabase CLI. Docker Compose owns the
-  Fastify API and, after ARC-WASM-001, private grader-controller/isolation test
-  wiring; it must not start a competing standalone PostgreSQL service or be
-  mistaken for the per-submission security boundary.
+  Fastify API only. ADR 0006's local Python/WASM proof uses a standalone fixed
+  Docker invocation, not a Compose service or future controller; neither may
+  start a competing standalone PostgreSQL service or be mistaken for the
+  per-submission security boundary.
 - No frontend technology is selected or implemented by this plan. Registration
   and login are specified and tested through a provider-neutral client contract
   and a headless local harness; actual screens remain a later client task.

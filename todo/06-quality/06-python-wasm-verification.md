@@ -14,6 +14,13 @@ bounds. The future browser adapter must match server results for public tests
 under the same manifest, but a parity match never makes browser grading
 authoritative.
 
+ADR 0006 contributes a narrow local public-proof regression suite: locked
+asset/image checks, strict framing/digest rejection, deterministic public runs,
+selected escape attempts, resource-result mapping, configuration inspection,
+and detached-client cleanup. It contains no private test plan, controller,
+database job, learner attempt, or finalization. It is evidence for the outer
+boundary design, not a substitute for QA-WASM-001's authoritative suite.
+
 ## Adversarial matrix
 
 Test at least:

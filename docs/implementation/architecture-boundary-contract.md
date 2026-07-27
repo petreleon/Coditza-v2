@@ -27,9 +27,24 @@ grader-controller process -> disposable hardened sandbox -> pinned Pyodide worke
                                 no network, no secret, no host mount, no socket
 ~~~
 
+ADR 0006 additionally records a developer-local **reference proof** outside the
+application graph:
+
+~~~text
+developer invokes scripts/python-wasm/local-launch-broker.mjs
+  -> one fixed, inspected, auto-removed local Docker container
+  -> local_public_proof only
+~~~
+
+This harness is neither the future grader-controller nor a sandbox port. It has
+local Docker CLI authority only to create the fixed proof container and is not
+importable by Fastify or a controller. It has no listener, database, queue,
+lease, private harness, or finalization capability.
+
 The grader-controller is not a public service, has no listener, owns no
 business data, and uses the same reviewed release. It is the only permitted
-process/deployment exception for learner Python. No microservice, broker,
+**product** process/deployment exception for learner Python; the local proof
+above is development evidence, not a product process. No microservice, broker,
 separate application database, ORM, generic event bus, distributed cache, or
 runtime DI container is authorized.
 
@@ -92,6 +107,7 @@ is denied.
 | server.ts | no | no | no | no | no | startup/shutdown only | yes | no |
 | grader-controller root | no | assessment queue/finalization contract only | its approved adapters | assessment only | runner protocol DTOs only | bounded | no | narrow queue credential remains inside adapter |
 | sandbox worker | no Coditza module import | versioned runner protocol only | no | no | protocol primitives only | no | no | no |
+| local Python/WASM proof harness | no | fixed public synthetic proof only | local Docker CLI for its fixed image only | no | `local_public_proof` only | no | no | never an application/controller adapter |
 | one-off executable | task-specific contract only | minimum needed | its approved adapters only | no ambient import | bounded | bounded | never registered | narrow adapter only |
 
 The matrix is stricter than folder proximity. For example, an HTTP adapter may

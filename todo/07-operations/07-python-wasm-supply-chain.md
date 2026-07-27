@@ -4,6 +4,11 @@
 
 Prerequisites: ARC-WASM-001 and QA-WASM-001.
 
+ADR 0006 leaves a reviewed local reference lock with exact assets and image-side
+hash checks. It is not an SBOM, signed provenance, offline clean-cache, hosted
+promotion, or rollback record. OPS-WASM-001 must revalidate the lock rather than
+treat its presence as release evidence.
+
 - [ ] Verify every Pyodide/Python/standard-library/package/harness/worker/image
       asset against `python-wasm-runtime.lock.json`; forbid CDN and runtime
       downloads.

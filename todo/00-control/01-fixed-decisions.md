@@ -122,9 +122,11 @@ approved ADR supersedes one.
 
 ## Containers
 
-- A root `compose.yaml` is required for the Fastify API and, after
-  ARC-WASM-001, the private grader-controller/isolation test wiring. Compose is
-  not itself the per-submission security boundary.
+- A root `compose.yaml` is required for the Fastify API. ADR 0006's completed
+  local Python/WASM reference proof deliberately runs as a standalone,
+  fixed-argument Docker invocation rather than a Compose service. A later
+  controller/isolation integration may be added only by FAST-WASM-001; Compose
+  is never itself the per-submission security boundary.
 - The normal bridged API container listens on `0.0.0.0`. A Linux-only local
   host-network connectivity path binds the API to `127.0.0.1` and publishes no
   Compose port.
@@ -190,9 +192,10 @@ approved ADR supersedes one.
 - Production creation, billing changes, destructive remote migrations, key
   rotation, and production deployment require explicit user approval.
 - No frontend framework is selected. Vercel is the user-requested eventual
-  public deployment target. OPS-VERCEL-001 must verify the exact public-API and
-  private-grader deployment topology before ARC-WASM-001 chooses a hosted
-  sandbox launcher; a supplemental private host is never selected implicitly.
+  public deployment target. OPS-VERCEL-001 verified the public-API/private-
+  grader topology, and ADR 0006 proved only a local reference boundary. A
+  supplemental hosted private launcher is selected solely by OPS-HOST-001 after
+  explicit user approval; it is never selected implicitly.
 - Local Auth email delivery uses the user-controlled Gmail SMTP account only
   through the Supabase CLI-owned local Auth stack. Root `compose.yaml` never
   owns that transport or its credential. SUP-SMTP-LOCAL-001 requires a Gmail

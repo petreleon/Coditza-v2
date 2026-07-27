@@ -1,0 +1,39 @@
+# Local-only ARC-WASM proof image. It is launched only by the fixed broker.
+FROM node:24.18.0-bookworm-slim@sha256:6f7b03f7c2c8e2e784dcf9295400527b9b1270fd37b7e9a7285cf83b6951452d AS native-build
+
+USER root
+RUN apt-get update \
+  && apt-get install --no-install-recommends --yes gcc libc6-dev libseccomp-dev=2.5.4-1+deb12u1 \
+  && rm -rf /var/lib/apt/lists/*
+
+WORKDIR /build
+COPY scripts/python-wasm/native/seccomp-gate.c ./seccomp-gate.c
+RUN gcc -std=c11 -O2 -D_FORTIFY_SOURCE=2 -fstack-protector-strong -fPIC -shared \
+  -I/usr/local/include/node -Wl,-z,relro,-z,now,-z,noexecstack \
+  -o seccomp-gate.node seccomp-gate.c -lseccomp
+
+FROM node:24.18.0-bookworm-slim@sha256:6f7b03f7c2c8e2e784dcf9295400527b9b1270fd37b7e9a7285cf83b6951452d AS runtime
+
+USER root
+WORKDIR /opt/coditza
+COPY package.json package-lock.json ./
+COPY apps/api/package.json ./apps/api/package.json
+RUN npm ci --ignore-scripts --omit=dev \
+  && npm cache clean --force \
+  && find /opt/coditza/node_modules -type f -name '*.map' -delete
+
+COPY scripts/python-wasm/runtime-policy.mjs ./runtime-policy.mjs
+COPY scripts/python-wasm/runner.mjs ./runner.mjs
+COPY --from=native-build /build/seccomp-gate.node ./native/seccomp-gate.node
+
+RUN chown -R 65532:65532 /opt/coditza \
+  && mkdir /work \
+  && chown 65532:65532 /work \
+  && test -r /usr/lib/aarch64-linux-gnu/libseccomp.so.2.5.4
+
+USER 65532:65532
+
+# The direct env entrypoint deliberately clears Docker/base-image variables.
+# Docker applies the bootstrap seccomp filter before this process, and the
+# trusted runner adds its permanent post-bootstrap filter before it reads input.
+ENTRYPOINT ["/usr/bin/env", "-i", "PATH=/usr/local/bin:/usr/bin:/bin", "HOME=/nonexistent", "LANG=C", "LC_ALL=C", "TZ=UTC", "UV_USE_IO_URING=0", "node", "/opt/coditza/runner.mjs"]

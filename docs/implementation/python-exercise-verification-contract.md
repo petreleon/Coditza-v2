@@ -3,10 +3,11 @@
 Status: accepted by PRD-WASM-001 on 2026-07-27.
 
 This document freezes product semantics and credential-free vectors for Python
-code exercises. It does not choose, download, install, or execute Pyodide or
-Python; select an outer-sandbox launcher; create a controller; create a
-database object; or prove a runtime boundary. Those actions remain owned by
-ARC-WASM-001, SUP-WASM-001, FAST-WASM-001, API-WASM-001, and QA-WASM-001.
+code exercises. ADR 0006 has since selected and proved a **developer-local
+public reference** Pyodide/Docker boundary, but it did not create a controller,
+database object, private test channel, or authoritative grading run. Protected
+definition/job/finalization work remains owned by SUP-WASM-001, FAST-WASM-001,
+API-WASM-001, and QA-WASM-001.
 
 ## Product scope and authority
 
@@ -161,9 +162,10 @@ limits, and non-secret runtime metadata. They never contain private case plan
 content, expected values, hidden test counts/digests, harness source, private
 tracebacks, or internal import allowlists.
 
-This contract selects no runtime, package, asset digest, launcher, or limit
-implementation. ARC-WASM-001 must select and prove them while preserving these
-semantics.
+This contract does not itself select a production runtime, package, asset digest,
+hosted launcher, or limit implementation. ADR 0006's local reference lock must
+preserve these semantics but cannot replace the protected authoritative handoff
+and finalization work.
 
 ## Closed authoritative runner protocol
 
@@ -344,7 +346,7 @@ and does not receive Auth material in its Python worker.
 
 | Task | Owns after this semantic contract |
 | --- | --- |
-| ARC-WASM-001 | Exact Pyodide/Python assets, runtime manifest, outer sandbox, protocol implementation, and launcher proof. |
+| ARC-WASM-001 | Completed ADR 0006 developer-local Pyodide/runtime lock, public-proof protocol, and outer-boundary evidence; no controller/private-test/finalization or hosted provider selection. |
 | SUP-WASM-001 | Private definition/job/evidence persistence, grants, leases, reserve/claim/finalize functions, retention. |
 | FAST-WASM-001 | Controller process, narrow ports/adapters, backpressure, shutdown, and result validation. |
 | API-WASM-001 | AAL2 HTTP schemas, reservation/status routes, owner concealment, idempotency, and forged-result rejection. |

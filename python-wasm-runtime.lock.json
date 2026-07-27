@@ -1,0 +1,88 @@
+{
+  "lockVersion": 1,
+  "reviewedAt": "2026-07-27",
+  "status": "local-proof-only",
+  "runtime": {
+    "pyodide": {
+      "npmPackage": "pyodide@314.0.3",
+      "npmTarball": "https://registry.npmjs.org/pyodide/-/pyodide-314.0.3.tgz",
+      "npmIntegrity": "sha512-sK40My6m8tmBUYtYH9au9rXUeh9x0wfahtHdOlGmJxZDsKBGKtP6KznyFB2+u/klbQTdDionR0uaVd176zVQzQ==",
+      "releaseUrl": "https://github.com/pyodide/pyodide/releases/tag/314.0.3",
+      "license": "MPL-2.0",
+      "runtimePython": "3.14.2",
+      "abiPython": "3.14.0",
+      "abiVersion": "2026_0",
+      "platform": "emscripten_5_0_3",
+      "architecture": "wasm32",
+      "assets": {
+        "package.json": "sha256:0393eb01a0707cddc251f1a66090998773fe1aa3cfde66eedc96e83e43861845",
+        "pyodide.asm.mjs": "sha256:1a9775427ef6e8abaa7db88ece0515422d1886915ae5c9093776410c865dfd8d",
+        "pyodide.asm.wasm": "sha256:e7f8fac36f8bf11085309cbc5c829b3ec3057c18bf1d73b05a6741612d63cdbf",
+        "pyodide-lock.json": "sha256:c963d22858f6bcb8f41586a2142f03905ab370c88ea22a86a2736e95fac2a8f3",
+        "pyodide.mjs": "sha256:5cfc46f5dcbaf2a16f26e2363f441873eb424762609cc03db00d6a2ace4d00e5",
+        "python_stdlib.zip": "sha256:444c770dfd75a32097fc0a7d5c1413fd3140601f49c3a1f2e9af0376fcd124b4"
+      },
+      "allowedExternalPackages": [],
+      "runtimeFetchAllowed": false
+    },
+    "node": {
+      "version": "24.18.0",
+      "baseImage": "node:24.18.0-bookworm-slim@sha256:6f7b03f7c2c8e2e784dcf9295400527b9b1270fd37b7e9a7285cf83b6951452d"
+    }
+  },
+  "protocol": {
+    "version": "coditza-python-runner-v1",
+    "fixtureVersion": "coditza-python-fixture-v1",
+    "profile": "python-basic-v1"
+  },
+  "sandbox": {
+    "launcher": "local-docker-launch-broker-v1",
+    "localImage": {
+      "tag": "coditza/python-wasm-sandbox:arc-wasm-001",
+      "id": "sha256:45767967a410ff8a3b3452809836504956a5a57073fb938ef83165c255f1337e",
+      "architecture": "linux/arm64"
+    },
+    "fixedUser": "65532:65532",
+    "bootstrapSeccompPolicy": "sha256:5fe648eb27717cd0aa86dcc49a3422b6040327a9b6e1f7c72e1c3ec00b8cbf14",
+    "nativeGateSource": "sha256:2e74b890eb6386a19fc1d140d2118fc878a9100a93233d371873f7f0fdc91218",
+    "nativeGateBinary": "sha256:9f07733c4b9afa112da3225781f46f60ce5145221f7c1cb1163c09df6c821a0c",
+    "libseccomp": {
+      "version": "2.5.4-1+deb12u1",
+      "library": "sha256:37ab5fe229e2edbd12350516158d4940337ceec093f0a498583636a0b4b54375"
+    },
+    "runner": "sha256:4ab2aeb19fadbbb6264a100bdf89be9392c5a44f0af7c9bb20c500c05cd1fd96",
+    "policy": "sha256:26e71b2a34ccfeb55f14837e2ee63b3abb2cba0d8b12d069dcc06f8f2b659699",
+    "localLaunchBroker": "sha256:87b0610a74a355185aeb2c26b3323efabc77c692f7a1b2e2dd105c84c3d5ef88",
+    "dockerfile": "sha256:810532709a731cdb2c4dad887b541ad06b127fb34308c14aedeb516ba9f2b642",
+    "imageFiles": {
+      "/opt/coditza/native/seccomp-gate.node": "sha256:9f07733c4b9afa112da3225781f46f60ce5145221f7c1cb1163c09df6c821a0c",
+      "/opt/coditza/runner.mjs": "sha256:4ab2aeb19fadbbb6264a100bdf89be9392c5a44f0af7c9bb20c500c05cd1fd96",
+      "/opt/coditza/runtime-policy.mjs": "sha256:26e71b2a34ccfeb55f14837e2ee63b3abb2cba0d8b12d069dcc06f8f2b659699",
+      "/usr/lib/aarch64-linux-gnu/libseccomp.so.2.5.4": "sha256:37ab5fe229e2edbd12350516158d4940337ceec093f0a498583636a0b4b54375",
+      "/opt/coditza/node_modules/pyodide/package.json": "sha256:0393eb01a0707cddc251f1a66090998773fe1aa3cfde66eedc96e83e43861845",
+      "/opt/coditza/node_modules/pyodide/pyodide.asm.mjs": "sha256:1a9775427ef6e8abaa7db88ece0515422d1886915ae5c9093776410c865dfd8d",
+      "/opt/coditza/node_modules/pyodide/pyodide.asm.wasm": "sha256:e7f8fac36f8bf11085309cbc5c829b3ec3057c18bf1d73b05a6741612d63cdbf",
+      "/opt/coditza/node_modules/pyodide/pyodide-lock.json": "sha256:c963d22858f6bcb8f41586a2142f03905ab370c88ea22a86a2736e95fac2a8f3",
+      "/opt/coditza/node_modules/pyodide/pyodide.mjs": "sha256:5cfc46f5dcbaf2a16f26e2363f441873eb424762609cc03db00d6a2ace4d00e5",
+      "/opt/coditza/node_modules/pyodide/python_stdlib.zip": "sha256:444c770dfd75a32097fc0a7d5c1413fd3140601f49c3a1f2e9af0376fcd124b4"
+    },
+    "profileLimits": {
+      "initializationWallMs": 15000,
+      "learnerWallMs": 5000,
+      "learnerCpuSeconds": 3,
+      "memoryBytes": 268435456,
+      "scratchBytes": 8388608,
+      "scratchRegularFiles": 128,
+      "sourceFiles": 16,
+      "sourceFileBytes": 65536,
+      "sourceTotalBytes": 262144,
+      "outputBytes": 65536,
+      "resultBytes": 131072,
+      "pids": 16
+    }
+  },
+  "hostedExecution": {
+    "status": "unselected",
+    "requiredCapability": "A later approved private launcher must enforce equivalent or stronger controls and prove the same runtime lock before deployment."
+  }
+}
