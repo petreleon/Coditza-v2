@@ -19,3 +19,24 @@ services:
         source: ./apps/api/src
         target: /workspace/apps/api/src
         read_only: true
+
+  checks:
+    profiles: ["checks"]
+    build:
+      context: .
+      target: checks
+    command: ["npm", "run", "format:check"]
+    entrypoint: []
+    init: true
+    network_mode: none
+    read_only: true
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
+    environment:
+      npm_config_cache: /tmp/npm-cache
+      npm_config_update_notifier: "false"
+    tmpfs:
+      - /tmp:rw,noexec,nosuid,nodev,mode=1777,uid=1000,gid=1000,size=64m
+      - /workspace/apps/api/dist:rw,noexec,nosuid,nodev,mode=0755,uid=1000,gid=1000,size=64m

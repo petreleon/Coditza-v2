@@ -379,7 +379,7 @@ Execute in this order:
 11. [x] ARC-BOUND-002 — app/listener boundary acceptance.
 12. [x] FAST-LIVE-001 — dependency-free liveness route.
 13. [x] ARC-DOCKER-001 — local Compose API service.
-14. [ ] ARC-DOCKER-002 — disposable container check path.
+14. [x] ARC-DOCKER-002 — disposable container check path.
 15. [ ] ARC-DOCKER-003 — production image proof.
 16. [ ] QA-STRAT-001 — test harness, Auth helpers and local-environment guard.
 17. [ ] Verify and record G1.

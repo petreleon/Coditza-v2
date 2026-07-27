@@ -83,11 +83,11 @@ runtime image.
 
 ### ARC-DOCKER-002 — Define foundation test execution
 
-- [ ] Provide a Compose profile or documented `docker compose run --rm` path for
+- [x] Provide a Compose profile or documented `docker compose run --rm` path for
       lint, typecheck, unit, and build commands.
-- [ ] Make test containers disposable and independent of developer global npm
+- [x] Make test containers disposable and independent of developer global npm
       packages.
-- [ ] Preserve useful test exit codes and reports.
+- [x] Preserve useful test exit codes and reports.
 
 ### ARC-DOCKER-003 — Verify production image
 

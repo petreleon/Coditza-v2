@@ -5,9 +5,8 @@
   implementation on 2026-07-27; only task-scoped local work is currently
   authorized.
 - Current phase: 1 — Foundation and API container
-- Active implementation task: ARC-DOCKER-002 (next; disposable foundation
-  container-check path)
-- Last verified implementation task: ARC-DOCKER-001
+- Active implementation task: ARC-DOCKER-003 (next; production image proof)
+- Last verified implementation task: ARC-DOCKER-002
 - Last updated: 2026-07-27
 
 ## Phase status
@@ -15,7 +14,7 @@
 | Phase | Status | Gate |
 | --- | --- | --- |
 | 0 — Plan acceptance | Complete; G0 and PLAN-004 passed | G0 |
-| 1 — Foundation and containers | ARC-DOCKER-001 complete; ARC-DOCKER-002 next | G1 |
+| 1 — Foundation and containers | ARC-DOCKER-002 complete; ARC-DOCKER-003 next | G1 |
 | 2 — Local Supabase and schema | Not started | G2 |
 | 3 — Fastify identity/read slice | Not started | G3 |
 | 4 — Learning workflows | Not started | G4 |
@@ -81,6 +80,10 @@ to the deadlines in that file.
   non-root development image, ignored build context, Compose configuration,
   host liveness, source reload, graceful shutdown, and exact-project cleanup
   passed using synthetic local configuration.
+- [ARC-DOCKER-002 report](../docs/implementation/ARC-DOCKER-002.md); isolated
+  non-root/read-only/no-network Compose checks passed format, lint, typecheck,
+  155 tests, boundary verification, build, exact nonzero exit propagation, and
+  exact-project cleanup using safe placeholder configuration.
 
 ## Update rule
 

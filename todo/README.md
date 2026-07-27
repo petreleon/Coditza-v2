@@ -38,9 +38,11 @@ accepted the one-factory/one-listener boundary with an AST-backed regression
 guard. FAST-LIVE-001 added the closed dependency-free foundation liveness
 route with listener-free injection evidence. ARC-DOCKER-001 added and
 runtime-verified the non-root local API Docker/Compose path: pinned image,
-ignored context, health/liveness, source reload, and graceful shutdown. The
-next task is the isolated foundation container-check path; real application
-modules/adapters remain deferred.
+ignored context, health/liveness, source reload, and graceful shutdown.
+ARC-DOCKER-002 added a profile-gated, non-root/read-only/no-network container
+check path for foundation scripts with exact exit-code and cleanup proof. The
+next task verifies the production image; real application modules/adapters
+remain deferred.
 Planning files plus the separately requested root `.env`, `.env.example`,
 `.gitignore`, and `.dockerignore` safety files may exist. The existing
 hosted-project environment values do not authorize a schema or deployment action;

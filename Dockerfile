@@ -20,6 +20,16 @@ COPY --chown=node:node tsconfig.base.json ./
 COPY --chown=node:node apps/api apps/api
 RUN npm run build
 
+FROM dependencies AS checks
+
+ENV NODE_ENV=test
+
+# One-off checks never start Fastify, so an API liveness probe would be false.
+HEALTHCHECK NONE
+
+COPY --chown=node:node tsconfig.base.json eslint.config.js .dependency-cruiser.cjs ./
+COPY --chown=node:node apps/api apps/api
+
 FROM dependencies AS development
 
 ENV NODE_ENV=development
