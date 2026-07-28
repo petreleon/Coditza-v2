@@ -461,9 +461,10 @@ named as the sole next task in `TASKS.md` and `NEXT.md`.
    record it as resolved; do not start SUP-MFA-001 with this prerequisite open.
 10. [ ] SUP-MFA-001 — explicitly enable/prove local Authenticator TOTP and
    sanitized AAL transitions.
-11. [ ] SUP-DATA-001 — module/chapter/theory hierarchy; this is the sole next
+11. [x] SUP-DATA-001 — module/chapter/theory hierarchy; see the
+    [completion report](../../docs/implementation/SUP-DATA-001.md).
+12. [ ] SUP-DATA-002 — exercises/quizzes/private keys; this is the sole next
     unblocked task independent of the SMTP/MFA prerequisite.
-12. [ ] SUP-DATA-002 — exercises/quizzes/private keys.
 13. [ ] SUP-DATA-003 — attempts/completions/progress/audit/idempotency.
 14. [ ] ARC-SEC-003 — audit contract acceptance.
 15. [ ] SUP-FUNCTIONS-001 — module-owned transactional workflows and helpers.

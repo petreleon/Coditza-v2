@@ -76,11 +76,14 @@ environment-level operations.
   the named foundational role/schema/types/helpers and task-owned local tests.
   SUP-AUTH-001 completed the local signup-profile migration, trigger, and
   protected proof. PRD-ROLE-001 verified the product default-learner
-  requirement against that evidence. SUP-DATA-001 is now the sole active local
-  task; it may create only the module/chapter/theory hierarchy migration and
-  task-owned checks through the local stack. It must not create/configure a
-  hosted resource, authenticate a CLI, enter a secret, select a
-  provider/region/tier/cost/owner, or change public API deployment behavior.
+  requirement against that evidence. SUP-DATA-001 then completed the protected
+  module/chapter/theory hierarchy migration and task-owned proof.
+  SUP-DATA-002 is now the sole active local task; it may create only the
+  assessment-definition/private-key migration, narrowly required validators or
+  task-owned database functions, and task-owned checks through the local stack.
+  It must not create/configure a hosted resource, authenticate a CLI, enter a
+  secret, select a provider/region/tier/cost/owner, or change public API
+  deployment behavior.
 - A hosted, production, billing-sensitive, destructive, or secret-dependent
   action still needs its own task-specific authority; broad implementation
   authorization does not authorize it.

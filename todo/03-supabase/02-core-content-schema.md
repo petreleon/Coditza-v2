@@ -84,12 +84,12 @@ Indexes: `(chapter_id, status, position, id)` and actor FKs.
 
 ## SUP-DATA-001 — Implement and prove core hierarchy
 
-- [ ] Create the enum/shared-function migration before table migrations.
-- [ ] Create tables in parent-to-child order.
-- [ ] Add every foreign-key index explicitly.
-- [ ] Add updated-at trigger and prove it changes only on update.
-- [ ] Test blank/oversized text, invalid slug, invalid time, duplicate
+- [x] Create the enum/shared-function migration before table migrations.
+- [x] Create tables in parent-to-child order.
+- [x] Add every foreign-key index explicitly.
+- [x] Add updated-at trigger and prove it changes only on update.
+- [x] Test blank/oversized text, invalid slug, invalid time, duplicate
       slug/position, and restricted delete.
-- [ ] Test full transactional reorder and a stale-version conflict.
-- [ ] Test effective visibility when a child is published under a non-published
+- [x] Test full transactional reorder and a stale-version conflict.
+- [x] Test effective visibility when a child is published under a non-published
       parent.
