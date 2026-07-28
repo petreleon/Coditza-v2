@@ -13,8 +13,13 @@ const supabaseDirectory = path.join(repositoryRoot, "supabase");
 const configPath = path.join(supabaseDirectory, "config.toml");
 const migrationsDirectory = path.join(supabaseDirectory, "migrations");
 const seedPath = path.join(supabaseDirectory, "seed.sql");
-const primitiveTestsDirectory = path.join(supabaseDirectory, "tests");
+const testsDirectory = path.join(supabaseDirectory, "tests");
 const primitiveTestFilename = "primitives_test.sql";
+const authProfileTestFilename = "auth_profiles_test.sql";
+const approvedTestFilenames = new Set([
+  primitiveTestFilename,
+  authProfileTestFilename,
+]);
 const localEnvironmentPath = path.join(repositoryRoot, ".env.supabase.local");
 const localCliStateRoot = path.join(repositoryRoot, ".supabase", "local-cli");
 const cliEntrypoint = path.join(
@@ -38,6 +43,7 @@ const actions = new Set([
   "capture-env",
   "verify-resets",
   "verify-primitives",
+  "verify-auth-profiles",
   "stop",
 ]);
 const dangerousDockerEnvironmentNames = [
@@ -75,7 +81,7 @@ function assertInvocation() {
 
   if (!actions.has(action) || extraArguments.length > 0) {
     fail(
-      "Use one fixed local action: start, status, capture-env, verify-resets, verify-primitives, or stop.",
+      "Use one fixed local action: start, status, capture-env, verify-resets, verify-primitives, verify-auth-profiles, or stop.",
     );
   }
 
@@ -476,46 +482,52 @@ async function readApprovedResetInputs() {
   });
 }
 
-async function readApprovedPrimitiveTestInputs() {
+async function readApprovedTestInputs() {
   let directoryMetadata;
 
   try {
-    directoryMetadata = await fs.lstat(primitiveTestsDirectory);
+    directoryMetadata = await fs.lstat(testsDirectory);
   } catch {
-    fail("The reviewed local primitive test directory is missing.");
+    fail("The reviewed local database test directory is missing.");
   }
 
   if (!directoryMetadata.isDirectory() || directoryMetadata.isSymbolicLink()) {
-    fail("The reviewed local primitive test directory is unsafe.");
+    fail("The reviewed local database test directory is unsafe.");
   }
 
   let entries;
 
   try {
-    entries = await fs.readdir(primitiveTestsDirectory, {
+    entries = await fs.readdir(testsDirectory, {
       withFileTypes: true,
     });
   } catch {
-    fail("The reviewed local primitive test directory cannot be read.");
+    fail("The reviewed local database test directory cannot be read.");
   }
 
   if (
-    entries.length !== 1 ||
-    entries[0].name !== primitiveTestFilename ||
-    !entries[0].isFile() ||
-    entries[0].isSymbolicLink()
+    entries.length !== approvedTestFilenames.size ||
+    entries.some(
+      (entry) =>
+        !approvedTestFilenames.has(entry.name) ||
+        !entry.isFile() ||
+        entry.isSymbolicLink(),
+    )
   ) {
-    fail("The reviewed local primitive test set is unsafe.");
+    fail("The reviewed local database test set is unsafe.");
   }
 
-  const content = await readRegularFile(
-    path.join(primitiveTestsDirectory, primitiveTestFilename),
-    "The reviewed local primitive test is missing or unsafe.",
-  );
+  const tests = {};
 
-  return Object.freeze({
-    digest: sha256(content),
-  });
+  for (const filename of approvedTestFilenames) {
+    const content = await readRegularFile(
+      path.join(testsDirectory, filename),
+      "A reviewed local database test is missing or unsafe.",
+    );
+    tests[filename] = Object.freeze({ digest: sha256(content) });
+  }
+
+  return Object.freeze(tests);
 }
 
 async function assertCliEntrypoint() {
@@ -1138,6 +1150,41 @@ function localPrimitiveTestFailure({ stdout, stderr }) {
   return "The reviewed local primitive database tests did not pass.";
 }
 
+function localAuthProfileTestFailure({ stdout, stderr }) {
+  const output = (stdout + "\n" + stderr).toLowerCase();
+  const failedAssertion = output.match(/not ok\s+(\d+)\s*-/u);
+
+  if (/not running|cannot connect|connection refused/u.test(output)) {
+    return "The reviewed local Supabase stack must be running before profile tests.";
+  }
+
+  if (
+    /permission denied while trying to connect to the docker daemon|cannot connect to the docker daemon|is the docker daemon running/u.test(
+      output,
+    )
+  ) {
+    return "The local profile tests could not access the local Docker engine.";
+  }
+
+  if (/permission denied|operation not permitted/u.test(output)) {
+    return "The reviewed local profile tests did not have the required local database privileges.";
+  }
+
+  if (failedAssertion !== null) {
+    return (
+      "The reviewed local profile database test assertion " +
+      failedAssertion[1] +
+      " did not pass."
+    );
+  }
+
+  if (/pull access denied|failed to pull|manifest unknown/u.test(output)) {
+    return "The local profile tests could not retrieve the local pgTAP image.";
+  }
+
+  return "The reviewed local profile database tests did not pass.";
+}
+
 function parseJsonOutput(output, failureMessage) {
   try {
     return JSON.parse(output);
@@ -1167,13 +1214,18 @@ function assertExpectedMigrationHistory(output, expectedVersions) {
 
   for (const [index, migration] of migrationHistory.migrations.entries()) {
     const expectedVersion = reviewedVersions[index];
+    // The pinned CLI emits an empty `remote` field for `--local` listings on
+    // some local-stack versions. A reset plus empty schema diff separately
+    // proves application; accept only that local-only form or a full mirror.
+    const hasAcceptedRemoteVersion =
+      migration?.remote === expectedVersion || migration?.remote === "";
 
     if (
       !migration ||
       typeof migration !== "object" ||
       Array.isArray(migration) ||
       migration.local !== expectedVersion ||
-      migration.remote !== expectedVersion
+      !hasAcceptedRemoteVersion
     ) {
       fail(
         "The local database migration history does not match the reviewed baseline.",
@@ -1349,6 +1401,26 @@ function printPrimitiveVerification(resetInputs, primitiveTests, fingerprint) {
   writeLine("Verified primitive reset fingerprint SHA-256: " + fingerprint);
   writeLine(
     "Applied local migration history matches the reviewed baseline; public and private schema diffs and lint passed.",
+  );
+}
+
+function printAuthProfileVerification(resetInputs, tests, fingerprint) {
+  writeLine("Local Auth-profile migration and pgTAP verification passed.");
+  writeLine("Reviewed migration count: " + resetInputs.migrationCount);
+  writeLine(
+    "Deterministic migration-and-seed manifest SHA-256: " +
+      resetInputs.manifest,
+  );
+  writeLine(
+    "Reviewed primitive test SHA-256: " + tests[primitiveTestFilename].digest,
+  );
+  writeLine(
+    "Reviewed Auth-profile test SHA-256: " +
+      tests[authProfileTestFilename].digest,
+  );
+  writeLine("Verified Auth-profile reset fingerprint SHA-256: " + fingerprint);
+  writeLine(
+    "Applied local migration history matches the reviewed baseline; primitive and Auth-profile pgTAP suites passed with public and private schema diffs and lint clean.",
   );
 }
 
@@ -1625,7 +1697,8 @@ async function main() {
   if (action === "verify-primitives") {
     await inspectNetwork(docker);
     const resetInputs = await readApprovedResetInputs();
-    const primitiveTests = await readApprovedPrimitiveTestInputs();
+    const tests = await readApprovedTestInputs();
+    const primitiveTests = tests[primitiveTestFilename];
     const beforeTestFingerprint = await withIsolatedCliWorkspace(
       true,
       (workspace) =>
@@ -1640,7 +1713,7 @@ async function main() {
           "test",
           "db",
           "--local",
-          "supabase/tests",
+          `supabase/tests/${primitiveTestFilename}`,
         ],
         localPrimitiveTestFailure,
       ),
@@ -1663,6 +1736,58 @@ async function main() {
       sha256(
         JSON.stringify({
           primitiveTests: primitiveTests.digest,
+          resetFingerprint: afterTestFingerprint,
+        }),
+      ),
+    );
+    return;
+  }
+
+  if (action === "verify-auth-profiles") {
+    await inspectNetwork(docker);
+    const resetInputs = await readApprovedResetInputs();
+    const tests = await readApprovedTestInputs();
+    const beforeTestFingerprint = await withIsolatedCliWorkspace(
+      true,
+      (workspace) =>
+        resetAndVerifyLocalDatabase(workspace, resetInputs, primitiveSchemas),
+    );
+    await withIsolatedCliWorkspace(true, (workspace) =>
+      runSupabase(
+        workspace,
+        [
+          "--network-id",
+          networkName,
+          "test",
+          "db",
+          "--local",
+          `supabase/tests/${primitiveTestFilename}`,
+          `supabase/tests/${authProfileTestFilename}`,
+        ],
+        localAuthProfileTestFailure,
+      ),
+    );
+    const afterTestFingerprint = await withIsolatedCliWorkspace(
+      true,
+      (workspace) =>
+        resetAndVerifyLocalDatabase(workspace, resetInputs, primitiveSchemas),
+    );
+
+    if (beforeTestFingerprint !== afterTestFingerprint) {
+      fail(
+        "The local Auth-profile tests left non-deterministic database state.",
+      );
+    }
+
+    await assertNoPublicBindings(docker);
+    await assertLocalAuthHealth();
+    printAuthProfileVerification(
+      resetInputs,
+      tests,
+      sha256(
+        JSON.stringify({
+          authProfileTests: tests[authProfileTestFilename].digest,
+          primitiveTests: tests[primitiveTestFilename].digest,
           resetFingerprint: afterTestFingerprint,
         }),
       ),

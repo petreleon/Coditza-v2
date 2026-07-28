@@ -24,20 +24,24 @@ Do not duplicate password data, provider secrets, full Auth metadata, email,
 factor status/ID, TOTP secret/code, QR SVG or `otpauth` URI unless a later
 approved feature proves it needs a separately governed non-secret projection.
 
+For the signup projection, client-controlled Auth metadata has one accepted
+JSON key: camelCase `displayName`. Database columns remain `snake_case`; no
+legacy alias is accepted, and invalid or absent metadata uses `Learner`.
+
 ## SUP-AUTH-001 — Signup profile
 
-- [ ] Create a fixed-search-path security-definer trigger function.
-- [ ] Insert a profile for each new Auth user.
-- [ ] Accept a trimmed 1–80 character display name only when valid; otherwise use
+- [x] Create a fixed-search-path security-definer trigger function.
+- [x] Insert a profile for each new Auth user.
+- [x] Accept a trimmed 1–80 character display name only when valid; otherwise use
       the non-identifying constant `Learner`. Do not derive it from email.
-- [ ] Always force role `learner`, ignoring client metadata.
-- [ ] Initialize `security_hold_at` to null and deny all user-writable access to
+- [x] Always force role `learner`, ignoring client metadata.
+- [x] Initialize `security_hold_at` to null and deny all user-writable access to
       it.
-- [ ] Make duplicate invocation harmless or clearly constrained.
-- [ ] Test signup rollback if profile creation fails.
-- [ ] Test profile creation at `aal1` does not imply domain API access and stores
+- [x] Make duplicate invocation harmless or clearly constrained.
+- [x] Test signup rollback if profile creation fails.
+- [x] Test profile creation at `aal1` does not imply domain API access and stores
       no factor/enrollment metadata.
-- [ ] Test account deletion follows the approved cascade policy.
+- [x] Test account deletion follows the approved cascade policy.
 
 ## SUP-AUTH-002 — Role control
 

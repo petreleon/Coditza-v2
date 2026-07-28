@@ -27,7 +27,7 @@ an Auth/Data API context is required.
 
 ## Identity and RLS
 
-- [ ] DB-020 — Signup creates exactly one learner profile.
+- [x] DB-020 — Signup creates exactly one learner profile.
 - [ ] DB-021 — `anon`/`authenticated` cannot directly select/mutate profiles,
       content, attempts, progress, roles, or server workflow functions.
 - [ ] DB-022 — New-object default privileges remain deny-by-default.
@@ -36,9 +36,9 @@ an Auth/Data API context is required.
       learner/editor/admin capability/ownership.
 - [ ] DB-025 — Serialized bootstrap/admin changes protect the final admin,
       including concurrent demotion/deletion, and audit correctly.
-- [ ] DB-026 — No Coditza migration/table/type/seed duplicates Supabase Auth
+- [x] DB-026 — No Coditza migration/table/type/seed duplicates Supabase Auth
       factor state, TOTP secret/code, QR/`otpauth`, challenge or refresh token.
-- [ ] DB-027 — Signup initializes `security_hold_at` null, and no user-facing
+- [x] DB-027 — Signup initializes `security_hold_at` null, and no user-facing
       role can read, set, or clear it directly.
 - [ ] DB-028 — The operator system function alone can idempotently set/clear the
       hold under a profile lock; every transition/reason is safely audited and

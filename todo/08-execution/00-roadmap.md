@@ -451,9 +451,11 @@ named as the sole next task in `TASKS.md` and `NEXT.md`.
 6. [x] SUP-PRIMITIVES-001 — schemas, enums, common helpers, private/default
    privileges, and pgTAP proof; see the
    [completion report](../../docs/implementation/SUP-PRIMITIVES-001.md).
-7. [ ] SUP-AUTH-001 — signup profile trigger; this is the sole next unblocked
-   task.
-8. [ ] PRD-ROLE-001 — prove default learner creation.
+7. [x] SUP-AUTH-001 — signup profile trigger, owner/default-deny boundary, and
+   protected local pgTAP/reset proof; see the
+   [completion report](../../docs/implementation/SUP-AUTH-001.md).
+8. [ ] PRD-ROLE-001 — prove default learner creation; this is the sole next
+   unblocked task.
 9. [ ] Confirm or amend the documented DEC-030 two-factor safe default and
    record it as resolved; do not start SUP-MFA-001 with this prerequisite open.
 10. [ ] SUP-MFA-001 — explicitly enable/prove local Authenticator TOTP and
