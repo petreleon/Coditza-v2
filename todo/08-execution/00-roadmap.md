@@ -448,9 +448,11 @@ named as the sole next task in `TASKS.md` and `NEXT.md`.
 5. [ ] SUP-SMTP-LOCAL-001 — ineligible pending a user-provided Gmail App
    Password; configure only the CLI-owned local Auth SMTP path and do not alter
    root Compose or hosted SMTP.
-6. [ ] SUP-PRIMITIVES-001 — schemas, extensions, enums, common helpers; this
-   is the sole next unblocked task.
-7. [ ] SUP-AUTH-001 — signup profile trigger.
+6. [x] SUP-PRIMITIVES-001 — schemas, enums, common helpers, private/default
+   privileges, and pgTAP proof; see the
+   [completion report](../../docs/implementation/SUP-PRIMITIVES-001.md).
+7. [ ] SUP-AUTH-001 — signup profile trigger; this is the sole next unblocked
+   task.
 8. [ ] PRD-ROLE-001 — prove default learner creation.
 9. [ ] Confirm or amend the documented DEC-030 two-factor safe default and
    record it as resolved; do not start SUP-MFA-001 with this prerequisite open.

@@ -72,9 +72,10 @@ environment-level operations.
   the private execution provider/launcher unselected. ARC-WASM-001 completed a
   local public-proof boundary under ADR 0006 without a controller or hosted
   selection. SUP-LOCAL-001/002 completed the CLI-owned local stack and its
-  protected migration/reset/seed discipline. SUP-PRIMITIVES-001 is now the
-  sole active local task; it may create only its named foundational database
-  primitives and task-owned checks through that stack. It must not
+  protected migration/reset/seed discipline. SUP-PRIMITIVES-001 then completed
+  the named foundational role/schema/types/helpers and task-owned local tests.
+  SUP-AUTH-001 is now the sole active local task; it may create only its
+  signup-profile migration and task-owned checks through that stack. It must not
   create/configure a hosted resource, authenticate a CLI, enter a secret,
   select a provider/region/tier/cost/owner, or change public API deployment
   behavior.

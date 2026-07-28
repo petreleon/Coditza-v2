@@ -50,24 +50,31 @@ email decision.
 
 Prerequisites: SUP-LOCAL-001/002.
 
-- [ ] Create required extensions only after checking local/hosted availability.
-- [ ] Create the exact `coditza_owner` role with
+- [x] Check extension availability before adding one. No application extension
+      is required or created at this stage; pgTAP is transient test tooling
+      only.
+- [x] Create the exact `coditza_owner` role with
       `NOLOGIN NOINHERIT NOBYPASSRLS NOCREATEDB NOCREATEROLE NOREPLICATION`;
       grant no role membership to `service_role`, `anon`, or `authenticated`.
       Because roles are cluster-level and may survive a local schema reset, use
       an existence-guarded migration that revalidates/sets every attribute and
       fails on unexpected ownership/membership; never drop/recreate it casually.
-- [ ] Create the unexposed `private` schema and revoke/default-deny privileges.
-- [ ] Create `app_role`, `content_status`, `exercise_type`, `question_type`, and
+      The documented PostgreSQL creator-admin edge and the separate controlled
+      non-inheriting migration `SET ROLE` edge are the only permitted owner
+      memberships. The `postgres` operator is migration-only and never a
+      Fastify/Data API runtime credential.
+- [x] Create the unexposed `private` schema and revoke/default-deny privileges.
+- [x] Create `app_role`, `content_status`, `exercise_type`, `question_type`, and
       `quiz_attempt_status` before any table references them.
-- [ ] Create a private/internal `authored_resource_type` with exactly `module`,
+- [x] Evaluate a private/internal `authored_resource_type` with exactly `module`,
       `chapter`, `theory_section`, `exercise`, and `quiz` only if shared static
-      workflow helpers need it; never expose it as a generic public RPC input.
-- [ ] Create shared timestamp/slug/text helpers that do not depend on profiles or
+      workflow helpers need it. No helper needs it yet, so it is intentionally
+      not created or exposed as a generic public RPC input.
+- [x] Create shared timestamp/slug/text helpers that do not depend on profiles or
       content tables.
-- [ ] Add pgTAP checks for enum values, schema exposure, function search paths,
+- [x] Add pgTAP checks for enum values, schema exposure, function search paths,
       owner-role attributes/membership, object ownership, and default privileges.
-- [ ] Complete a clean reset before SUP-AUTH-001.
+- [x] Complete a clean reset before SUP-AUTH-001.
 
 ## Required local feedback loop
 

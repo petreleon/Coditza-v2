@@ -13,6 +13,8 @@ const supabaseDirectory = path.join(repositoryRoot, "supabase");
 const configPath = path.join(supabaseDirectory, "config.toml");
 const migrationsDirectory = path.join(supabaseDirectory, "migrations");
 const seedPath = path.join(supabaseDirectory, "seed.sql");
+const primitiveTestsDirectory = path.join(supabaseDirectory, "tests");
+const primitiveTestFilename = "primitives_test.sql";
 const localEnvironmentPath = path.join(repositoryRoot, ".env.supabase.local");
 const localCliStateRoot = path.join(repositoryRoot, ".supabase", "local-cli");
 const cliEntrypoint = path.join(
@@ -35,6 +37,7 @@ const actions = new Set([
   "status",
   "capture-env",
   "verify-resets",
+  "verify-primitives",
   "stop",
 ]);
 const dangerousDockerEnvironmentNames = [
@@ -49,6 +52,8 @@ const dangerousDockerEnvironmentNames = [
 const localStateDirectoryNames = new Set([".branches", ".temp", "backups"]);
 const migrationFilenamePattern = /^(\d{14})_[a-z0-9][a-z0-9_-]*\.sql$/u;
 const seedExecutionMarker = "CODITZA_LOCAL_SEED_V1";
+const publicSchema = "public";
+const primitiveSchemas = Object.freeze([publicSchema, "private"]);
 
 class LocalStackError extends Error {
   constructor(message) {
@@ -70,7 +75,7 @@ function assertInvocation() {
 
   if (!actions.has(action) || extraArguments.length > 0) {
     fail(
-      "Use one fixed local action: start, status, capture-env, verify-resets, or stop.",
+      "Use one fixed local action: start, status, capture-env, verify-resets, verify-primitives, or stop.",
     );
   }
 
@@ -347,6 +352,15 @@ function assertApprovedConfiguration(config) {
   }
 
   if (
+    !/^schemas\s*=\s*\["public",\s*"graphql_public"\]\s*$/mu.test(api) ||
+    !/^extra_search_path\s*=\s*\["public",\s*"extensions"\]\s*$/mu.test(api)
+  ) {
+    fail(
+      "The local Supabase API configuration could expose the private schema.",
+    );
+  }
+
+  if (
     !hasExactBoolean(dbMigrations, "enabled", "true") ||
     !/^schema_paths\s*=\s*\[\]\s*$/mu.test(dbMigrations) ||
     !hasExactBoolean(dbSeed, "enabled", "true") ||
@@ -459,6 +473,48 @@ async function readApprovedResetInputs() {
     migrationVersions: Object.freeze(
       migrations.map((migration) => migration.version),
     ),
+  });
+}
+
+async function readApprovedPrimitiveTestInputs() {
+  let directoryMetadata;
+
+  try {
+    directoryMetadata = await fs.lstat(primitiveTestsDirectory);
+  } catch {
+    fail("The reviewed local primitive test directory is missing.");
+  }
+
+  if (!directoryMetadata.isDirectory() || directoryMetadata.isSymbolicLink()) {
+    fail("The reviewed local primitive test directory is unsafe.");
+  }
+
+  let entries;
+
+  try {
+    entries = await fs.readdir(primitiveTestsDirectory, {
+      withFileTypes: true,
+    });
+  } catch {
+    fail("The reviewed local primitive test directory cannot be read.");
+  }
+
+  if (
+    entries.length !== 1 ||
+    entries[0].name !== primitiveTestFilename ||
+    !entries[0].isFile() ||
+    entries[0].isSymbolicLink()
+  ) {
+    fail("The reviewed local primitive test set is unsafe.");
+  }
+
+  const content = await readRegularFile(
+    path.join(primitiveTestsDirectory, primitiveTestFilename),
+    "The reviewed local primitive test is missing or unsafe.",
+  );
+
+  return Object.freeze({
+    digest: sha256(content),
   });
 }
 
@@ -1047,6 +1103,41 @@ function localSchemaDiffFailure({ stdout, stderr }) {
   return "The local migration schema diff could not be verified.";
 }
 
+function localPrimitiveTestFailure({ stdout, stderr }) {
+  const output = (stdout + "\n" + stderr).toLowerCase();
+  const failedAssertion = output.match(/not ok\s+(\d+)\s*-/u);
+
+  if (/not running|cannot connect|connection refused/u.test(output)) {
+    return "The reviewed local Supabase stack must be running before primitive tests.";
+  }
+
+  if (
+    /permission denied while trying to connect to the docker daemon|cannot connect to the docker daemon|is the docker daemon running/u.test(
+      output,
+    )
+  ) {
+    return "The local primitive tests could not access the local Docker engine.";
+  }
+
+  if (/permission denied|operation not permitted/u.test(output)) {
+    return "The reviewed local primitive tests did not have the required local database privileges.";
+  }
+
+  if (failedAssertion !== null) {
+    return (
+      "The reviewed local primitive database test assertion " +
+      failedAssertion[1] +
+      " did not pass."
+    );
+  }
+
+  if (/pull access denied|failed to pull|manifest unknown/u.test(output)) {
+    return "The local primitive tests could not retrieve the local pgTAP image.";
+  }
+
+  return "The reviewed local primitive database tests did not pass.";
+}
+
 function parseJsonOutput(output, failureMessage) {
   try {
     return JSON.parse(output);
@@ -1102,7 +1193,7 @@ function assertSeedExecution({ stdout, stderr }) {
   }
 }
 
-function assertEmptySchemaDiff(output) {
+function assertEmptySchemaDiff(output, schema) {
   const schemaDiff = parseJsonOutput(
     output,
     "The local migration schema diff format is unsupported.",
@@ -1117,14 +1208,16 @@ function assertEmptySchemaDiff(output) {
     schemaDiff.dropStatements.length > 0
   ) {
     fail(
-      "The local database has public-schema drift outside reviewed migrations.",
+      "The local database has " +
+        schema +
+        "-schema drift outside reviewed migrations.",
     );
   }
 
   return sha256(schemaDiff.diff);
 }
 
-function assertEmptyLintResult(output) {
+function assertEmptyLintResult(output, schema) {
   const lint = parseJsonOutput(
     output,
     "The local public-schema lint format is unsupported.",
@@ -1136,13 +1229,62 @@ function assertEmptyLintResult(output) {
     !Array.isArray(lint.results) ||
     lint.results.length > 0
   ) {
-    fail("The local public-schema lint did not pass.");
+    fail("The local " + schema + "-schema lint did not pass.");
   }
 
   return lint.results.length;
 }
 
-async function resetAndVerifyLocalDatabase(workspace, resetInputs) {
+async function inspectLocalSchema(workspace, schema) {
+  await assertLocalShadowPortAvailable();
+  const schemaDiff = await runSupabase(
+    workspace,
+    [
+      "--network-id",
+      networkName,
+      "--output-format",
+      "json",
+      "db",
+      "diff",
+      "--local",
+      "--use-migra",
+      "--schema",
+      schema,
+    ],
+    localSchemaDiffFailure,
+  );
+  const schemaDiffDigest = assertEmptySchemaDiff(schemaDiff, schema);
+  await assertLocalShadowPortAvailable();
+  const lintOutput = await runSupabase(
+    workspace,
+    [
+      "--network-id",
+      networkName,
+      "--output-format",
+      "json",
+      "db",
+      "lint",
+      "--local",
+      "--schema",
+      schema,
+      "--fail-on",
+      "warning",
+    ],
+    "The local " + schema + "-schema lint did not pass.",
+  );
+
+  return Object.freeze({
+    lintIssueCount: assertEmptyLintResult(lintOutput, schema),
+    schema,
+    schemaDiffDigest,
+  });
+}
+
+async function resetAndVerifyLocalDatabase(
+  workspace,
+  resetInputs,
+  schemas = [publicSchema],
+) {
   const resetOutput = await runSupabaseResult(
     workspace,
     ["--network-id", networkName, "--yes", "db", "reset", "--local"],
@@ -1166,51 +1308,18 @@ async function resetAndVerifyLocalDatabase(workspace, resetInputs) {
     migrationHistory,
     resetInputs.migrationVersions,
   );
-  await assertLocalShadowPortAvailable();
-  const schemaDiff = await runSupabase(
-    workspace,
-    [
-      "--network-id",
-      networkName,
-      "--output-format",
-      "json",
-      "db",
-      "diff",
-      "--local",
-      "--use-migra",
-      "--schema",
-      "public",
-    ],
-    localSchemaDiffFailure,
-  );
-  const schemaDiffDigest = assertEmptySchemaDiff(schemaDiff);
-  await assertLocalShadowPortAvailable();
-  const lintOutput = await runSupabase(
-    workspace,
-    [
-      "--network-id",
-      networkName,
-      "--output-format",
-      "json",
-      "db",
-      "lint",
-      "--local",
-      "--schema",
-      "public",
-      "--fail-on",
-      "warning",
-    ],
-    "The local public-schema lint did not pass.",
-  );
-  const lintIssueCount = assertEmptyLintResult(lintOutput);
+  const inspectedSchemas = [];
+
+  for (const schema of schemas) {
+    inspectedSchemas.push(await inspectLocalSchema(workspace, schema));
+  }
 
   return sha256(
     JSON.stringify({
       appliedVersions,
-      lintIssueCount,
       manifest: resetInputs.manifest,
-      schemaDiffDigest,
       seedExecuted: true,
+      inspectedSchemas,
     }),
   );
 }
@@ -1225,6 +1334,22 @@ function printResetVerification(resetInputs, fingerprint) {
   writeLine("Verified reset fingerprint SHA-256: " + fingerprint);
   writeLine("Applied local migration history matches the reviewed baseline.");
   writeLine("Public schema diff is empty; local public-schema lint passed.");
+}
+
+function printPrimitiveVerification(resetInputs, primitiveTests, fingerprint) {
+  writeLine(
+    "Local database primitive migration and pgTAP verification passed.",
+  );
+  writeLine("Reviewed migration count: " + resetInputs.migrationCount);
+  writeLine(
+    "Deterministic migration-and-seed manifest SHA-256: " +
+      resetInputs.manifest,
+  );
+  writeLine("Reviewed primitive test SHA-256: " + primitiveTests.digest);
+  writeLine("Verified primitive reset fingerprint SHA-256: " + fingerprint);
+  writeLine(
+    "Applied local migration history matches the reviewed baseline; public and private schema diffs and lint passed.",
+  );
 }
 
 function parseEnvironmentOutput(output) {
@@ -1494,6 +1619,54 @@ async function main() {
     await assertNoPublicBindings(docker);
     await assertLocalAuthHealth();
     printResetVerification(resetInputs, firstFingerprint);
+    return;
+  }
+
+  if (action === "verify-primitives") {
+    await inspectNetwork(docker);
+    const resetInputs = await readApprovedResetInputs();
+    const primitiveTests = await readApprovedPrimitiveTestInputs();
+    const beforeTestFingerprint = await withIsolatedCliWorkspace(
+      true,
+      (workspace) =>
+        resetAndVerifyLocalDatabase(workspace, resetInputs, primitiveSchemas),
+    );
+    await withIsolatedCliWorkspace(true, (workspace) =>
+      runSupabase(
+        workspace,
+        [
+          "--network-id",
+          networkName,
+          "test",
+          "db",
+          "--local",
+          "supabase/tests",
+        ],
+        localPrimitiveTestFailure,
+      ),
+    );
+    const afterTestFingerprint = await withIsolatedCliWorkspace(
+      true,
+      (workspace) =>
+        resetAndVerifyLocalDatabase(workspace, resetInputs, primitiveSchemas),
+    );
+
+    if (beforeTestFingerprint !== afterTestFingerprint) {
+      fail("The local primitive tests left non-deterministic database state.");
+    }
+
+    await assertNoPublicBindings(docker);
+    await assertLocalAuthHealth();
+    printPrimitiveVerification(
+      resetInputs,
+      primitiveTests,
+      sha256(
+        JSON.stringify({
+          primitiveTests: primitiveTests.digest,
+          resetFingerprint: afterTestFingerprint,
+        }),
+      ),
+    );
     return;
   }
 

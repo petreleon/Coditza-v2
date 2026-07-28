@@ -5,10 +5,10 @@
   implementation on 2026-07-27; only task-scoped local work is currently
   authorized.
 - Current phase: 2 — Local Supabase and database security
-- Active implementation task: SUP-PRIMITIVES-001 (next; local database
-  primitives)
-- Last verified implementation task: SUP-LOCAL-002 local migration/reset/seed
-  discipline
+- Active implementation task: SUP-AUTH-001 (next; local signup-profile
+  migration and tests)
+- Last verified implementation task: SUP-PRIMITIVES-001 local database
+  primitives
 - Last updated: 2026-07-28
 
 ## Phase status
@@ -17,7 +17,7 @@
 | --- | --- | --- |
 | 0 — Plan acceptance | Complete; G0 and PLAN-004 passed | G0 |
 | 1 — Foundation and containers | Complete; QA-STRAT-001 and G1 passed | G1 |
-| 2 — Local Supabase and schema | SUP-LOCAL-001/002 complete; SUP-PRIMITIVES-001 next | G2 |
+| 2 — Local Supabase and schema | SUP-LOCAL-001/002 and SUP-PRIMITIVES-001 complete; SUP-AUTH-001 next | G2 |
 | 3 — Fastify identity/read slice | Not started | G3 |
 | 4 — Learning workflows | Not started | G4 |
 | 5 — Authoring/admin workflows | Not started | G5 |
@@ -41,7 +41,7 @@
   approves lost-all-factors recovery.
 - SUP-SMTP-LOCAL-001 is not eligible until the user supplies a Gmail App
   Password through the approved ignored local mechanism. It does not block the
-  independent SUP-PRIMITIVES-001 task.
+  independent SUP-AUTH-001 task.
 
 ## Open decisions
 
@@ -121,6 +121,11 @@ to the deadlines in that file.
   with exact migration history, deterministic seed evidence, an empty
   public-schema diff and lint result, released shadow-diff port, and no hosted
   mutation or domain schema.
+- [SUP-PRIMITIVES-001 report](../docs/implementation/SUP-PRIMITIVES-001.md);
+  the hardened owner role, private schema, default-deny privileges, enums, and
+  table-independent helpers passed protected local reset, pgTAP, drift, and
+  cleanup verification without an application extension, hosted mutation, or
+  secret disclosure.
 - [G1 completion record](08-execution/00-roadmap.md#g1-completion-record);
   Foundation reproducibility is recorded from the accepted architecture/product
   contracts, current checks, Docker evidence, and scope review.
