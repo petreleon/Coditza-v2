@@ -28,6 +28,10 @@ published -> archived
   once, and emits an audit event naming changed fields. It cannot change slug,
   parent, position, status, identity, requirement/scoring rules, or timestamps
   directly.
+- correctionReason is an approved non-content audit reason code, not free-form
+  prose. The audit event stores only safe changed-field names and approved
+  before/after codes; it never copies authored Markdown or prior/new content
+  values.
 - Existing theory completions survive an allowed published correction. An
   editor must create a new theory section for a new concept, new completion
   requirement, or any change that should reopen progress.

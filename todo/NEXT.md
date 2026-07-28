@@ -2,80 +2,88 @@
 
 The sole next implementation task is:
 
-**ARC-SEC-003 — Accept the privileged-action audit contract (next; not
-started).**
+**SUP-FUNCTIONS-001 — Implement workflow primitives (next; not started).**
 
-Prerequisite verified: SUP-DATA-003 completed the local private audit store,
-its append-only helper, safe-summary validation, direct-access denial, account
-deletion behavior, and protected verification. SUP-SMTP-LOCAL-001 and
-SUP-MFA-001 remain independently ineligible; neither blocks this local audit
-contract acceptance.
+Prerequisites verified: all currently owned primitive, profile, curriculum,
+assessment, learning-record, idempotency, and hardened audit tables are local,
+protected, and covered by deterministic reset proof. ARC-SEC-003 completed the
+closed audit contract. SUP-SMTP-LOCAL-001 and SUP-MFA-001 remain independently
+ineligible; neither blocks this task.
 
-This is a narrow architecture/security acceptance task. It must map the
-approved privileged-action audit requirements to the completed database
-boundary and prove that normal application roles cannot append, alter, delete,
-or read audit events directly. It does not authorize a public API, a generic
-audit event bus, or a new client-facing query surface.
+This task builds the named server-only transaction facades over those existing
+tables. It is not permission to add HTTP routes, direct client policies, hosted
+configuration, Python/WASM jobs, or identity/bootstrap workflows.
 
 ## Read first
 
 1. README.md, TASKS.md, STATUS.md, and 00-control/00-scope-and-non-goals.md.
 2. 00-control/01-fixed-decisions.md and 00-control/02-open-decisions.md.
-3. 02-architecture/04-data-flow-and-security.md,
-   02-architecture/06-modular-hexagonal-architecture.md,
+3. 02-architecture/04-data-flow-and-security.md and
+   02-architecture/06-modular-hexagonal-architecture.md.
+4. 03-supabase/02-core-content-schema.md,
+   03-supabase/03-assessment-schema.md,
    03-supabase/04-learning-progress-schema.md,
-   03-supabase/05-functions-constraints-indexes.md, and
+   03-supabase/05-functions-constraints-indexes.md,
+   03-supabase/06-auth-profiles-and-roles.md, and
    03-supabase/07-rls-policy-matrix.md.
-4. docs/implementation/SUP-DATA-003.md and the preceding Supabase completion
-   reports needed to understand the owner/private-schema convention.
-5. 08-execution/00-roadmap.md, 08-execution/01-dependency-map.md, and
+5. docs/implementation/SUP-DATA-001.md, SUP-DATA-002.md,
+   SUP-DATA-003.md, and ARC-SEC-003.md.
+6. 08-execution/00-roadmap.md, 08-execution/01-dependency-map.md, and
    08-execution/03-handoff-protocol.md.
 
 ## Permitted scope
 
-1. Produce an explicit acceptance mapping for every required audit field:
-   actor kind, nullable actor user ID, action, entity type/ID, sanitized
-   change summary, required reason, request ID, timestamp, ownership, and
-   account-deletion handling.
-2. Verify and document that audit entries are append-only through the intended
-   owner-controlled helper and that normal runtime roles have no direct table
-   read, insert, update, delete, or routine-execution access.
-3. Verify and document the safe-summary contract: no password, token, refresh
-   token, TOTP code/secret, QR or otpauth material, answer payload, answer key,
-   or complete Markdown/content body can enter an audit event.
-4. Reuse the reviewed protected local verifier and add only task-owned,
-   narrowly necessary proof. A forward-only migration is permitted only if an
-   objective audit-contract gap is found; do not modify an applied migration.
-5. Record one non-secret completion report with exact checks, result,
-   limitations, and exactly one next eligible task.
+1. Add only forward local migrations for the named server-only transactional
+   facades and tightly scoped private collaborators specified by the functions
+   plan. Preserve one context owner and one coordinator per workflow; reject a
+   generic public type-switched lifecycle function.
+2. Implement the listed curriculum, assessment, progress, operations, and safe
+   learner workflow functions except the three Python grading job functions.
+   Reserve, claim, and finalize Python grading remain exclusively owned by
+   SUP-WASM-001.
+3. Use exact server-verified actor arguments, reload and lock current
+   profile/role/ownership inside PostgreSQL, fixed safe search paths, owner
+   ownership, default-deny grants, and direct user denial. No function may
+   claim to derive a user from the secret-key session.
+4. Keep actor authorization, lock order, lifecycle validation, idempotency,
+   audit append, source/progress update, and returned safe result in one
+   transaction. Audit calls must use the closed reason-code and safe-delta
+   contract; raw content/Auth/answer material never enters the audit row.
+5. Add task-owned pgTAP, normalization golden vectors, deterministic race or
+   rollback proof, and a fixed local verifier action. Preserve every preceding
+   protected regression suite and schema diff/lint behavior.
 
 ## Required proof
 
-1. The report maps each ARC-SEC-003 requirement to an implemented constraint,
-   helper, privilege, test, or documented operational boundary.
-2. Direct runtime-role access and mutation are denied; no permissive RLS policy
-   or public routine bypass exists.
-3. Safe-summary validation rejects the forbidden secret, answer, and full-body
-   categories without logging their contents in test output or reports.
-4. A protected fresh local reset, the relevant regression suites, schema diff,
-   lint, loopback assertion, and the repository foundation checks pass if code
-   changes. Credentials remain unread and no hosted state changes.
-5. The task report identifies only the next eligible task and leaves all other
-   ownership boundaries intact.
+1. Every public facade has one documented context owner, grants only the
+   intended server role, and has no direct client/runtime bypass. Private
+   helpers remain non-executable by runtime roles.
+2. Each function validates exact input shapes, actor role/ownership, current
+   lifecycle/publication state, cross-resource references, and its documented
+   lock/idempotency order. Replays return only the stored safe result.
+3. SQL and TypeScript normalization share golden vectors for accents, case,
+   whitespace, empty-after-trim, and non-ASCII distinctions.
+4. Representative concurrent, rollback, idempotency, audit, source/progress,
+   attempt-finalization, and definition-history cases pass without orphaned
+   state or duplicate effects.
+5. Protected fresh resets, all regression suites, function tests, public/private
+   diff, lint, loopback checks, launcher override refusal, and the foundation
+   gate pass. The report contains only non-secret evidence and names exactly
+   one next task.
 
 ## Explicitly forbidden
 
-- Do not add Fastify routes, public RPCs, direct user policies, audit list/read
-  endpoints, client UI, generated types, generic audit buses, or a new policy
-  matrix.
-- Do not configure Gmail SMTP, TOTP/MFA, Chrome, hosted Supabase, Vercel,
-  deployment, billing, CLI authentication, a secret, or remote URL.
-- Do not implement admin/bootstrap/role-control workflows, Python-verifier
-  definitions/jobs/evidence, a controller, learner authoring, or public
-  application modules.
-- Do not alter applied migrations, weaken default denial, or broaden the audit
-  schema beyond the documented privileged-action contract.
+- Do not add Fastify routes, public client RPCs, direct user policies, generated
+  database types, seed users/content, audit list endpoints, or a generic
+  cross-context function.
+- Do not implement Python grading definitions, job reservation/claim/finalize,
+  controller selection, private test artifacts, or Python execution evidence.
+- Do not implement admin bootstrap, role-control, identity security-hold,
+  SMTP, TOTP/MFA, Chrome, hosted Supabase, Vercel, deployment, billing, CLI
+  authentication, secrets, or remote URLs.
+- Do not modify applied migrations, weaken RLS/default denial, or add a
+  free-text audit reason or raw audit delta.
 
-If an audit requirement needs a public surface, a product decision, an external
-service, or a workflow owned by another task, stop at that boundary and record
-it rather than expanding ARC-SEC-003.
+If a function requires a product/API decision, a user factor, a provider
+capability, or an action owned by a later task, stop at that boundary and record
+it rather than broadening SUP-FUNCTIONS-001.

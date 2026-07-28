@@ -81,10 +81,13 @@ environment-level operations.
   SUP-DATA-002 then completed the protected assessment-definition/private-key
   migration and task-owned proof. SUP-DATA-003 then completed the protected
   learning-record, immutable-attempt, source-derived-progress, idempotency,
-  and audit migration/proof. ARC-SEC-003 is now the sole next local task; it
-  may accept and prove the privileged-action audit contract over the completed
-  local audit store. It must not create a new effective-user policy matrix, a
-  public RPC or Fastify surface, MFA, SMTP, generated types, Python-grading
+  and audit migration/proof. ARC-SEC-003 then completed the protected
+  privileged-action audit contract, including closed reason codes and safe
+  before/after deltas. SUP-FUNCTIONS-001 is now the sole next local task; it
+  may create only named server-only transactional workflow facades, their
+  narrowly required helpers/grants, normalization vectors, and task-owned
+  proof over already-owned tables. It must not create a new effective-user
+  policy matrix, Fastify surface, MFA, SMTP, generated types, Python-grading
   jobs, a hosted resource, CLI authentication, a secret, or public API
   deployment behavior.
 - A hosted, production, billing-sensitive, destructive, or secret-dependent

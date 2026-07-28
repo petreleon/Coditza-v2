@@ -60,6 +60,10 @@ enroll a fresh factor.
       and request ID.
 - [ ] Never return Auth credentials or sensitive metadata.
 
+The mandatory reason is the approved role_change reason code, not user-provided
+free text. The audit delta records only the safe previous/new role codes
+learner, editor, or admin; it never records profile/Auth metadata.
+
 ## Acceptance examples
 
 - A learner calling an editor route receives `403 role_required`.

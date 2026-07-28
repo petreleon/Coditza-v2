@@ -45,6 +45,10 @@ legacy alias is accepted, and invalid or absent metadata uses `Learner`.
 
 ## SUP-AUTH-002 — Role control
 
+The required reason for a privileged identity operation is an approved
+non-content audit reason code, not free text. Role transitions must use the
+safe before/after role codes from the audit contract.
+
 - [ ] Prevent direct user updates to `role` with column grants/policies.
 - [ ] Admin role-change function receives the Fastify-verified actor ID from the
       identity Supabase adapter and loads its current role from `profiles`.
@@ -62,6 +66,9 @@ legacy alias is accepted, and invalid or absent metadata uses `Learner`.
 
 ## SUP-BOOTSTRAP-001 — First-admin bootstrap
 
+The bootstrap reason is an approved reason code; the script must not accept or
+persist a free-form explanation.
+
 Do not edit `profiles.role` manually in the Dashboard.
 
 1. Create/confirm the intended Auth user in the correct non-production project.
@@ -78,6 +85,10 @@ Do not edit `profiles.role` manually in the Dashboard.
 Production bootstrap is separately approved and never reused from development.
 
 ## SUP-AUTH-003 — Build the identity hold and recovery operator
+
+Identity-hold transitions use the approved security_hold reason code and safe
+before/after hold-state codes. No free-form operator note, factor state, email,
+or Auth material belongs in the audit row.
 
 Prerequisites: profile/audit tables, workflow-function security, and
 SUP-AUTH-002.

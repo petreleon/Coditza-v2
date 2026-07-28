@@ -53,10 +53,11 @@ future public Fastify API and leaves the required private execution plane
 unselected. ARC-WASM-001 then completed a local public-proof Docker boundary
 with pinned Pyodide assets; it did not create a controller, hidden-test path, or
 hosted selection. G1 remains passed; SUP-LOCAL-001/002,
-SUP-PRIMITIVES-001, SUP-AUTH-001, PRD-ROLE-001, and SUP-DATA-001/002/003 are
-complete. ARC-SEC-003 is the sole next local task: it accepts the
-privileged-action audit contract over the completed local audit store. Real
-application modules and all hosted configuration remain deferred.
+SUP-PRIMITIVES-001, SUP-AUTH-001, PRD-ROLE-001, SUP-DATA-001/002/003, and
+ARC-SEC-003 are complete. SUP-FUNCTIONS-001 is the sole next local task: it
+implements the named server-only transactional workflow facades over the
+completed schemas and audit contract. Real application modules and all hosted
+configuration remain deferred.
 Planning files plus the separately requested root `.env`, `.env.example`,
 `.gitignore`, and `.dockerignore` safety files may exist. The existing
 hosted-project environment values do not authorize a schema or deployment action;

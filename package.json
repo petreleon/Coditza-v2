@@ -37,6 +37,7 @@
     "supabase:verify-core-content:local": "node scripts/supabase/local-stack.mjs verify-core-content",
     "supabase:verify-assessments:local": "node scripts/supabase/local-stack.mjs verify-assessments",
     "supabase:verify-learning-records:local": "node scripts/supabase/local-stack.mjs verify-learning-records",
+    "supabase:verify-audit-contract:local": "node scripts/supabase/local-stack.mjs verify-audit-contract",
     "supabase:stop:local": "node scripts/supabase/local-stack.mjs stop",
     "build:wasm-local": "node scripts/python-wasm/build-local-sandbox.mjs --update-lock",
     "test:wasm": "node apps/api/test/wasm/require-approved-outer-sandbox.mjs",

@@ -467,9 +467,10 @@ named as the sole next task in `TASKS.md` and `NEXT.md`.
     [completion report](../../docs/implementation/SUP-DATA-002.md).
 13. [x] SUP-DATA-003 — attempts/completions/progress/audit/idempotency; see the
     [completion report](../../docs/implementation/SUP-DATA-003.md).
-14. [ ] ARC-SEC-003 — audit contract acceptance; this is the sole next
-    unblocked task independent of the SMTP/MFA prerequisite.
-15. [ ] SUP-FUNCTIONS-001 — module-owned transactional workflows and helpers.
+14. [x] ARC-SEC-003 — audit contract acceptance; see the
+    [completion report](../../docs/implementation/ARC-SEC-003.md).
+15. [ ] SUP-FUNCTIONS-001 — module-owned transactional workflows and helpers;
+    this is the sole next unblocked task independent of the SMTP/MFA prerequisite.
 16. [ ] SUP-WASM-001 — private Python definitions/jobs/evidence plus
     reserve/claim/finalize transactions.
 17. [ ] ARC-SEC-002 — database function security/atomicity acceptance.

@@ -138,7 +138,8 @@ SELECT extensions.ok(
           'changed_fields',
           'reason',
           'request_id',
-          'created_at'
+          'created_at',
+          'change_summary'
         ]::text[]
       FROM pg_catalog.pg_attribute AS attribute_entry
       WHERE attribute_entry.attrelid = 'private.audit_events'::pg_catalog.regclass
@@ -288,7 +289,7 @@ SELECT extensions.ok(
         ), (
           'private.recalculate_chapter_progress(uuid,uuid)'::pg_catalog.regprocedure
         ), (
-          'private.append_audit_event(text,uuid,text,text,uuid,text[],text,uuid)'::pg_catalog.regprocedure
+          'private.append_audit_event(text,uuid,text,text,uuid,text[],jsonb,text,uuid)'::pg_catalog.regprocedure
         )
       ) AS helper(procedure_oid)
       CROSS JOIN (
@@ -319,7 +320,7 @@ SELECT extensions.ok(
       'private.save_quiz_answer(uuid,uuid,uuid,jsonb)'::pg_catalog.regprocedure,
       'private.submit_quiz_attempt(uuid,uuid)'::pg_catalog.regprocedure,
       'private.recalculate_chapter_progress(uuid,uuid)'::pg_catalog.regprocedure,
-      'private.append_audit_event(text,uuid,text,text,uuid,text[],text,uuid)'::pg_catalog.regprocedure
+      'private.append_audit_event(text,uuid,text,text,uuid,text[],jsonb,text,uuid)'::pg_catalog.regprocedure
     )
   ),
   'workflow helpers are owner-controlled SECURITY INVOKER functions with empty paths'
@@ -1177,7 +1178,8 @@ BEGIN
     'chapter',
     'a3200000-0000-0000-0000-000000000001',
     ARRAY['status']::text[],
-    'Synthetic audit event.',
+    '{"status":{"before":"none","after":"started"}}'::jsonb,
+    NULL,
     'a3a00000-0000-0000-0000-000000000001'
   );
   BEGIN
@@ -1199,6 +1201,7 @@ BEGIN
       'chapter',
       'a3200000-0000-0000-0000-000000000001',
       ARRAY['answer']::text[],
+      '{}'::jsonb,
       NULL,
       'a3a00000-0000-0000-0000-000000000002'
     );
@@ -1224,6 +1227,7 @@ SELECT private.append_audit_event(
   'chapter',
   'a3200000-0000-0000-0000-000000000001',
   ARRAY['status']::text[],
+  '{"status":{"before":"none","after":"started"}}'::jsonb,
   NULL,
   'a3a00000-0000-0000-0000-000000000003'
 );

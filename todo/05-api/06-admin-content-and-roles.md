@@ -123,8 +123,11 @@ audit.
 
 ### `PUT /api/v1/admin/users/:userId/role`
 
-Body: `{ role: "learner"|"editor"|"admin", reason: string }`.
+Body: `{ role: "learner"|"editor"|"admin", reasonCode: "role_change" }`.
 
+- The reasonCode field is the required role_change reason code, not free-form text.
+  The endpoint does not accept an audit summary from the client; the server
+  derives the safe previous/new role codes.
 - exact target exists;
 - actor is admin;
 - no self-promotion shortcut or final-admin removal;

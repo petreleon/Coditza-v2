@@ -143,8 +143,18 @@ path; never silently insert/repair during a GET.
 - nullable `actor_user_id` references `auth.users(id) on delete set null`;
   system events require null, user events require a non-null actor at insertion
   but retain a null actor after approved account deletion;
-- action, entity type/ID, safe changed-field summary, reason when required,
-  request ID, timestamp;
+- action, entity type/ID, safe changed-field names, exact structured
+  before/after summary, reason code when required, request ID, timestamp;
+- each change-summary key is exactly one safe changed-field name and each value
+  is an object containing only approved before/after codes. Raw values are never
+  stored: sensitive or content-bearing fields are rejected and ordinary
+  free-text fields use the redacted code;
+- reason is null when not required, otherwise one approved non-content code:
+  administrative_correction, content_archive, content_correction,
+  content_replacement, identity_recovery, maintenance, other_approved,
+  policy_enforcement, progress_reconciliation, role_change, or security_hold.
+  A named future workflow, rather than the generic append helper, owns deciding
+  when one is mandatory;
 - append-only to application paths;
 - never store tokens, answer payloads/keys, complete content bodies, or passwords.
 

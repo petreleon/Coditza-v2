@@ -36,7 +36,7 @@ SQL helpers may live in `private`, but the runtime cannot execute them directly.
 | `update_own_profile(actor_id, display_name)` | server secret + verified actor | lock/load exact profile, validate name, update only that actor |
 | `create_draft_content(actor_id, type, parent_id, input, idempotency_key, canonical_version, request_hash)` | server secret + verified staff actor | idempotency step zero; static type branch/exact input allowlist; chapter requires non-archived module, lower items require non-archived chapter+module; next position; audit/result |
 | `update_draft_content(actor_id, type, id, expected_version, input)` | server secret + verified staff actor | static type/field allowlist; atomic root/tree change; one row-version increment and, for behavior changes, one definition-version increment; audit |
-| `correct_published_content(actor_id, type, id, expected_version, reason, input)` | server secret + verified staff actor | module/chapter/theory correction allowlist only; non-empty reason; preserve completion; audit |
+| `correct_published_content(actor_id, type, id, expected_version, reason_code, input)` | server secret + verified staff actor | module/chapter/theory correction allowlist only; required approved reason code; preserve completion; audit |
 | `replace_draft_quiz_definition(actor_id, quiz_id, expected_version, definition)` | server secret + verified staff actor | validate/replace complete question-option-key tree, increment row/definition versions once, no partial state |
 | `get_draft_assessment_authoring(actor_id, type, id)` | server secret + verified staff actor | reload staff role, require draft, return protected ID-based definition/key projection, audit access |
 | `start_quiz_attempt(actor_id, quiz_id, idempotency_key, canonical_version, request_hash)` | server secret + verified authenticated owner actor | idempotency step zero; for new key lock ancestors/quiz, recheck publication, finalize stale attempt, enforce limit, create deadline/result |
@@ -54,15 +54,15 @@ SQL helpers may live in `private`, but the runtime cannot execute them directly.
 | `get_own_quiz_attempt(actor_id, attempt_id)` | server secret + verified authenticated owner actor | reload actor; conceal non-owner; safe immutable question/options + saved answers; if terminal left-join every frozen question and return result-selected feedback, including omitted questions |
 | `reorder_content(actor_id, parent, ordered_ids, expected_versions)` | server secret + verified staff actor | exact all-sibling set including archived rows, one transaction, audit |
 | `publish_content(actor_id, type, id, expected_version)` | server secret + verified staff actor | validate descendants/keys, transition, recalculate affected learner denominators, audit |
-| `archive_content(actor_id, type, id, expected_version, reason)` | server secret + verified staff actor | non-empty reason, subtree/parent validity/history, recalculate affected learner denominators, audit |
+| `archive_content(actor_id, type, id, expected_version, reason_code)` | server secret + verified staff actor | required approved reason code, subtree/parent validity/history, recalculate affected learner denominators, audit |
 | `clone_assessment(actor_id, type, id, expected_version, idempotency_key, canonical_version, request_hash)` | server secret + verified staff actor | idempotency step zero; published/archived source only; require non-archived chapter+module; lock/version-check, new tree IDs, remap answer specs, validate, draft/result |
 | `replace_published_assessment(actor_id, old_id, draft_replacement_id, expected_versions)` | server secret + verified staff actor | distinct IDs; same chapter/type; old published, replacement draft, ancestors non-archived; swap positions, publish/archive, progress, audit |
 | `list_own_progress_modules(actor_id, cursor, limit)` | server secret + verified authenticated owner actor | reload actor; start from published modules/chapters, left-join caller snapshots/source aggregates, synthesize missing zero/default state, stable keyset order |
 | `get_own_module_progress(actor_id, module_id)` | server secret + verified authenticated owner actor | reload actor; require published module; return every published chapter in order using snapshot or from-source missing-row fallback; no N+1 |
-| `reconcile_chapter_progress(actor_id, target_user_id, chapter_id, reason)` | server secret + verified admin actor | non-empty reason, progress lock, derive sources, replace snapshot only, audit safe before/after |
+| `reconcile_chapter_progress(actor_id, target_user_id, chapter_id, reason_code)` | server secret + verified admin actor | required approved reason code, progress lock, derive sources, replace snapshot only, audit safe before/after |
 | `list_audit_events(actor_id, filters, cursor, limit)` | server secret + verified admin actor | reload admin role, bounded filters/keyset order, return safe projection from private audit table |
-| `change_user_role(actor_id, target_user_id, role, reason)` | server secret + verified admin actor | serialize all admin-count changes, protect final admin, audit |
-| `bootstrap_first_admin(target_user_id, reason)` | separately invoked server system context | serialize, require zero admins, promote once, system audit |
+| `change_user_role(actor_id, target_user_id, role, reason_code)` | server secret + verified admin actor | serialize all admin-count changes, protect final admin, audit safe old/new role codes |
+| `bootstrap_first_admin(target_user_id, reason_code)` | separately invoked server system context | serialize, require zero admins, promote once, system audit |
 | `server_readiness()` | server secret only | bounded constant result proving Data API/database/function access; no row/user/secret data |
 | `finalize_expired_quiz_attempts(batch_limit)` | scheduled server system context | select only in-progress rows where `expires_at is not null and now() >= expires_at`, bounded `FOR UPDATE SKIP LOCKED`; grade/finalize each once and recalculate owner progress |
 | `purge_expired_idempotency(batch_limit)` | scheduled server system context | bounded expired selection; for each row take its request-key advisory lock, re-read, delete only when `expires_at <= now()`, return count only |
@@ -71,6 +71,14 @@ The operator-only `set_identity_security_hold` function is specified and owned
 exclusively by SUP-AUTH-003 after these shared function-security/audit
 primitives exist. It follows the same security-definer rules but is not part of
 SUP-FUNCTIONS-001 and is never an HTTP/runtime use-case facade.
+
+Every audited function passes the closed audit contract: safe changed-field
+names, a change-summary object with exactly matching keys and approved
+before/after codes, an optional approved reason code, and a server-generated
+request UUID. It must never pass raw previous/new values, Markdown, answer
+material, Auth material, or free-form reason text. A function requiring a reason
+enforces its non-null approved code itself; the generic audit helper does not
+guess which action requires one.
 
 `start_quiz_attempt` returns a structured success-or-domain-outcome record for
 expected denials. If it finalizes a stale attempt and then finds no remaining

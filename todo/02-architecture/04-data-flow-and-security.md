@@ -104,10 +104,19 @@ command and cannot be reused by a future API/controller process.
 
 ### ARC-SEC-003 — Audit privileged actions
 
-- [ ] Record actor kind (`user` or `system`), nullable actor user ID, action,
+The accepted record is private and owner-controlled. Its changed_fields names
+and change_summary keys match exactly. Each summary entry has only before/after
+values from a finite safe-code vocabulary: role/lifecycle/state facts may be
+recorded, while arbitrary content and user-facing text use redacted or are not
+recorded. Reasons are optional approved codes, never free text; the named
+privileged workflow enforces a non-null code when its product contract requires
+one. The only allowed post-insert mutation is Auth foreign-key anonymization of
+a deleted user actor.
+
+- [x] Record actor kind (`user` or `system`), nullable actor user ID, action,
       entity type/ID, sanitized before/after summary,
       reason where required, request ID, and timestamp.
-- [ ] Do not store tokens, answer payloads, answer keys, or full Markdown bodies
+- [x] Do not store tokens, answer payloads, answer keys, or full Markdown bodies
       in audit rows; also exclude TOTP codes/secrets, QR/`otpauth` material,
       refresh tokens, and Auth SDK bodies.
-- [ ] Make audit events append-only to normal application roles.
+- [x] Make audit events append-only to normal application roles.
