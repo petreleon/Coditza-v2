@@ -36,10 +36,10 @@ enroll a fresh factor.
 
 ### PRD-ROLE-001 — Enforce default learner creation
 
-- [ ] Create a profile row transactionally when an Auth user is created.
-- [ ] Ignore any client-supplied role in sign-up metadata.
-- [ ] Test a new user receives exactly `learner`.
-- [ ] Test duplicate trigger execution is safe.
+- [x] Create a profile row transactionally when an Auth user is created.
+- [x] Ignore any client-supplied role in sign-up metadata.
+- [x] Test a new user receives exactly `learner`.
+- [x] Test duplicate trigger execution is safe.
 
 ### PRD-ROLE-002 — Enforce authorization at three layers
 

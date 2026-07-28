@@ -454,13 +454,15 @@ named as the sole next task in `TASKS.md` and `NEXT.md`.
 7. [x] SUP-AUTH-001 — signup profile trigger, owner/default-deny boundary, and
    protected local pgTAP/reset proof; see the
    [completion report](../../docs/implementation/SUP-AUTH-001.md).
-8. [ ] PRD-ROLE-001 — prove default learner creation; this is the sole next
-   unblocked task.
+8. [x] PRD-ROLE-001 — default learner creation verified against the protected
+   local profile evidence; see the
+   [completion report](../../docs/implementation/PRD-ROLE-001.md).
 9. [ ] Confirm or amend the documented DEC-030 two-factor safe default and
    record it as resolved; do not start SUP-MFA-001 with this prerequisite open.
 10. [ ] SUP-MFA-001 — explicitly enable/prove local Authenticator TOTP and
    sanitized AAL transitions.
-11. [ ] SUP-DATA-001 — module/chapter/theory hierarchy.
+11. [ ] SUP-DATA-001 — module/chapter/theory hierarchy; this is the sole next
+    unblocked task independent of the SMTP/MFA prerequisite.
 12. [ ] SUP-DATA-002 — exercises/quizzes/private keys.
 13. [ ] SUP-DATA-003 — attempts/completions/progress/audit/idempotency.
 14. [ ] ARC-SEC-003 — audit contract acceptance.

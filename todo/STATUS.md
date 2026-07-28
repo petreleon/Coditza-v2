@@ -5,10 +5,10 @@
   implementation on 2026-07-27; only task-scoped local work is currently
   authorized.
 - Current phase: 2 — Local Supabase and database security
-- Active implementation task: PRD-ROLE-001 (next; local verification of the
-  default-learner product requirement)
-- Last verified implementation task: SUP-AUTH-001 local signup-profile
-  migration and tests
+- Active implementation task: SUP-DATA-001 (next; local module/chapter/theory
+  schema migration and tests)
+- Last verified implementation task: PRD-ROLE-001 default-learner requirement
+  verification
 - Last updated: 2026-07-28
 
 ## Phase status
@@ -17,7 +17,7 @@
 | --- | --- | --- |
 | 0 — Plan acceptance | Complete; G0 and PLAN-004 passed | G0 |
 | 1 — Foundation and containers | Complete; QA-STRAT-001 and G1 passed | G1 |
-| 2 — Local Supabase and schema | SUP-LOCAL-001/002, SUP-PRIMITIVES-001, and SUP-AUTH-001 complete; PRD-ROLE-001 next | G2 |
+| 2 — Local Supabase and schema | SUP-LOCAL-001/002, SUP-PRIMITIVES-001, SUP-AUTH-001, and PRD-ROLE-001 complete; SUP-DATA-001 next | G2 |
 | 3 — Fastify identity/read slice | Not started | G3 |
 | 4 — Learning workflows | Not started | G4 |
 | 5 — Authoring/admin workflows | Not started | G5 |
@@ -41,7 +41,7 @@
   approves lost-all-factors recovery.
 - SUP-SMTP-LOCAL-001 is not eligible until the user supplies a Gmail App
   Password through the approved ignored local mechanism. It does not block the
-  independent PRD-ROLE-001 task.
+  independent SUP-DATA-001 task.
 
 ## Open decisions
 
@@ -130,6 +130,10 @@ to the deadlines in that file.
   `profiles` projection, fixed-path owner trigger, default learner/fallback,
   cascade/rollback behavior, direct-access denial, and absence of Auth factor
   state passed protected local reset, pgTAP, drift, and cleanup verification.
+- [PRD-ROLE-001 report](../docs/implementation/PRD-ROLE-001.md); each product
+  requirement for transactional default-learner creation maps to the completed
+  local profile migration and protected pgTAP evidence, without claiming MFA
+  or Fastify authorization is complete.
 - [G1 completion record](08-execution/00-roadmap.md#g1-completion-record);
   Foundation reproducibility is recorded from the accepted architecture/product
   contracts, current checks, Docker evidence, and scope review.
