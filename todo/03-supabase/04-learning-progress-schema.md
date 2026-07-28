@@ -150,11 +150,11 @@ path; never silently insert/repair during a GET.
 
 ## SUP-DATA-003 — Implement and prove learning records
 
-- [ ] Create tables in dependency order.
-- [ ] Add immutable-attempt protections.
-- [ ] Add indexes for ownership, pagination, policy, and progress queries.
-- [ ] Create atomic start/save/submit and recalculation functions.
-- [ ] Test cross-user/cross-question references, duplicate active attempts,
+- [x] Create tables in dependency order.
+- [x] Add immutable-attempt protections.
+- [x] Add indexes for ownership, pagination, policy, and progress queries.
+- [x] Create atomic start/save/submit and recalculation functions.
+- [x] Test cross-user/cross-question references, duplicate active attempts,
       attempt limits, time expiry, and repeat submission.
-- [ ] Compare every stored progress snapshot with a from-source calculation.
-- [ ] Test account deletion against the approved privacy rule.
+- [x] Compare every stored progress snapshot with a from-source calculation.
+- [x] Test account deletion against the approved privacy rule.

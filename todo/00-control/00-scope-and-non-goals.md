@@ -79,13 +79,14 @@ environment-level operations.
   requirement against that evidence. SUP-DATA-001 then completed the protected
   module/chapter/theory hierarchy migration and task-owned proof.
   SUP-DATA-002 then completed the protected assessment-definition/private-key
-  migration and task-owned proof. SUP-DATA-003 is now the sole next local task;
-  it may create only completion, attempt, progress-snapshot, audit, and
-  idempotency records; narrowly required immutable workflow/recalculation
-  functions; and task-owned checks through the local stack. It must not create
-  a new effective-user policy matrix, a public RPC or Fastify surface, MFA,
-  SMTP, generated types, Python-grading jobs, a hosted resource, CLI
-  authentication, a secret, or public API deployment behavior.
+  migration and task-owned proof. SUP-DATA-003 then completed the protected
+  learning-record, immutable-attempt, source-derived-progress, idempotency,
+  and audit migration/proof. ARC-SEC-003 is now the sole next local task; it
+  may accept and prove the privileged-action audit contract over the completed
+  local audit store. It must not create a new effective-user policy matrix, a
+  public RPC or Fastify surface, MFA, SMTP, generated types, Python-grading
+  jobs, a hosted resource, CLI authentication, a secret, or public API
+  deployment behavior.
 - A hosted, production, billing-sensitive, destructive, or secret-dependent
   action still needs its own task-specific authority; broad implementation
   authorization does not authorize it.

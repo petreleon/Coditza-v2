@@ -2,100 +2,80 @@
 
 The sole next implementation task is:
 
-**SUP-DATA-003 — Implement and prove learning records (next; not started).**
+**ARC-SEC-003 — Accept the privileged-action audit contract (next; not
+started).**
 
-Prerequisites verified: G1, SUP-LOCAL-001/002, SUP-PRIMITIVES-001,
-SUP-AUTH-001, PRD-ROLE-001, SUP-DATA-001, and SUP-DATA-002 are complete.
-SUP-SMTP-LOCAL-001 and SUP-MFA-001 remain separately ineligible; neither blocks
-this independent local learning-records task.
+Prerequisite verified: SUP-DATA-003 completed the local private audit store,
+its append-only helper, safe-summary validation, direct-access denial, account
+deletion behavior, and protected verification. SUP-SMTP-LOCAL-001 and
+SUP-MFA-001 remain independently ineligible; neither blocks this local audit
+contract acceptance.
 
-The boundary is deliberately narrow: add the durable source-of-truth and
-recalculable learning records required by the approved data plan, with a fixed
-local proof. Do not turn this database task into public APIs, hosted setup, or
-an incomplete Python-grading implementation.
+This is a narrow architecture/security acceptance task. It must map the
+approved privileged-action audit requirements to the completed database
+boundary and prove that normal application roles cannot append, alter, delete,
+or read audit events directly. It does not authorize a public API, a generic
+audit event bus, or a new client-facing query surface.
 
 ## Read first
 
 1. README.md, TASKS.md, STATUS.md, and 00-control/00-scope-and-non-goals.md.
 2. 00-control/01-fixed-decisions.md and 00-control/02-open-decisions.md.
-3. 03-supabase/01-local-cli-and-migrations.md,
-   03-supabase/03-assessment-schema.md,
+3. 02-architecture/04-data-flow-and-security.md,
+   02-architecture/06-modular-hexagonal-architecture.md,
    03-supabase/04-learning-progress-schema.md,
-   03-supabase/05-functions-constraints-indexes.md,
-   03-supabase/07-rls-policy-matrix.md,
-   03-supabase/09-database-tests.md, and
-   03-supabase/13-python-code-verification-data.md.
-4. docs/implementation/SUP-PRIMITIVES-001.md, SUP-AUTH-001.md,
-   SUP-DATA-001.md, and SUP-DATA-002.md.
-5. 02-architecture/04-data-flow-and-security.md,
-   08-execution/00-roadmap.md, 01-dependency-map.md, and
-   03-handoff-protocol.md.
+   03-supabase/05-functions-constraints-indexes.md, and
+   03-supabase/07-rls-policy-matrix.md.
+4. docs/implementation/SUP-DATA-003.md and the preceding Supabase completion
+   reports needed to understand the owner/private-schema convention.
+5. 08-execution/00-roadmap.md, 08-execution/01-dependency-map.md, and
+   08-execution/03-handoff-protocol.md.
 
 ## Permitted scope
 
-1. Add only forward local migrations, in dependency order, for
-   `theory_section_completions`, `exercise_attempts`, `quiz_attempts`,
-   `quiz_attempt_answers`, `chapter_progress`, private idempotency records, and
-   private append-only audit events. Follow the established owner, UUID,
-   timestamp, foreign-key, default-deny, and RLS-enabled conventions. Do not
-   modify an applied migration.
-2. Encode the documented immutable attempt, frozen definition-version, bounded
-   answer/score/timestamp, unique attempt-number, one-active-quiz-attempt,
-   finalization/expiry, and progress-snapshot invariants. Completion rows may
-   reference only effectively published theory. A missing snapshot must remain
-   readable as a from-source aggregate; it must not be silently inserted during
-   a read.
-3. Add only narrowly scoped owner-controlled database functions required for
-   atomic exercise submission, quiz start/save/submit/expiry behavior,
-   idempotency replay/conflict/expiry, audit append, and deterministic progress
-   recalculation. Use fixed search paths, explicit grants/revocations, actor
-   checks, and private helper surfaces. No function may expose answer keys or
-   create a broad client-callable authoring/grading API.
-4. Keep Python-code grading fail-closed. An infrastructure failure creates no
-   attempt and changes no progress. Reserve/claim/finalize jobs, private
-   artifacts, digest/verdict evidence, and the authoritative WASM execution
-   plane belong to SUP-WASM-001, not this task.
-5. Add an exact allowlisted local pgTAP suite and verifier action for learning
-   records. It must preserve all primitive, profile, core-content, and
-   assessment regressions and use only synthetic data rolled back by each test
-   transaction.
+1. Produce an explicit acceptance mapping for every required audit field:
+   actor kind, nullable actor user ID, action, entity type/ID, sanitized
+   change summary, required reason, request ID, timestamp, ownership, and
+   account-deletion handling.
+2. Verify and document that audit entries are append-only through the intended
+   owner-controlled helper and that normal runtime roles have no direct table
+   read, insert, update, delete, or routine-execution access.
+3. Verify and document the safe-summary contract: no password, token, refresh
+   token, TOTP code/secret, QR or otpauth material, answer payload, answer key,
+   or complete Markdown/content body can enter an audit event.
+4. Reuse the reviewed protected local verifier and add only task-owned,
+   narrowly necessary proof. A forward-only migration is permitted only if an
+   objective audit-contract gap is found; do not modify an applied migration.
+5. Record one non-secret completion report with exact checks, result,
+   limitations, and exactly one next eligible task.
 
 ## Required proof
 
-1. Catalog, ACL, RLS/no-policy, index, constraint, and schema-isolation tests
-   cover every public and private object, including direct runtime DML/private
-   read denial and owner-only helper execution.
-2. Tests prove theory completion publication checks; cross-user, cross-quiz,
-   and cross-question references fail; attempts are immutable after their
-   permitted workflow transition; duplicate active quiz attempts, invalid
-   limits, expiry, and repeat submission fail safely; and published definition
-   history is used rather than current mutable state.
-3. Tests prove idempotency uses the canonical request hash and its 24-hour
-   window correctly, permits a fresh record after expiry, and cannot disclose
-   unsafe responses. Audit events are append-only, preserve the approved
-   account-deletion privacy behavior, and reject tokens, answers, keys, and
-   complete content bodies.
-4. For representative source states, every stored chapter-progress snapshot
-   equals a from-source recalculation, with the documented empty/missing-source
-   and timestamp rules. Account deletion follows the approved cascade/set-null
-   rule without leaving unsafe identity data.
-5. A fresh protected reset applies the complete reviewed history with clean
-   public/private schema diff and lint results. All fixed regression suites and
-   the task suite pass, the stack remains loopback-only, and credentials remain
-   unread. The completion report identifies exactly one next eligible task.
+1. The report maps each ARC-SEC-003 requirement to an implemented constraint,
+   helper, privilege, test, or documented operational boundary.
+2. Direct runtime-role access and mutation are denied; no permissive RLS policy
+   or public routine bypass exists.
+3. Safe-summary validation rejects the forbidden secret, answer, and full-body
+   categories without logging their contents in test output or reports.
+4. A protected fresh local reset, the relevant regression suites, schema diff,
+   lint, loopback assertion, and the repository foundation checks pass if code
+   changes. Credentials remain unread and no hosted state changes.
+5. The task report identifies only the next eligible task and leaves all other
+   ownership boundaries intact.
 
 ## Explicitly forbidden
 
-- Do not add Fastify routes, public RPCs, direct user policies, client UI,
-  generated database types, seeds, admin/bootstrap or role-control workflows,
-  learner authoring, broad policy-matrix work, or a hosted action.
-- Do not configure TOTP/MFA, Gmail SMTP, root Compose, Chrome, hosted
-  Supabase, Vercel, deployment, billing, or a remote URL. Do not authenticate a
-  CLI, inspect credentials, or alter prior applied migrations.
-- Do not implement private Python definitions, verifier jobs, controller
-  selection, hidden-test execution, or finalization evidence before
-  SUP-WASM-001. Do not add a placeholder that lets `python_code` grading pass.
+- Do not add Fastify routes, public RPCs, direct user policies, audit list/read
+  endpoints, client UI, generated types, generic audit buses, or a new policy
+  matrix.
+- Do not configure Gmail SMTP, TOTP/MFA, Chrome, hosted Supabase, Vercel,
+  deployment, billing, CLI authentication, a secret, or remote URL.
+- Do not implement admin/bootstrap/role-control workflows, Python-verifier
+  definitions/jobs/evidence, a controller, learner authoring, or public
+  application modules.
+- Do not alter applied migrations, weaken default denial, or broaden the audit
+  schema beyond the documented privileged-action contract.
 
-If a rule requires an unapproved policy, product decision, external service, or
-workflow owned by another task, stop at that boundary and record it rather than
-broadening SUP-DATA-003.
+If an audit requirement needs a public surface, a product decision, an external
+service, or a workflow owned by another task, stop at that boundary and record
+it rather than expanding ARC-SEC-003.

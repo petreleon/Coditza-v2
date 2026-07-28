@@ -18,11 +18,13 @@ const primitiveTestFilename = "primitives_test.sql";
 const authProfileTestFilename = "auth_profiles_test.sql";
 const coreContentTestFilename = "core_content_test.sql";
 const assessmentDefinitionsTestFilename = "assessment_definitions_test.sql";
+const learningRecordsTestFilename = "learning_records_test.sql";
 const approvedTestFilenames = new Set([
   primitiveTestFilename,
   authProfileTestFilename,
   coreContentTestFilename,
   assessmentDefinitionsTestFilename,
+  learningRecordsTestFilename,
 ]);
 const localEnvironmentPath = path.join(repositoryRoot, ".env.supabase.local");
 const localCliStateRoot = path.join(repositoryRoot, ".supabase", "local-cli");
@@ -50,6 +52,7 @@ const actions = new Set([
   "verify-auth-profiles",
   "verify-core-content",
   "verify-assessments",
+  "verify-learning-records",
   "stop",
 ]);
 const dangerousDockerEnvironmentNames = [
@@ -87,7 +90,7 @@ function assertInvocation() {
 
   if (!actions.has(action) || extraArguments.length > 0) {
     fail(
-      "Use one fixed local action: start, status, capture-env, verify-resets, verify-primitives, verify-auth-profiles, verify-core-content, verify-assessments, or stop.",
+      "Use one fixed local action: start, status, capture-env, verify-resets, verify-primitives, verify-auth-profiles, verify-core-content, verify-assessments, verify-learning-records, or stop.",
     );
   }
 
@@ -1261,6 +1264,41 @@ function localAssessmentDefinitionsTestFailure({ stdout, stderr }) {
   return "The reviewed local assessment-definition database tests did not pass.";
 }
 
+function localLearningRecordsTestFailure({ stdout, stderr }) {
+  const output = (stdout + "\n" + stderr).toLowerCase();
+  const failedAssertion = output.match(/not ok\s+(\d+)\s*-/u);
+
+  if (/not running|cannot connect|connection refused/u.test(output)) {
+    return "The reviewed local Supabase stack must be running before learning-record tests.";
+  }
+
+  if (
+    /permission denied while trying to connect to the docker daemon|cannot connect to the docker daemon|is the docker daemon running/u.test(
+      output,
+    )
+  ) {
+    return "The local learning-record tests could not access the local Docker engine.";
+  }
+
+  if (/permission denied|operation not permitted/u.test(output)) {
+    return "The reviewed local learning-record tests did not have the required local database privileges.";
+  }
+
+  if (failedAssertion !== null) {
+    return (
+      "The reviewed local learning-record database test assertion " +
+      failedAssertion[1] +
+      " did not pass."
+    );
+  }
+
+  if (/pull access denied|failed to pull|manifest unknown/u.test(output)) {
+    return "The local learning-record tests could not retrieve the local pgTAP image.";
+  }
+
+  return "The reviewed local learning-record database tests did not pass.";
+}
+
 function parseJsonOutput(output, failureMessage) {
   try {
     return JSON.parse(output);
@@ -1557,6 +1595,40 @@ function printAssessmentDefinitionsVerification(
   );
   writeLine(
     "Applied local migration history matches the reviewed baseline; primitive, Auth-profile, core-content, and assessment-definition pgTAP suites passed with public and private schema diffs and lint clean.",
+  );
+}
+
+function printLearningRecordsVerification(resetInputs, tests, fingerprint) {
+  writeLine("Local learning-record migration and pgTAP verification passed.");
+  writeLine("Reviewed migration count: " + resetInputs.migrationCount);
+  writeLine(
+    "Deterministic migration-and-seed manifest SHA-256: " +
+      resetInputs.manifest,
+  );
+  writeLine(
+    "Reviewed primitive test SHA-256: " + tests[primitiveTestFilename].digest,
+  );
+  writeLine(
+    "Reviewed Auth-profile test SHA-256: " +
+      tests[authProfileTestFilename].digest,
+  );
+  writeLine(
+    "Reviewed core-content test SHA-256: " +
+      tests[coreContentTestFilename].digest,
+  );
+  writeLine(
+    "Reviewed assessment-definition test SHA-256: " +
+      tests[assessmentDefinitionsTestFilename].digest,
+  );
+  writeLine(
+    "Reviewed learning-record test SHA-256: " +
+      tests[learningRecordsTestFilename].digest,
+  );
+  writeLine(
+    "Verified learning-record reset fingerprint SHA-256: " + fingerprint,
+  );
+  writeLine(
+    "Applied local migration history matches the reviewed baseline; primitive, Auth-profile, core-content, assessment-definition, and learning-record pgTAP suites passed with public and private schema diffs and lint clean.",
   );
 }
 
@@ -2034,6 +2106,65 @@ async function main() {
             tests[assessmentDefinitionsTestFilename].digest,
           authProfileTests: tests[authProfileTestFilename].digest,
           coreContentTests: tests[coreContentTestFilename].digest,
+          primitiveTests: tests[primitiveTestFilename].digest,
+          resetFingerprint: afterTestFingerprint,
+        }),
+      ),
+    );
+    return;
+  }
+
+  if (action === "verify-learning-records") {
+    await inspectNetwork(docker);
+    const resetInputs = await readApprovedResetInputs();
+    const tests = await readApprovedTestInputs();
+    const beforeTestFingerprint = await withIsolatedCliWorkspace(
+      true,
+      (workspace) =>
+        resetAndVerifyLocalDatabase(workspace, resetInputs, primitiveSchemas),
+    );
+    await withIsolatedCliWorkspace(true, (workspace) =>
+      runSupabase(
+        workspace,
+        [
+          "--network-id",
+          networkName,
+          "test",
+          "db",
+          "--local",
+          `supabase/tests/${primitiveTestFilename}`,
+          `supabase/tests/${authProfileTestFilename}`,
+          `supabase/tests/${coreContentTestFilename}`,
+          `supabase/tests/${assessmentDefinitionsTestFilename}`,
+          `supabase/tests/${learningRecordsTestFilename}`,
+        ],
+        localLearningRecordsTestFailure,
+      ),
+    );
+    const afterTestFingerprint = await withIsolatedCliWorkspace(
+      true,
+      (workspace) =>
+        resetAndVerifyLocalDatabase(workspace, resetInputs, primitiveSchemas),
+    );
+
+    if (beforeTestFingerprint !== afterTestFingerprint) {
+      fail(
+        "The local learning-record tests left non-deterministic database state.",
+      );
+    }
+
+    await assertNoPublicBindings(docker);
+    await assertLocalAuthHealth();
+    printLearningRecordsVerification(
+      resetInputs,
+      tests,
+      sha256(
+        JSON.stringify({
+          assessmentDefinitionTests:
+            tests[assessmentDefinitionsTestFilename].digest,
+          authProfileTests: tests[authProfileTestFilename].digest,
+          coreContentTests: tests[coreContentTestFilename].digest,
+          learningRecordTests: tests[learningRecordsTestFilename].digest,
           primitiveTests: tests[primitiveTestFilename].digest,
           resetFingerprint: afterTestFingerprint,
         }),
