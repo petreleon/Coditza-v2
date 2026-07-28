@@ -5,11 +5,11 @@
   implementation on 2026-07-27; only task-scoped local work is currently
   authorized.
 - Current phase: 2 — Local Supabase and database security
-- Active implementation task: SUP-DATA-002 (next; local exercise/quiz
-  definitions, private answer keys, and database proof)
-- Last verified implementation task: SUP-DATA-001 core hierarchy migration and
-  protected local verification
-- Last updated: 2026-07-28
+- Active implementation task: SUP-DATA-003 (next; not started) — local
+  learning records for completions, attempts, progress, audit, and idempotency.
+- Last verified implementation task: SUP-DATA-002 assessment definitions and
+  private answer keys with protected local verification
+- Last updated: 2026-07-29
 
 ## Phase status
 
@@ -17,7 +17,7 @@
 | --- | --- | --- |
 | 0 — Plan acceptance | Complete; G0 and PLAN-004 passed | G0 |
 | 1 — Foundation and containers | Complete; QA-STRAT-001 and G1 passed | G1 |
-| 2 — Local Supabase and schema | SUP-LOCAL-001/002, SUP-PRIMITIVES-001, SUP-AUTH-001, PRD-ROLE-001, and SUP-DATA-001 complete; SUP-DATA-002 next | G2 |
+| 2 — Local Supabase and schema | SUP-LOCAL-001/002, SUP-PRIMITIVES-001, SUP-AUTH-001, PRD-ROLE-001, SUP-DATA-001, and SUP-DATA-002 complete; SUP-DATA-003 is next | G2 |
 | 3 — Fastify identity/read slice | Not started | G3 |
 | 4 — Learning workflows | Not started | G4 |
 | 5 — Authoring/admin workflows | Not started | G5 |
@@ -41,7 +41,7 @@
   approves lost-all-factors recovery.
 - SUP-SMTP-LOCAL-001 is not eligible until the user supplies a Gmail App
   Password through the approved ignored local mechanism. It does not block the
-  independent SUP-DATA-002 task.
+  independent SUP-DATA-003 task.
 
 ## Open decisions
 
@@ -139,6 +139,11 @@ to the deadlines in that file.
   default denial, RLS state, constraints, versions, reorders, and effective
   visibility passed protected local pgTAP/reset/diff/lint evidence without a
   hosted mutation or secret disclosure.
+- [SUP-DATA-002 report](../docs/implementation/SUP-DATA-002.md); public
+  exercise/quiz definitions and private answer keys passed deterministic local
+  resets, primitive/profile/core regressions, 38 assessment assertions,
+  public/private diff and lint checks, and the pinned Node 24 foundation gate
+  without hosted mutation or secret disclosure.
 - [G1 completion record](08-execution/00-roadmap.md#g1-completion-record);
   Foundation reproducibility is recorded from the accepted architecture/product
   contracts, current checks, Docker evidence, and scope review.

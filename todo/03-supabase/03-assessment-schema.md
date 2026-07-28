@@ -36,7 +36,9 @@
 - `feedback_incorrect_markdown text null`
 - audit timestamps/actors
 
-Each feedback value is null or trimmed 1–20,000 characters.
+Each feedback value is null or bounded non-blank Markdown of 1–20,000
+characters. Its source is preserved: leading Markdown indentation is not
+silently trimmed because it can be semantically meaningful.
 
 The `private` schema is not exposed through the Data API and grants no table
 read/write access to `PUBLIC`, `anon`, or `authenticated`. Set matching default
@@ -94,7 +96,9 @@ client `.from(...)`.
 - `feedback_incorrect_markdown text null`
 - audit timestamps/actors
 
-Each feedback value is null or trimmed 1–20,000 characters.
+Each feedback value is null or bounded non-blank Markdown of 1–20,000
+characters. Its source is preserved: leading Markdown indentation is not
+silently trimmed because it can be semantically meaningful.
 
 ## Exact answer-spec shapes
 
@@ -142,6 +146,11 @@ The publish validator enforces:
   [SUP-WASM-001](13-python-code-verification-data.md);
 - quiz questions reject `python_code`.
 
+Until SUP-WASM-001 supplies that approved private definition, database publish
+validation fails closed for every `python_code` exercise. SUP-DATA-002 must not
+invent a placeholder table or a weaker definition merely to make Python content
+publishable.
+
 ## Exact create/complete-definition reference contract
 
 New question/option UUIDs do not exist when an author submits one atomic
@@ -163,6 +172,47 @@ authoring response returns generated `{clientRef,id}` mappings plus the safe
 draft definition so a client can reconcile. Complete draft-tree replacement
 generates new child UUIDs; old unpublished child/key rows are removed under the
 locked draft-root exception.
+
+### SUP-DATA-002 private draft-definition envelope
+
+The database helpers are private, owner-only primitives—not public RPCs. Their
+closed JSONB envelopes make the later Fastify schemas mechanically derivable:
+
+```json
+{
+  "options": [
+    { "clientRef": "optionA", "labelMarkdown": "..." }
+  ],
+  "answerSpec": { "correctOptionRef": "optionA" },
+  "feedbackCorrectMarkdown": null,
+  "feedbackIncorrectMarkdown": null
+}
+```
+
+is the exercise shape. `options` and `answerSpec` are required; feedback fields
+are optional and, if present, are `null` or bounded Markdown. A draft may use
+`"answerSpec": null` only with absent/null feedback; no key row is persisted,
+so publish validation later rejects the incomplete draft. For a non-null answer
+spec, the authoring-only shapes are exactly:
+
+- `single_choice`: `{ "correctOptionRef": "optionA" }`
+- `multiple_choice`: `{ "correctOptionRefs": ["optionA", "optionB"] }`
+- `short_text`: `{ "acceptedAnswers": ["raw answer"], "normalization": "nfkc_ascii_ws_ascii_lower_v1" }`
+
+The quiz envelope is `{ "questions": [...] }`. Every question requires
+`clientRef`, `promptMarkdown`, `questionType`, `points`, `options`, and
+`answerSpec`; the same optional feedback fields and per-question answer-spec
+rules apply. Unknown fields—including `id`, any parent ID, `position`, versions,
+actors, status, and timestamps—are rejected. Array index is the stored position.
+Question refs are unique per quiz; option refs are unique only per exact
+question. Questions are capped at 100 and options at 20 before expansion.
+
+The functions return controlled generated-ID mappings and post-mutation version
+numbers only. The staff-only ID/key projection and any public/server facade are
+owned by SUP-FUNCTIONS-001. JSONB has already canonicalized duplicate object
+keys before a database function receives it; raw duplicate-object-key rejection
+belongs to the later Fastify parser boundary, while this layer rejects duplicate
+references and answer-array values.
 
 Question array index becomes question `position`; each option array index becomes
 option `position`. Child input rejects an explicit `position`. The UTF-8 raw HTTP
@@ -205,14 +255,14 @@ ceilings, not permission to exceed this aggregate definition limit.
 
 ## SUP-DATA-002 — Implement and prove assessments
 
-- [ ] Create public definitions before private keys.
-- [ ] Lock down `private` schema privileges in the same migration.
-- [ ] Add database validators for answer-spec structure and option ownership.
-- [ ] Test duplicate/missing/cross-question client refs and prove every stored
+- [x] Create public definitions before private keys.
+- [x] Lock down `private` schema privileges in the same migration.
+- [x] Add database validators for answer-spec structure and option ownership.
+- [x] Test duplicate/missing/cross-question client refs and prove every stored
       answer spec contains generated IDs, never client refs.
-- [ ] Add atomic authoring functions for replacing draft options/keys and quiz
+- [x] Add atomic authoring functions for replacing draft options/keys and quiz
       question trees.
-- [ ] Add publish validation covering every rule above.
-- [ ] Test malformed specs, cross-item option IDs, empty quiz, invalid limits,
+- [x] Add publish validation covering every rule above.
+- [x] Test malformed specs, cross-item option IDs, empty quiz, invalid limits,
       and every published-assessment mutation.
-- [ ] Prove learner/staff tokens cannot select private key data.
+- [x] Prove learner/staff tokens cannot select private key data.

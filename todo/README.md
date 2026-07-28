@@ -54,8 +54,9 @@ unselected. ARC-WASM-001 then completed a local public-proof Docker boundary
 with pinned Pyodide assets; it did not create a controller, hidden-test path, or
 hosted selection. G1 remains passed; SUP-LOCAL-001/002,
 SUP-PRIMITIVES-001, SUP-AUTH-001, PRD-ROLE-001, and SUP-DATA-001 are complete,
-and SUP-DATA-002 is the sole next local task. Real application modules and all
-hosted configuration remain deferred.
+and SUP-DATA-002 has completed its protected local proof. SUP-DATA-003 is the
+sole next local task. Real application modules and all hosted configuration
+remain deferred.
 Planning files plus the separately requested root `.env`, `.env.example`,
 `.gitignore`, and `.dockerignore` safety files may exist. The existing
 hosted-project environment values do not authorize a schema or deployment action;

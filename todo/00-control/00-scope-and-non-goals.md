@@ -78,12 +78,14 @@ environment-level operations.
   protected proof. PRD-ROLE-001 verified the product default-learner
   requirement against that evidence. SUP-DATA-001 then completed the protected
   module/chapter/theory hierarchy migration and task-owned proof.
-  SUP-DATA-002 is now the sole active local task; it may create only the
-  assessment-definition/private-key migration, narrowly required validators or
-  task-owned database functions, and task-owned checks through the local stack.
-  It must not create/configure a hosted resource, authenticate a CLI, enter a
-  secret, select a provider/region/tier/cost/owner, or change public API
-  deployment behavior.
+  SUP-DATA-002 then completed the protected assessment-definition/private-key
+  migration and task-owned proof. SUP-DATA-003 is now the sole next local task;
+  it may create only completion, attempt, progress-snapshot, audit, and
+  idempotency records; narrowly required immutable workflow/recalculation
+  functions; and task-owned checks through the local stack. It must not create
+  a new effective-user policy matrix, a public RPC or Fastify surface, MFA,
+  SMTP, generated types, Python-grading jobs, a hosted resource, CLI
+  authentication, a secret, or public API deployment behavior.
 - A hosted, production, billing-sensitive, destructive, or secret-dependent
   action still needs its own task-specific authority; broad implementation
   authorization does not authorize it.
