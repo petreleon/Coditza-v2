@@ -181,10 +181,13 @@ saved/graded answers so omitted questions cannot disappear.
 
 ## SUP-FUNCTIONS-001 — Implement workflow primitives
 
-- [ ] Implement every helper and workflow in this file after its owning tables
-      exist except `reserve_python_grading_job`, `claim_python_grading_jobs`,
-      and `finalize_python_grading_job`; SUP-WASM-001 exclusively owns those
-      three after the shared function-security/idempotency primitives pass.
+- [ ] Implement every curriculum, assessment, progress, operations, and
+      platform helper/workflow in this file after its owning tables exist,
+      except `reserve_python_grading_job`, `claim_python_grading_jobs`, and
+      `finalize_python_grading_job`; SUP-WASM-001 exclusively owns those three
+      after the shared function-security/idempotency primitives pass. Identity
+      profile, role, bootstrap, and security-hold facades are separately owned
+      by their identity tasks and are not implicitly pulled into this task.
 - [ ] Apply the accepted ARC-DESIGN-001 ownership/RPC-coordinator map: every
       public facade has one context owner, and no generic public type-switched
       lifecycle function spans curriculum and assessment.
@@ -198,6 +201,13 @@ saved/graded answers so omitted questions cannot disappear.
       changes in the same transaction.
 - [ ] Grant execution only to the server path and prove direct user denial.
 - [ ] Add concurrency tests before any HTTP mutation task uses a function.
+
+Implementation note (2026-07-29): the first forward-only slice is present:
+structured idempotency replay, exact safe exercise/quiz-start response schemas,
+the assessment learner mutation facades, service-role-only grants, and matching
+SQL/TypeScript normalization vectors. It is documented in
+[SUP-FUNCTIONS-001 slice 01](../../docs/implementation/SUP-FUNCTIONS-001-slice-01.md).
+All other listed facade families and real two-session race proof remain open.
 
 ## Constraint checklist
 

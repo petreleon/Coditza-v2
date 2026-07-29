@@ -54,6 +54,7 @@ export default defineConfig({
       nodeLayerProject("unit", [
         "test/app/**/*.test.ts",
         "test/config/**/*.test.ts",
+        "test/modules/**/*.test.ts",
         "test/server/**/*.test.ts",
         "test/support/**/*.test.ts",
       ]),

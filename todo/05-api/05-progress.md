@@ -69,7 +69,8 @@ operation; GET never writes.
 
 ### `POST /api/v1/admin/progress/reconcile`
 
-Admin only. Body is exactly `{ userId, chapterId, reason }`. The function
+Admin only. Body is exactly `{ userId, chapterId, reasonCode }`, where
+`reasonCode` is the closed `progress_reconciliation` audit code. The function
 derives progress from immutable sources under the common progress lock, replaces
 only the recalculable snapshot, and returns safe
 `{ before, after, changed }` percentages/timestamps. It never changes answers,

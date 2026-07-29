@@ -23,8 +23,9 @@ that value and never the lifecycle `version`.
 
 Square brackets in the table describe list versus detail forms; they are not
 literal route characters. Each `PATCH .../:id` requires `expectedVersion` and
-at least one allowed field. A published correction also requires non-empty
-`correctionReason`. Parent, position, ID, status, timestamps, and unlisted fields
+at least one allowed field. A published correction also requires the closed
+`reasonCode: "content_correction"` audit code, never free-form explanation
+text. Parent, position, ID, status, timestamps, and unlisted fields
 are always rejected. Draft exercise tree changes are atomic and increment the
 exercise `version` and `definitionVersion` once. Draft quiz question trees use
 the definition route
@@ -37,7 +38,7 @@ For each exact resource name `modules`, `chapters`, `theory-sections`,
 
 - `POST /api/v1/admin/<resource>/:id/publish` with `{ expectedVersion }`;
 - `POST /api/v1/admin/<resource>/:id/archive` with
-  `{ expectedVersion, reason }`.
+  `{ expectedVersion, reasonCode: "content_archive" }`.
 
 Repeated action against the same final state returns the same safe 200 state.
 Module/chapter archive atomically archives descendants. Assessment-only routes:

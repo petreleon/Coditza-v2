@@ -2,7 +2,7 @@
 
 The sole next implementation task is:
 
-**SUP-FUNCTIONS-001 — Implement workflow primitives (next; not started).**
+**SUP-FUNCTIONS-001 — Implement workflow primitives (in progress).**
 
 Prerequisites verified: all currently owned primitive, profile, curriculum,
 assessment, learning-record, idempotency, and hardened audit tables are local,
@@ -11,8 +11,12 @@ closed audit contract. SUP-SMTP-LOCAL-001 and SUP-MFA-001 remain independently
 ineligible; neither blocks this task.
 
 This task builds the named server-only transaction facades over those existing
-tables. It is not permission to add HTTP routes, direct client policies, hosted
-configuration, Python/WASM jobs, or identity/bootstrap workflows.
+tables. Its first completed slice is the structured idempotency/replay contract
+and assessment learner-mutation facade cluster documented in
+[SUP-FUNCTIONS-001 slice 01](../docs/implementation/SUP-FUNCTIONS-001-slice-01.md).
+Continue from that bounded baseline; it is not permission to add HTTP routes,
+direct client policies, hosted configuration, Python/WASM jobs, or
+identity/bootstrap workflows.
 
 ## Read first
 
