@@ -14,10 +14,10 @@
   definition-replacement and protected draft-exercise and draft-quiz
   authoring-read and draft-module/draft-chapter/draft-theory-section PATCH and
   published-module/published-chapter/published-theory-section correction and
-  theory-section, exercise, and quiz publication slices are implemented and
-  verified; remaining owner families and real concurrency proof are still
-  required.
-- Last verified implementation slice: SUP-FUNCTIONS-001 quiz publication
+  theory-section, exercise, quiz, and chapter publication slices are
+  implemented and verified; remaining owner families and real concurrency
+  proof are still required.
+- Last verified implementation slice: SUP-FUNCTIONS-001 chapter publication
   facade with protected local and Docker verification
 - Last updated: 2026-07-29
 
@@ -279,6 +279,12 @@ to the deadlines in that file.
   canonical hierarchy and UUID-ordered progress locks, validates the complete
   question/key tree before the lifecycle write, recalculates all effective
   source users including optional-denominator behavior, retries safely by
+  lifecycle state, and passes protected local/Docker proof.
+- [SUP-FUNCTIONS-001 chapter publication slice report](../docs/implementation/SUP-FUNCTIONS-001-slice-24.md);
+  a service-role-only facade now publishes one chapter only after all three
+  direct published child categories exist, locks module then chapter,
+  reconciles snapshot/current/optional/archived learner sources only under a
+  published module, preserves draft-module progress exactly, retries safely by
   lifecycle state, and passes protected local/Docker proof.
 - [G1 completion record](08-execution/00-roadmap.md#g1-completion-record);
   Foundation reproducibility is recorded from the accepted architecture/product
