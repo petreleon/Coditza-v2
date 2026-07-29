@@ -19,7 +19,7 @@ draft-exercise and complete draft-quiz creation clusters, scalar
 draft-exercise and draft-quiz PATCH clusters, protected assessment authoring
 reads, draft-module/chapter/theory-section PATCH clusters,
 published-module/chapter/theory-section correction clusters, and
-theory-section and exercise publication, documented in
+theory-section, exercise, and quiz publication, documented in
 [slice 01](../docs/implementation/SUP-FUNCTIONS-001-slice-01.md),
 [slice 02](../docs/implementation/SUP-FUNCTIONS-001-slice-02.md), and
 [slice 03](../docs/implementation/SUP-FUNCTIONS-001-slice-03.md), and
@@ -41,42 +41,43 @@ theory-section and exercise publication, documented in
 [slice 19](../docs/implementation/SUP-FUNCTIONS-001-slice-19.md), and
 [slice 20](../docs/implementation/SUP-FUNCTIONS-001-slice-20.md), and
 [slice 21](../docs/implementation/SUP-FUNCTIONS-001-slice-21.md), and
-[slice 22](../docs/implementation/SUP-FUNCTIONS-001-slice-22.md). Continue
-from those bounded baselines with the assessment-owned
-assessment_publish_quiz facade. It must require a server-generated request
-UUID, non-null actor and quiz identifiers, and a positive expected row version.
-It must recheck the live active editor/admin actor before hierarchy, quiz-root,
-definition, or progress-source access; discover the current
-quiz-to-chapter-to-module path; lock module then chapter then quiz in canonical
-order; and recheck both hierarchy edges. Module and chapter may be draft or
-published but must not be archived.
+[slice 22](../docs/implementation/SUP-FUNCTIONS-001-slice-22.md), and
+[slice 23](../docs/implementation/SUP-FUNCTIONS-001-slice-23.md). Continue
+from those bounded baselines with the curriculum-owned
+curriculum_publish_chapter facade. It must require a server-generated request
+UUID, non-null actor and chapter identifiers, and a positive expected row
+version. It must recheck the live active editor/admin actor before hierarchy,
+chapter-root, descendant readiness, or progress-source access; discover the
+current chapter-to-module path; lock module then chapter in canonical order;
+and recheck the hierarchy edge. The module may be draft or published but must
+not be archived.
 
 The target is a closed lifecycle transition: an archived target is rejected;
 an already published target returns only its current id and rowVersion before
-expected-version comparison, with no UPDATE, audit, or progress recalculation;
-and only a current draft with the expected version may publish. Validate the
-locked root slug through private.is_valid_slug, title (trimmed 1..160),
-instructions Markdown (nonblank, at most 20,000 characters), non-negative
-unique sibling position, passing_percent (0..100), max_attempts (null or
-1..100), time_limit_seconds (null or 30..86,400), non-null is_required, and
-null published_at. It must invoke the existing
-private.validate_quiz_definition(quiz_id) as the authoritative question,
-option, and answer-key completeness check, not duplicate that logic.
+expected-version comparison, with no UPDATE, audit, descendant scan, or
+progress recalculation; and only a current draft with the expected version may
+publish. Validate the locked root slug through private.is_valid_slug, title
+(trimmed 1..160), summary Markdown (nonblank, at most 5,000 characters),
+non-negative unique sibling position, estimated_minutes (1..1,440), and null
+published_at. While the chapter remains locked, require at least one published
+theory section, one published exercise, and one published quiz in that exact
+chapter. The chapter lock is the outer serialization point for leaf lifecycle
+and definition writers; do not invent a generic descendant-lock protocol or
+revalidate published leaf definitions here.
 
 The sole real write changes only status, first published_at, and updated_by;
 the lifecycle triggers advance row_version/updated_at once. It then appends
-exactly one quiz_published audit event with changed_fields ['status'], the
-closed draft-to-published status delta, and no reason code. When both ancestors
-are published, it must recalculate every affected learner from the distinct
-UUID-sorted union of chapter_progress, theory completions, exercise attempts,
-and quiz attempts for that chapter, acquiring all progress locks last before
-calling the existing recalculator. Under a draft ancestor it must perform no
-progress source/snapshot reads or writes. It must preserve root/definition
-versions, question/option/key tree, hierarchy, created fields,
-attempts/history, and required versus optional quiz denominator semantics.
-It must not add input/reason envelopes, idempotency records,
-hierarchy/reorder/replacement, generic lifecycle, Fastify/HTTP/direct-client,
-Python/SMTP/MFA/Vercel behavior, or WASM work.
+exactly one chapter_published audit event with changed_fields ['status'], the
+closed draft-to-published status delta, and no reason code. When the locked
+module is published, it must recalculate every affected learner from the
+distinct UUID-sorted union of chapter_progress, theory completions, exercise
+attempts, and quiz attempts for that chapter, acquiring all progress locks last
+before calling the existing recalculator. Under a draft module it must perform
+no progress source/snapshot reads or writes. It must preserve every child
+status, version, definition/tree, hierarchy, created field, and learner
+completion/attempt/history. It must not add input/reason envelopes,
+idempotency records, hierarchy/reorder/replacement, generic lifecycle,
+Fastify/HTTP/direct-client/Python/SMTP/MFA/Vercel behavior, or WASM work.
 
 ## Read first
 

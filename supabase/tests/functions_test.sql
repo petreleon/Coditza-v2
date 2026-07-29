@@ -4,7 +4,7 @@ BEGIN;
 -- and the only runtime role used for successful calls is service_role.
 GRANT USAGE ON SCHEMA extensions TO coditza_owner;
 
-SELECT extensions.plan(56);
+SELECT extensions.plan(58);
 
 SET LOCAL ROLE coditza_owner;
 DO $normalization_golden_vectors$
@@ -852,6 +852,59 @@ SELECT extensions.ok(
   'exercise publication facade is owner-controlled, fixed-path, exact-name, and server-only'
 );
 
+SELECT extensions.ok(
+  (
+    SELECT procedure_entry.proowner = 'coditza_owner'::pg_catalog.regrole
+      AND procedure_entry.prosecdef
+      AND procedure_entry.proconfig = ARRAY['search_path=""']::text[]
+    FROM pg_catalog.pg_proc AS procedure_entry
+    WHERE procedure_entry.oid =
+      'public.assessment_publish_quiz(uuid,uuid,integer,uuid)'::pg_catalog.regprocedure
+  )
+  AND (
+    SELECT pg_catalog.count(*) = 1
+    FROM pg_catalog.pg_proc AS procedure_entry
+    JOIN pg_catalog.pg_namespace AS procedure_namespace
+      ON procedure_namespace.oid = procedure_entry.pronamespace
+    WHERE procedure_namespace.nspname = 'public'
+      AND procedure_entry.proname = 'assessment_publish_quiz'
+  )
+  AND NOT EXISTS (
+    SELECT 1
+    FROM (
+      VALUES ('anon'), ('authenticated'), ('authenticator')
+    ) AS runtime_role(rolname)
+    WHERE pg_catalog.has_function_privilege(
+      runtime_role.rolname,
+      'public.assessment_publish_quiz(uuid,uuid,integer,uuid)'::pg_catalog.regprocedure,
+      'EXECUTE'
+    )
+  )
+  AND pg_catalog.has_function_privilege(
+    'service_role',
+    'public.assessment_publish_quiz(uuid,uuid,integer,uuid)'::pg_catalog.regprocedure,
+    'EXECUTE'
+  )
+  AND pg_catalog.strpos(
+    pg_catalog.pg_get_functiondef(
+      'public.assessment_publish_quiz(uuid,uuid,integer,uuid)'::pg_catalog.regprocedure
+    ),
+    'PERFORM private.validate_quiz_definition(p_quiz_id);'
+  ) > 0
+  AND pg_catalog.strpos(
+    pg_catalog.pg_get_functiondef(
+      'public.assessment_publish_quiz(uuid,uuid,integer,uuid)'::pg_catalog.regprocedure
+    ),
+    'PERFORM private.validate_quiz_definition(p_quiz_id);'
+  ) < pg_catalog.strpos(
+    pg_catalog.pg_get_functiondef(
+      'public.assessment_publish_quiz(uuid,uuid,integer,uuid)'::pg_catalog.regprocedure
+    ),
+    'UPDATE public.quizzes AS quiz_entry'
+  ),
+  'quiz publication facade is owner-controlled, fixed-path, exact-name, server-only, and explicitly validates the definition before its lifecycle write'
+);
+
 SET LOCAL ROLE authenticated;
 DO $authenticated_facade_denial$
 DECLARE
@@ -1214,6 +1267,22 @@ BEGIN
   END;
   IF NOT v_rejected THEN
     RAISE EXCEPTION 'authenticated role unexpectedly executed an exercise publication facade';
+  END IF;
+
+  v_rejected := false;
+  BEGIN
+    PERFORM *
+    FROM public.assessment_publish_quiz(
+      'c3000000-0000-0000-0000-000000000005',
+      'c4600000-0000-0000-0000-000000000001',
+      1,
+      'c5020000-0000-0000-0000-000000000001'
+    );
+  EXCEPTION WHEN insufficient_privilege THEN
+    v_rejected := true;
+  END;
+  IF NOT v_rejected THEN
+    RAISE EXCEPTION 'authenticated role unexpectedly executed a quiz publication facade';
   END IF;
 END;
 $authenticated_facade_denial$;
@@ -17433,6 +17502,2027 @@ RESET ROLE;
 SELECT extensions.ok(
   TRUE,
   'exercise publication locks the full path, validates definition readiness, recalculates every effective-progress source once, preserves optional and ineffective-parent semantics, audits only real transitions, and uses state-based retry without replay records'
+);
+
+-- Slice 23 adds fresh source-only learners. The earlier Slice 22 sources now
+-- have derived snapshots, so these make a regression that scans only
+-- chapter_progress rather than the complete four-source union observable.
+INSERT INTO auth.users (
+  id,
+  aud,
+  role,
+  email,
+  raw_app_meta_data,
+  raw_user_meta_data,
+  created_at,
+  updated_at
+)
+VALUES
+  (
+    'c3000000-0000-0000-0000-000000000010',
+    'authenticated',
+    'authenticated',
+    'quiz-publish-theory-source@coditza.invalid',
+    '{}'::jsonb,
+    '{"displayName":"Quiz Publish Theory Source"}'::jsonb,
+    pg_catalog.now(),
+    pg_catalog.now()
+  ),
+  (
+    'c3000000-0000-0000-0000-000000000011',
+    'authenticated',
+    'authenticated',
+    'quiz-publish-exercise-source@coditza.invalid',
+    '{}'::jsonb,
+    '{"displayName":"Quiz Publish Exercise Source"}'::jsonb,
+    pg_catalog.now(),
+    pg_catalog.now()
+  ),
+  (
+    'c3000000-0000-0000-0000-000000000012',
+    'authenticated',
+    'authenticated',
+    'quiz-publish-attempt-source@coditza.invalid',
+    '{}'::jsonb,
+    '{"displayName":"Quiz Publish Attempt Source"}'::jsonb,
+    pg_catalog.now(),
+    pg_catalog.now()
+  );
+
+SET LOCAL ROLE coditza_owner;
+DO $assessment_publish_quiz_seed$
+DECLARE
+  v_question record;
+  v_option record;
+  v_key record;
+BEGIN
+  INSERT INTO public.quizzes (
+    id,
+    chapter_id,
+    slug,
+    title,
+    instructions_markdown,
+    position,
+    passing_percent,
+    max_attempts,
+    time_limit_seconds,
+    is_required,
+    created_by,
+    updated_by
+  )
+  VALUES
+    (
+      'c4600000-0000-0000-0000-000000000001',
+      'c3200000-0000-0000-0000-000000000001',
+      'quiz-publication-required',
+      'Required quiz publication target',
+      'Answer every publication question.',
+      90,
+      70,
+      3,
+      600,
+      true,
+      'c3000000-0000-0000-0000-000000000005',
+      'c3000000-0000-0000-0000-000000000005'
+    ),
+    (
+      'c4690000-0000-0000-0000-000000000001',
+      'c3200000-0000-0000-0000-000000000001',
+      'quiz-publication-optional',
+      'Optional quiz publication target',
+      'Answer yes.',
+      91,
+      70,
+      NULL,
+      NULL,
+      false,
+      'c3000000-0000-0000-0000-000000000005',
+      'c3000000-0000-0000-0000-000000000005'
+    ),
+    (
+      'c4640000-0000-0000-0000-000000000001',
+      'c3200000-0000-0000-0000-000000000001',
+      'quiz-publication-missing-key',
+      'Missing-key quiz publication target',
+      'This root deliberately has no answer key.',
+      92,
+      70,
+      NULL,
+      NULL,
+      true,
+      'c3000000-0000-0000-0000-000000000005',
+      'c3000000-0000-0000-0000-000000000005'
+    ),
+    (
+      'c46a0000-0000-0000-0000-000000000001',
+      'c3200000-0000-0000-0000-000000000001',
+      'quiz-publication-empty',
+      'Empty quiz publication target',
+      'This root deliberately has no questions.',
+      93,
+      70,
+      NULL,
+      NULL,
+      true,
+      'c3000000-0000-0000-0000-000000000005',
+      'c3000000-0000-0000-0000-000000000005'
+    ),
+    (
+      'c4650000-0000-0000-0000-000000000001',
+      'c3200000-0000-0000-0000-000000000001',
+      'quiz-publication-one-option',
+      'One-option quiz publication target',
+      'Choose the only option.',
+      94,
+      70,
+      NULL,
+      NULL,
+      true,
+      'c3000000-0000-0000-0000-000000000005',
+      'c3000000-0000-0000-0000-000000000005'
+    ),
+    (
+      'c4660000-0000-0000-0000-000000000001',
+      'c3200000-0000-0000-0000-000000000001',
+      'quiz-publication-archived',
+      'Archived quiz publication target',
+      'Answer yes.',
+      95,
+      70,
+      NULL,
+      NULL,
+      true,
+      'c3000000-0000-0000-0000-000000000005',
+      'c3000000-0000-0000-0000-000000000005'
+    ),
+    (
+      'c46d0000-0000-0000-0000-000000000001',
+      'c3200000-0000-0000-0000-000000000001',
+      'quiz-publication-duplicate-position',
+      'Duplicate-position quiz publication target',
+      'This root demonstrates readiness validation.',
+      96,
+      70,
+      NULL,
+      NULL,
+      true,
+      'c3000000-0000-0000-0000-000000000005',
+      'c3000000-0000-0000-0000-000000000005'
+    ),
+    (
+      'c4610000-0000-0000-0000-000000000001',
+      'c32f0000-0000-0000-0000-000000000001',
+      'quiz-publication-published-draft',
+      'Published-module draft-chapter quiz target',
+      'Answer yes.',
+      90,
+      70,
+      NULL,
+      NULL,
+      true,
+      'c3000000-0000-0000-0000-000000000005',
+      'c3000000-0000-0000-0000-000000000005'
+    ),
+    (
+      'c4620000-0000-0000-0000-000000000001',
+      'c4200000-0000-0000-0000-000000000001',
+      'quiz-publication-draft-published',
+      'Draft-module published-chapter quiz target',
+      'Answer yes.',
+      90,
+      70,
+      NULL,
+      NULL,
+      true,
+      'c3000000-0000-0000-0000-000000000004',
+      'c3000000-0000-0000-0000-000000000004'
+    ),
+    (
+      'c4630000-0000-0000-0000-000000000001',
+      'c32e0000-0000-0000-0000-000000000001',
+      'quiz-publication-draft-draft',
+      'Draft-module draft-chapter quiz target',
+      'Answer yes.',
+      90,
+      70,
+      NULL,
+      NULL,
+      true,
+      'c3000000-0000-0000-0000-000000000005',
+      'c3000000-0000-0000-0000-000000000005'
+    ),
+    (
+      'c4670000-0000-0000-0000-000000000001',
+      'c32c0000-0000-0000-0000-000000000001',
+      'quiz-publication-archived-chapter-draft',
+      'Archived-chapter draft quiz target',
+      'Answer yes.',
+      90,
+      70,
+      NULL,
+      NULL,
+      true,
+      'c3000000-0000-0000-0000-000000000005',
+      'c3000000-0000-0000-0000-000000000005'
+    ),
+    (
+      'c46b0000-0000-0000-0000-000000000001',
+      'c32c0000-0000-0000-0000-000000000001',
+      'quiz-publication-archived-chapter-published',
+      'Archived-chapter published quiz target',
+      'Answer yes.',
+      91,
+      70,
+      NULL,
+      NULL,
+      true,
+      'c3000000-0000-0000-0000-000000000005',
+      'c3000000-0000-0000-0000-000000000005'
+    ),
+    (
+      'c4680000-0000-0000-0000-000000000001',
+      'c3310000-0000-0000-0000-000000000001',
+      'quiz-publication-archived-module-draft',
+      'Archived-module draft quiz target',
+      'Answer yes.',
+      90,
+      70,
+      NULL,
+      NULL,
+      true,
+      'c3000000-0000-0000-0000-000000000005',
+      'c3000000-0000-0000-0000-000000000005'
+    ),
+    (
+      'c46c0000-0000-0000-0000-000000000001',
+      'c3310000-0000-0000-0000-000000000001',
+      'quiz-publication-archived-module-published',
+      'Archived-module published quiz target',
+      'Answer yes.',
+      91,
+      70,
+      NULL,
+      NULL,
+      true,
+      'c3000000-0000-0000-0000-000000000005',
+      'c3000000-0000-0000-0000-000000000005'
+    );
+
+  FOR v_question IN
+    SELECT *
+    FROM (
+      VALUES
+        (
+          'c4600000-0000-0000-0000-000000000001'::uuid,
+          'c4700000-0000-0000-0000-000000000001'::uuid,
+          'Choose the safe outer lock.',
+          'single_choice'::public.question_type,
+          0,
+          3
+        ),
+        (
+          'c4600000-0000-0000-0000-000000000001'::uuid,
+          'c4710000-0000-0000-0000-000000000001'::uuid,
+          'Choose every safe publication property.',
+          'multiple_choice'::public.question_type,
+          1,
+          4
+        ),
+        (
+          'c4600000-0000-0000-0000-000000000001'::uuid,
+          'c4720000-0000-0000-0000-000000000001'::uuid,
+          'Type yes for a safe audit.',
+          'short_text'::public.question_type,
+          2,
+          2
+        ),
+        (
+          'c4690000-0000-0000-0000-000000000001'::uuid,
+          'c4730000-0000-0000-0000-000000000001'::uuid,
+          'Type yes.',
+          'short_text'::public.question_type,
+          0,
+          1
+        ),
+        (
+          'c4610000-0000-0000-0000-000000000001'::uuid,
+          'c4740000-0000-0000-0000-000000000001'::uuid,
+          'Type yes.',
+          'short_text'::public.question_type,
+          0,
+          1
+        ),
+        (
+          'c4620000-0000-0000-0000-000000000001'::uuid,
+          'c4750000-0000-0000-0000-000000000001'::uuid,
+          'Type yes.',
+          'short_text'::public.question_type,
+          0,
+          1
+        ),
+        (
+          'c4630000-0000-0000-0000-000000000001'::uuid,
+          'c4760000-0000-0000-0000-000000000001'::uuid,
+          'Type yes.',
+          'short_text'::public.question_type,
+          0,
+          1
+        ),
+        (
+          'c4640000-0000-0000-0000-000000000001'::uuid,
+          'c4770000-0000-0000-0000-000000000001'::uuid,
+          'This question deliberately has no key.',
+          'short_text'::public.question_type,
+          0,
+          1
+        ),
+        (
+          'c4650000-0000-0000-0000-000000000001'::uuid,
+          'c4780000-0000-0000-0000-000000000001'::uuid,
+          'Choose the only option.',
+          'single_choice'::public.question_type,
+          0,
+          1
+        ),
+        (
+          'c4660000-0000-0000-0000-000000000001'::uuid,
+          'c4790000-0000-0000-0000-000000000001'::uuid,
+          'Type yes.',
+          'short_text'::public.question_type,
+          0,
+          1
+        ),
+        (
+          'c4670000-0000-0000-0000-000000000001'::uuid,
+          'c47a0000-0000-0000-0000-000000000001'::uuid,
+          'Type yes.',
+          'short_text'::public.question_type,
+          0,
+          1
+        ),
+        (
+          'c4680000-0000-0000-0000-000000000001'::uuid,
+          'c47b0000-0000-0000-0000-000000000001'::uuid,
+          'Type yes.',
+          'short_text'::public.question_type,
+          0,
+          1
+        ),
+        (
+          'c46b0000-0000-0000-0000-000000000001'::uuid,
+          'c47c0000-0000-0000-0000-000000000001'::uuid,
+          'Type yes.',
+          'short_text'::public.question_type,
+          0,
+          1
+        ),
+        (
+          'c46c0000-0000-0000-0000-000000000001'::uuid,
+          'c47d0000-0000-0000-0000-000000000001'::uuid,
+          'Type yes.',
+          'short_text'::public.question_type,
+          0,
+          1
+        ),
+        (
+          'c46d0000-0000-0000-0000-000000000001'::uuid,
+          'c47e0000-0000-0000-0000-000000000001'::uuid,
+          'Type yes.',
+          'short_text'::public.question_type,
+          0,
+          1
+        )
+    ) AS question_fixture(
+      quiz_id,
+      question_id,
+      prompt_markdown,
+      question_type,
+      position,
+      points
+    )
+  LOOP
+    PERFORM pg_catalog.set_config(
+      'coditza.assessment_tree_root',
+      'quiz:' || v_question.quiz_id::text,
+      true
+    );
+    INSERT INTO public.quiz_questions (
+      id,
+      quiz_id,
+      prompt_markdown,
+      question_type,
+      position,
+      points
+    )
+    VALUES (
+      v_question.question_id,
+      v_question.quiz_id,
+      v_question.prompt_markdown,
+      v_question.question_type,
+      v_question.position,
+      v_question.points
+    );
+  END LOOP;
+
+  FOR v_option IN
+    SELECT *
+    FROM (
+      VALUES
+        (
+          'c4600000-0000-0000-0000-000000000001'::uuid,
+          'c4700000-0000-0000-0000-000000000001'::uuid,
+          'c4800000-0000-0000-0000-000000000001'::uuid,
+          'Lock module first.',
+          0
+        ),
+        (
+          'c4600000-0000-0000-0000-000000000001'::uuid,
+          'c4700000-0000-0000-0000-000000000001'::uuid,
+          'c4800000-0000-0000-0000-000000000002'::uuid,
+          'Lock progress first.',
+          1
+        ),
+        (
+          'c4600000-0000-0000-0000-000000000001'::uuid,
+          'c4710000-0000-0000-0000-000000000001'::uuid,
+          'c4810000-0000-0000-0000-000000000001'::uuid,
+          'Keep the root transition narrow.',
+          0
+        ),
+        (
+          'c4600000-0000-0000-0000-000000000001'::uuid,
+          'c4710000-0000-0000-0000-000000000001'::uuid,
+          'c4810000-0000-0000-0000-000000000002'::uuid,
+          'Write raw answers to audit.',
+          1
+        ),
+        (
+          'c4600000-0000-0000-0000-000000000001'::uuid,
+          'c4710000-0000-0000-0000-000000000001'::uuid,
+          'c4810000-0000-0000-0000-000000000003'::uuid,
+          'Validate the definition tree.',
+          2
+        ),
+        (
+          'c4650000-0000-0000-0000-000000000001'::uuid,
+          'c4780000-0000-0000-0000-000000000001'::uuid,
+          'c4880000-0000-0000-0000-000000000001'::uuid,
+          'Only option.',
+          0
+        )
+    ) AS option_fixture(
+      quiz_id,
+      question_id,
+      option_id,
+      label_markdown,
+      position
+    )
+  LOOP
+    PERFORM pg_catalog.set_config(
+      'coditza.assessment_tree_root',
+      'quiz:' || v_option.quiz_id::text,
+      true
+    );
+    INSERT INTO public.quiz_question_options (
+      id,
+      question_id,
+      label_markdown,
+      position
+    )
+    VALUES (
+      v_option.option_id,
+      v_option.question_id,
+      v_option.label_markdown,
+      v_option.position
+    );
+  END LOOP;
+
+  FOR v_key IN
+    SELECT *
+    FROM (
+      VALUES
+        (
+          'c4600000-0000-0000-0000-000000000001'::uuid,
+          'c4700000-0000-0000-0000-000000000001'::uuid,
+          '{"correctOptionId":"c4800000-0000-0000-0000-000000000001"}'::jsonb
+        ),
+        (
+          'c4600000-0000-0000-0000-000000000001'::uuid,
+          'c4710000-0000-0000-0000-000000000001'::uuid,
+          '{"correctOptionIds":["c4810000-0000-0000-0000-000000000001","c4810000-0000-0000-0000-000000000003"]}'::jsonb
+        ),
+        (
+          'c4600000-0000-0000-0000-000000000001'::uuid,
+          'c4720000-0000-0000-0000-000000000001'::uuid,
+          '{"acceptedAnswers":["yes"],"normalization":"nfkc_ascii_ws_ascii_lower_v1"}'::jsonb
+        ),
+        (
+          'c4690000-0000-0000-0000-000000000001'::uuid,
+          'c4730000-0000-0000-0000-000000000001'::uuid,
+          '{"acceptedAnswers":["yes"],"normalization":"nfkc_ascii_ws_ascii_lower_v1"}'::jsonb
+        ),
+        (
+          'c4610000-0000-0000-0000-000000000001'::uuid,
+          'c4740000-0000-0000-0000-000000000001'::uuid,
+          '{"acceptedAnswers":["yes"],"normalization":"nfkc_ascii_ws_ascii_lower_v1"}'::jsonb
+        ),
+        (
+          'c4620000-0000-0000-0000-000000000001'::uuid,
+          'c4750000-0000-0000-0000-000000000001'::uuid,
+          '{"acceptedAnswers":["yes"],"normalization":"nfkc_ascii_ws_ascii_lower_v1"}'::jsonb
+        ),
+        (
+          'c4630000-0000-0000-0000-000000000001'::uuid,
+          'c4760000-0000-0000-0000-000000000001'::uuid,
+          '{"acceptedAnswers":["yes"],"normalization":"nfkc_ascii_ws_ascii_lower_v1"}'::jsonb
+        ),
+        (
+          'c4650000-0000-0000-0000-000000000001'::uuid,
+          'c4780000-0000-0000-0000-000000000001'::uuid,
+          '{"correctOptionId":"c4880000-0000-0000-0000-000000000001"}'::jsonb
+        ),
+        (
+          'c4660000-0000-0000-0000-000000000001'::uuid,
+          'c4790000-0000-0000-0000-000000000001'::uuid,
+          '{"acceptedAnswers":["yes"],"normalization":"nfkc_ascii_ws_ascii_lower_v1"}'::jsonb
+        ),
+        (
+          'c4670000-0000-0000-0000-000000000001'::uuid,
+          'c47a0000-0000-0000-0000-000000000001'::uuid,
+          '{"acceptedAnswers":["yes"],"normalization":"nfkc_ascii_ws_ascii_lower_v1"}'::jsonb
+        ),
+        (
+          'c4680000-0000-0000-0000-000000000001'::uuid,
+          'c47b0000-0000-0000-0000-000000000001'::uuid,
+          '{"acceptedAnswers":["yes"],"normalization":"nfkc_ascii_ws_ascii_lower_v1"}'::jsonb
+        ),
+        (
+          'c46b0000-0000-0000-0000-000000000001'::uuid,
+          'c47c0000-0000-0000-0000-000000000001'::uuid,
+          '{"acceptedAnswers":["yes"],"normalization":"nfkc_ascii_ws_ascii_lower_v1"}'::jsonb
+        ),
+        (
+          'c46c0000-0000-0000-0000-000000000001'::uuid,
+          'c47d0000-0000-0000-0000-000000000001'::uuid,
+          '{"acceptedAnswers":["yes"],"normalization":"nfkc_ascii_ws_ascii_lower_v1"}'::jsonb
+        ),
+        (
+          'c46d0000-0000-0000-0000-000000000001'::uuid,
+          'c47e0000-0000-0000-0000-000000000001'::uuid,
+          '{"acceptedAnswers":["yes"],"normalization":"nfkc_ascii_ws_ascii_lower_v1"}'::jsonb
+        )
+    ) AS key_fixture(quiz_id, question_id, answer_spec)
+  LOOP
+    PERFORM pg_catalog.set_config(
+      'coditza.assessment_tree_root',
+      'quiz:' || v_key.quiz_id::text,
+      true
+    );
+    INSERT INTO private.quiz_question_answer_keys (
+      question_id,
+      answer_spec,
+      created_by,
+      updated_by
+    )
+    VALUES (
+      v_key.question_id,
+      v_key.answer_spec,
+      'c3000000-0000-0000-0000-000000000005',
+      'c3000000-0000-0000-0000-000000000005'
+    );
+  END LOOP;
+  PERFORM pg_catalog.set_config('coditza.assessment_tree_root', '', true);
+
+  UPDATE public.quizzes
+  SET
+    status = 'archived'::public.content_status,
+    updated_by = 'c3000000-0000-0000-0000-000000000005'
+  WHERE id = 'c4660000-0000-0000-0000-000000000001';
+
+  UPDATE public.quizzes
+  SET
+    status = 'published'::public.content_status,
+    published_at = pg_catalog.clock_timestamp(),
+    updated_by = 'c3000000-0000-0000-0000-000000000005'
+  WHERE id IN (
+    'c46b0000-0000-0000-0000-000000000001'::uuid,
+    'c46c0000-0000-0000-0000-000000000001'::uuid
+  );
+
+  PERFORM pg_catalog.set_config(
+    'coditza.learning_write',
+    'theory:c3000000-0000-0000-0000-000000000010:c3300000-0000-0000-0000-000000000001',
+    true
+  );
+  INSERT INTO public.theory_section_completions (
+    user_id,
+    theory_section_id
+  )
+  VALUES (
+    'c3000000-0000-0000-0000-000000000010',
+    'c3300000-0000-0000-0000-000000000001'
+  );
+
+  PERFORM pg_catalog.set_config('coditza.learning_write', 'exercise', true);
+  INSERT INTO public.exercise_attempts (
+    id,
+    user_id,
+    exercise_id,
+    exercise_definition_version,
+    answer,
+    is_correct,
+    points_earned,
+    points_possible
+  )
+  VALUES (
+    'c4900000-0000-0000-0000-000000000001',
+    'c3000000-0000-0000-0000-000000000011',
+    'c3410000-0000-0000-0000-000000000001',
+    1,
+    '{"text":"yes"}'::jsonb,
+    true,
+    7,
+    7
+  );
+
+  PERFORM pg_catalog.set_config('coditza.learning_write', 'quiz-start', true);
+  INSERT INTO public.quiz_attempts (
+    id,
+    user_id,
+    quiz_id,
+    quiz_definition_version,
+    attempt_number
+  )
+  VALUES (
+    'c4910000-0000-0000-0000-000000000001',
+    'c3000000-0000-0000-0000-000000000012',
+    'c3510000-0000-0000-0000-000000000001',
+    1,
+    1
+  );
+  PERFORM pg_catalog.set_config('coditza.learning_write', '', true);
+END;
+$assessment_publish_quiz_seed$;
+
+DO $assessment_publish_quiz_initial_snapshot$
+DECLARE
+  v_c460_root_snapshot jsonb;
+  v_c460_tree_snapshot jsonb;
+  v_parent_snapshot jsonb;
+  v_ineffective_progress_snapshot jsonb;
+  v_source_fingerprint text;
+  v_affected_user_ids jsonb;
+  v_progress_updated_at_snapshot jsonb;
+  v_user_one_first_completed_at text;
+BEGIN
+  SELECT pg_catalog.jsonb_build_object(
+    'chapterId', quiz_entry.chapter_id::text,
+    'slug', quiz_entry.slug,
+    'title', quiz_entry.title,
+    'instructionsMarkdown', quiz_entry.instructions_markdown,
+    'position', quiz_entry.position,
+    'passingPercent', quiz_entry.passing_percent,
+    'maxAttempts', quiz_entry.max_attempts,
+    'timeLimitSeconds', quiz_entry.time_limit_seconds,
+    'isRequired', quiz_entry.is_required,
+    'definitionVersion', quiz_entry.definition_version,
+    'createdAt', quiz_entry.created_at::text,
+    'createdBy', quiz_entry.created_by::text
+  )
+  INTO v_c460_root_snapshot
+  FROM public.quizzes AS quiz_entry
+  WHERE quiz_entry.id = 'c4600000-0000-0000-0000-000000000001';
+
+  SELECT pg_catalog.jsonb_build_object(
+    'questions',
+    COALESCE(
+      (
+        SELECT pg_catalog.jsonb_agg(
+          pg_catalog.to_jsonb(question_entry)
+          ORDER BY question_entry.id
+        )
+        FROM public.quiz_questions AS question_entry
+        WHERE question_entry.quiz_id =
+          'c4600000-0000-0000-0000-000000000001'::uuid
+      ),
+      '[]'::jsonb
+    ),
+    'options',
+    COALESCE(
+      (
+        SELECT pg_catalog.jsonb_agg(
+          pg_catalog.to_jsonb(option_entry)
+          ORDER BY option_entry.id
+        )
+        FROM public.quiz_question_options AS option_entry
+        JOIN public.quiz_questions AS question_entry
+          ON question_entry.id = option_entry.question_id
+        WHERE question_entry.quiz_id =
+          'c4600000-0000-0000-0000-000000000001'::uuid
+      ),
+      '[]'::jsonb
+    ),
+    'answerKeys',
+    COALESCE(
+      (
+        SELECT pg_catalog.jsonb_agg(
+          pg_catalog.to_jsonb(answer_key)
+          ORDER BY answer_key.question_id
+        )
+        FROM private.quiz_question_answer_keys AS answer_key
+        JOIN public.quiz_questions AS question_entry
+          ON question_entry.id = answer_key.question_id
+        WHERE question_entry.quiz_id =
+          'c4600000-0000-0000-0000-000000000001'::uuid
+      ),
+      '[]'::jsonb
+    )
+  )
+  INTO v_c460_tree_snapshot;
+
+  SELECT pg_catalog.jsonb_build_object(
+    'modules',
+    (
+      SELECT pg_catalog.jsonb_agg(
+        pg_catalog.to_jsonb(module_entry)
+        ORDER BY module_entry.id
+      )
+      FROM public.modules AS module_entry
+      WHERE module_entry.id IN (
+        'c3100000-0000-0000-0000-000000000001'::uuid,
+        'c31e0000-0000-0000-0000-000000000001'::uuid,
+        'c4100000-0000-0000-0000-000000000001'::uuid,
+        'c31f0000-0000-0000-0000-000000000001'::uuid
+      )
+    ),
+    'chapters',
+    (
+      SELECT pg_catalog.jsonb_agg(
+        pg_catalog.to_jsonb(chapter_entry)
+        ORDER BY chapter_entry.id
+      )
+      FROM public.chapters AS chapter_entry
+      WHERE chapter_entry.id IN (
+        'c3200000-0000-0000-0000-000000000001'::uuid,
+        'c32f0000-0000-0000-0000-000000000001'::uuid,
+        'c4200000-0000-0000-0000-000000000001'::uuid,
+        'c32e0000-0000-0000-0000-000000000001'::uuid,
+        'c32c0000-0000-0000-0000-000000000001'::uuid,
+        'c3310000-0000-0000-0000-000000000001'::uuid
+      )
+    )
+  )
+  INTO v_parent_snapshot;
+
+  SELECT COALESCE(
+    pg_catalog.jsonb_agg(
+      pg_catalog.to_jsonb(progress_entry)
+      ORDER BY progress_entry.chapter_id, progress_entry.user_id
+    ),
+    '[]'::jsonb
+  )
+  INTO v_ineffective_progress_snapshot
+  FROM public.chapter_progress AS progress_entry
+  WHERE progress_entry.chapter_id IN (
+    'c32f0000-0000-0000-0000-000000000001'::uuid,
+    'c4200000-0000-0000-0000-000000000001'::uuid,
+    'c32e0000-0000-0000-0000-000000000001'::uuid
+  );
+
+  SELECT COALESCE(
+    pg_catalog.jsonb_agg(affected_user.user_id::text ORDER BY affected_user.user_id),
+    '[]'::jsonb
+  )
+  INTO v_affected_user_ids
+  FROM (
+    SELECT progress_entry.user_id
+    FROM public.chapter_progress AS progress_entry
+    WHERE progress_entry.chapter_id =
+      'c3200000-0000-0000-0000-000000000001'::uuid
+
+    UNION
+
+    SELECT completion_entry.user_id
+    FROM public.theory_section_completions AS completion_entry
+    JOIN public.theory_sections AS theory_entry
+      ON theory_entry.id = completion_entry.theory_section_id
+    WHERE theory_entry.chapter_id =
+      'c3200000-0000-0000-0000-000000000001'::uuid
+
+    UNION
+
+    SELECT attempt_entry.user_id
+    FROM public.exercise_attempts AS attempt_entry
+    JOIN public.exercises AS exercise_entry
+      ON exercise_entry.id = attempt_entry.exercise_id
+    WHERE exercise_entry.chapter_id =
+      'c3200000-0000-0000-0000-000000000001'::uuid
+
+    UNION
+
+    SELECT attempt_entry.user_id
+    FROM public.quiz_attempts AS attempt_entry
+    JOIN public.quizzes AS quiz_entry
+      ON quiz_entry.id = attempt_entry.quiz_id
+    WHERE quiz_entry.chapter_id =
+      'c3200000-0000-0000-0000-000000000001'::uuid
+  ) AS affected_user;
+
+  SELECT pg_catalog.md5(
+    COALESCE(
+      pg_catalog.jsonb_agg(
+        pg_catalog.jsonb_build_object(
+          'kind',
+          source_entry.kind,
+          'state',
+          source_entry.state
+        )
+        ORDER BY source_entry.kind, source_entry.state::text
+      )::text,
+      '[]'
+    )
+  )
+  INTO v_source_fingerprint
+  FROM (
+    SELECT
+      'theory_completion'::text AS kind,
+      pg_catalog.to_jsonb(completion_entry) AS state
+    FROM public.theory_section_completions AS completion_entry
+    JOIN public.theory_sections AS theory_entry
+      ON theory_entry.id = completion_entry.theory_section_id
+    WHERE theory_entry.chapter_id =
+      'c3200000-0000-0000-0000-000000000001'::uuid
+
+    UNION ALL
+
+    SELECT
+      'exercise_attempt'::text,
+      pg_catalog.to_jsonb(attempt_entry)
+    FROM public.exercise_attempts AS attempt_entry
+    JOIN public.exercises AS exercise_entry
+      ON exercise_entry.id = attempt_entry.exercise_id
+    WHERE exercise_entry.chapter_id =
+      'c3200000-0000-0000-0000-000000000001'::uuid
+
+    UNION ALL
+
+    SELECT
+      'quiz_attempt'::text,
+      pg_catalog.to_jsonb(attempt_entry)
+    FROM public.quiz_attempts AS attempt_entry
+    JOIN public.quizzes AS quiz_entry
+      ON quiz_entry.id = attempt_entry.quiz_id
+    WHERE quiz_entry.chapter_id =
+      'c3200000-0000-0000-0000-000000000001'::uuid
+  ) AS source_entry;
+
+  SELECT pg_catalog.jsonb_object_agg(
+    progress_entry.user_id::text,
+    progress_entry.updated_at::text
+  )
+  INTO v_progress_updated_at_snapshot
+  FROM public.chapter_progress AS progress_entry
+  WHERE progress_entry.chapter_id =
+    'c3200000-0000-0000-0000-000000000001'::uuid;
+
+  SELECT progress_entry.first_completed_at::text
+  INTO v_user_one_first_completed_at
+  FROM public.chapter_progress AS progress_entry
+  WHERE progress_entry.user_id =
+      'c3000000-0000-0000-0000-000000000001'::uuid
+    AND progress_entry.chapter_id =
+      'c3200000-0000-0000-0000-000000000001'::uuid;
+
+  IF v_c460_root_snapshot IS NULL
+    OR v_c460_tree_snapshot -> 'questions' IS NULL
+    OR v_parent_snapshot IS NULL
+    OR v_source_fingerprint IS NULL
+    OR v_progress_updated_at_snapshot IS NULL
+    OR v_user_one_first_completed_at IS NULL
+    OR v_affected_user_ids IS DISTINCT FROM pg_catalog.jsonb_build_array(
+      'c3000000-0000-0000-0000-000000000001',
+      'c3000000-0000-0000-0000-000000000002',
+      'c3000000-0000-0000-0000-000000000003',
+      'c3000000-0000-0000-0000-000000000004',
+      'c3000000-0000-0000-0000-000000000007',
+      'c3000000-0000-0000-0000-000000000008',
+      'c3000000-0000-0000-0000-000000000009',
+      'c3000000-0000-0000-0000-000000000010',
+      'c3000000-0000-0000-0000-000000000011',
+      'c3000000-0000-0000-0000-000000000012'
+    )
+    OR EXISTS (
+      SELECT 1
+      FROM public.chapter_progress AS progress_entry
+      WHERE progress_entry.chapter_id =
+          'c3200000-0000-0000-0000-000000000001'::uuid
+        AND progress_entry.user_id IN (
+          'c3000000-0000-0000-0000-000000000010'::uuid,
+          'c3000000-0000-0000-0000-000000000011'::uuid,
+          'c3000000-0000-0000-0000-000000000012'::uuid
+        )
+    ) THEN
+    RAISE EXCEPTION 'quiz publication fixture is incomplete';
+  END IF;
+
+  PERFORM pg_catalog.set_config(
+    'coditza.slice23_c460_root_snapshot',
+    v_c460_root_snapshot::text,
+    true
+  );
+  PERFORM pg_catalog.set_config(
+    'coditza.slice23_c460_tree_snapshot',
+    v_c460_tree_snapshot::text,
+    true
+  );
+  PERFORM pg_catalog.set_config(
+    'coditza.slice23_parent_snapshot',
+    v_parent_snapshot::text,
+    true
+  );
+  PERFORM pg_catalog.set_config(
+    'coditza.slice23_ineffective_progress_snapshot',
+    v_ineffective_progress_snapshot::text,
+    true
+  );
+  PERFORM pg_catalog.set_config(
+    'coditza.slice23_source_fingerprint',
+    v_source_fingerprint,
+    true
+  );
+  PERFORM pg_catalog.set_config(
+    'coditza.slice23_pre_progress_updated_at',
+    v_progress_updated_at_snapshot::text,
+    true
+  );
+  PERFORM pg_catalog.set_config(
+    'coditza.slice23_first_completed_at',
+    v_user_one_first_completed_at,
+    true
+  );
+END;
+$assessment_publish_quiz_initial_snapshot$;
+RESET ROLE;
+
+-- The facade must reject duplicate positions itself rather than relying on a
+-- deferred uniqueness constraint to fail after its lifecycle write.
+SET LOCAL ROLE coditza_owner;
+DO $assessment_publish_quiz_position_readiness_denial$
+DECLARE
+  v_rejected boolean := false;
+BEGIN
+  BEGIN
+    SET CONSTRAINTS quizzes_chapter_position_key DEFERRED;
+    UPDATE public.quizzes
+    SET position = 90
+    WHERE id = 'c46d0000-0000-0000-0000-000000000001';
+
+    PERFORM *
+    FROM public.assessment_publish_quiz(
+      'c3000000-0000-0000-0000-000000000005',
+      'c46d0000-0000-0000-0000-000000000001',
+      2,
+      'c5020000-0000-0000-0000-000000000011'
+    );
+  EXCEPTION WHEN raise_exception THEN
+    v_rejected := true;
+  END;
+
+  IF NOT v_rejected THEN
+    RAISE EXCEPTION 'quiz publication accepted a duplicate draft sibling position';
+  END IF;
+END;
+$assessment_publish_quiz_position_readiness_denial$;
+RESET ROLE;
+
+SET LOCAL ROLE service_role;
+DO $assessment_publish_quiz_validation$
+DECLARE
+  v_invalid_case record;
+  v_rejected boolean;
+BEGIN
+  FOR v_invalid_case IN
+    SELECT *
+    FROM (
+      VALUES
+        (
+          'learner actor',
+          'c3000000-0000-0000-0000-000000000001'::uuid,
+          'c4600000-0000-0000-0000-000000000001'::uuid,
+          1::integer,
+          'c5020000-0000-0000-0000-000000000002'::uuid
+        ),
+        (
+          'held actor',
+          'c3000000-0000-0000-0000-000000000006'::uuid,
+          'c4600000-0000-0000-0000-000000000001'::uuid,
+          1::integer,
+          'c5020000-0000-0000-0000-000000000003'::uuid
+        ),
+        (
+          'null actor',
+          NULL::uuid,
+          'c4600000-0000-0000-0000-000000000001'::uuid,
+          1::integer,
+          'c5020000-0000-0000-0000-000000000004'::uuid
+        ),
+        (
+          'missing actor',
+          'c3000000-0000-0000-0000-000000000999'::uuid,
+          'c4600000-0000-0000-0000-000000000001'::uuid,
+          1::integer,
+          'c5020000-0000-0000-0000-000000000005'::uuid
+        ),
+        (
+          'null quiz',
+          'c3000000-0000-0000-0000-000000000005'::uuid,
+          NULL::uuid,
+          1::integer,
+          'c5020000-0000-0000-0000-000000000006'::uuid
+        ),
+        (
+          'missing quiz',
+          'c3000000-0000-0000-0000-000000000005'::uuid,
+          'c46f0000-0000-0000-0000-000000000001'::uuid,
+          1::integer,
+          'c5020000-0000-0000-0000-000000000007'::uuid
+        ),
+        (
+          'null expected version',
+          'c3000000-0000-0000-0000-000000000005'::uuid,
+          'c4600000-0000-0000-0000-000000000001'::uuid,
+          NULL::integer,
+          'c5020000-0000-0000-0000-000000000008'::uuid
+        ),
+        (
+          'zero expected version',
+          'c3000000-0000-0000-0000-000000000005'::uuid,
+          'c4600000-0000-0000-0000-000000000001'::uuid,
+          0::integer,
+          'c5020000-0000-0000-0000-000000000009'::uuid
+        ),
+        (
+          'negative expected version',
+          'c3000000-0000-0000-0000-000000000005'::uuid,
+          'c4600000-0000-0000-0000-000000000001'::uuid,
+          (-1)::integer,
+          'c5020000-0000-0000-0000-000000000010'::uuid
+        ),
+        (
+          'null request identifier',
+          'c3000000-0000-0000-0000-000000000005'::uuid,
+          'c4600000-0000-0000-0000-000000000001'::uuid,
+          1::integer,
+          NULL::uuid
+        ),
+        (
+          'stale draft',
+          'c3000000-0000-0000-0000-000000000005'::uuid,
+          'c4600000-0000-0000-0000-000000000001'::uuid,
+          2::integer,
+          'c5020000-0000-0000-0000-000000000012'::uuid
+        ),
+        (
+          'missing answer key',
+          'c3000000-0000-0000-0000-000000000005'::uuid,
+          'c4640000-0000-0000-0000-000000000001'::uuid,
+          1::integer,
+          'c5020000-0000-0000-0000-000000000013'::uuid
+        ),
+        (
+          'empty question tree',
+          'c3000000-0000-0000-0000-000000000005'::uuid,
+          'c46a0000-0000-0000-0000-000000000001'::uuid,
+          1::integer,
+          'c5020000-0000-0000-0000-000000000014'::uuid
+        ),
+        (
+          'one-option choice tree',
+          'c3000000-0000-0000-0000-000000000005'::uuid,
+          'c4650000-0000-0000-0000-000000000001'::uuid,
+          1::integer,
+          'c5020000-0000-0000-0000-000000000015'::uuid
+        ),
+        (
+          'archived target',
+          'c3000000-0000-0000-0000-000000000005'::uuid,
+          'c4660000-0000-0000-0000-000000000001'::uuid,
+          2::integer,
+          'c5020000-0000-0000-0000-000000000016'::uuid
+        ),
+        (
+          'draft target under archived chapter',
+          'c3000000-0000-0000-0000-000000000005'::uuid,
+          'c4670000-0000-0000-0000-000000000001'::uuid,
+          1::integer,
+          'c5020000-0000-0000-0000-000000000017'::uuid
+        ),
+        (
+          'draft target under archived module',
+          'c3000000-0000-0000-0000-000000000005'::uuid,
+          'c4680000-0000-0000-0000-000000000001'::uuid,
+          1::integer,
+          'c5020000-0000-0000-0000-000000000018'::uuid
+        ),
+        (
+          'published target under archived chapter',
+          'c3000000-0000-0000-0000-000000000005'::uuid,
+          'c46b0000-0000-0000-0000-000000000001'::uuid,
+          2::integer,
+          'c5020000-0000-0000-0000-000000000019'::uuid
+        ),
+        (
+          'published target under archived module',
+          'c3000000-0000-0000-0000-000000000005'::uuid,
+          'c46c0000-0000-0000-0000-000000000001'::uuid,
+          2::integer,
+          'c5020000-0000-0000-0000-000000000020'::uuid
+        )
+    ) AS invalid_case(
+      label,
+      actor_user_id,
+      quiz_id,
+      expected_row_version,
+      request_id
+    )
+  LOOP
+    v_rejected := false;
+    BEGIN
+      PERFORM *
+      FROM public.assessment_publish_quiz(
+        v_invalid_case.actor_user_id,
+        v_invalid_case.quiz_id,
+        v_invalid_case.expected_row_version,
+        v_invalid_case.request_id
+      );
+    EXCEPTION WHEN raise_exception THEN
+      v_rejected := true;
+    END;
+
+    IF NOT v_rejected THEN
+      RAISE EXCEPTION 'quiz publication unexpectedly accepted invalid case: %',
+        v_invalid_case.label;
+    END IF;
+  END LOOP;
+END;
+$assessment_publish_quiz_validation$;
+
+DO $assessment_publish_quiz_effective_parent_success$
+DECLARE
+  v_published record;
+BEGIN
+  SELECT * INTO v_published
+  FROM public.assessment_publish_quiz(
+    'c3000000-0000-0000-0000-000000000004',
+    'c4600000-0000-0000-0000-000000000001',
+    1,
+    'c5020000-0000-0000-0000-000000000040'
+  );
+
+  IF v_published.response_status <> 200
+    OR v_published.response_body IS DISTINCT FROM pg_catalog.jsonb_build_object(
+      'id', 'c4600000-0000-0000-0000-000000000001',
+      'rowVersion', 2
+    ) THEN
+    RAISE EXCEPTION 'quiz publication did not return its safe effective-parent result';
+  END IF;
+END;
+$assessment_publish_quiz_effective_parent_success$;
+RESET ROLE;
+
+SET LOCAL ROLE coditza_owner;
+DO $assessment_publish_quiz_effective_snapshot$
+DECLARE
+  v_target_updated_at text;
+  v_target_updated_by text;
+  v_target_published_at text;
+  v_progress_fingerprint text;
+  v_metric_snapshot jsonb;
+  v_progress_updated_at_snapshot jsonb;
+  v_existing_progress_recalculated boolean;
+BEGIN
+  SELECT
+    quiz_entry.updated_at::text,
+    quiz_entry.updated_by::text,
+    quiz_entry.published_at::text
+  INTO v_target_updated_at, v_target_updated_by, v_target_published_at
+  FROM public.quizzes AS quiz_entry
+  WHERE quiz_entry.id = 'c4600000-0000-0000-0000-000000000001';
+
+  SELECT pg_catalog.md5(
+    COALESCE(
+      pg_catalog.jsonb_agg(
+        pg_catalog.to_jsonb(progress_entry)
+        ORDER BY progress_entry.user_id
+      )::text,
+      '[]'
+    )
+  )
+  INTO v_progress_fingerprint
+  FROM public.chapter_progress AS progress_entry
+  WHERE progress_entry.chapter_id =
+    'c3200000-0000-0000-0000-000000000001'::uuid;
+
+  SELECT COALESCE(
+    pg_catalog.jsonb_agg(
+      pg_catalog.jsonb_build_object(
+        'userId', progress_entry.user_id::text,
+        'theoryPercent', progress_entry.theory_percent,
+        'exercisePercent', progress_entry.exercise_percent,
+        'quizPercent', progress_entry.quiz_percent,
+        'overallPercent', progress_entry.overall_percent,
+        'firstCompletedAt', progress_entry.first_completed_at::text,
+        'completedAt', progress_entry.completed_at::text
+      )
+      ORDER BY progress_entry.user_id
+    ),
+    '[]'::jsonb
+  )
+  INTO v_metric_snapshot
+  FROM public.chapter_progress AS progress_entry
+  WHERE progress_entry.chapter_id =
+    'c3200000-0000-0000-0000-000000000001'::uuid;
+
+  SELECT pg_catalog.jsonb_object_agg(
+    progress_entry.user_id::text,
+    progress_entry.updated_at::text
+  )
+  INTO v_progress_updated_at_snapshot
+  FROM public.chapter_progress AS progress_entry
+  WHERE progress_entry.chapter_id =
+    'c3200000-0000-0000-0000-000000000001'::uuid;
+
+  SELECT pg_catalog.count(*) = 7
+    AND pg_catalog.bool_and(
+      progress_entry.updated_at > (
+        pg_catalog.current_setting(
+          'coditza.slice23_pre_progress_updated_at',
+          true
+        )::jsonb ->> progress_entry.user_id::text
+      )::timestamptz
+    )
+  INTO v_existing_progress_recalculated
+  FROM public.chapter_progress AS progress_entry
+  WHERE progress_entry.chapter_id =
+      'c3200000-0000-0000-0000-000000000001'::uuid
+    AND progress_entry.user_id IN (
+      'c3000000-0000-0000-0000-000000000001'::uuid,
+      'c3000000-0000-0000-0000-000000000002'::uuid,
+      'c3000000-0000-0000-0000-000000000003'::uuid,
+      'c3000000-0000-0000-0000-000000000004'::uuid,
+      'c3000000-0000-0000-0000-000000000007'::uuid,
+      'c3000000-0000-0000-0000-000000000008'::uuid,
+      'c3000000-0000-0000-0000-000000000009'::uuid
+    );
+
+  IF v_target_updated_at IS NULL
+    OR v_target_updated_by <> 'c3000000-0000-0000-0000-000000000004'
+    OR v_target_published_at IS NULL
+    OR NOT v_existing_progress_recalculated
+    OR (
+      SELECT pg_catalog.count(*)
+      FROM public.chapter_progress AS progress_entry
+      WHERE progress_entry.chapter_id =
+        'c3200000-0000-0000-0000-000000000001'::uuid
+    ) <> 10
+    OR EXISTS (
+      SELECT 1
+      FROM (
+        VALUES
+          ('c3000000-0000-0000-0000-000000000001'::uuid, 50::numeric, 50::numeric, 50::numeric, 50::numeric),
+          ('c3000000-0000-0000-0000-000000000002'::uuid, 0::numeric, 0::numeric, 0::numeric, 0::numeric),
+          ('c3000000-0000-0000-0000-000000000003'::uuid, 50::numeric, 50::numeric, 50::numeric, 50::numeric),
+          ('c3000000-0000-0000-0000-000000000004'::uuid, 0::numeric, 0::numeric, 0::numeric, 0::numeric),
+          ('c3000000-0000-0000-0000-000000000007'::uuid, 50::numeric, 0::numeric, 0::numeric, 16::numeric),
+          ('c3000000-0000-0000-0000-000000000008'::uuid, 0::numeric, 0::numeric, 0::numeric, 0::numeric),
+          ('c3000000-0000-0000-0000-000000000009'::uuid, 0::numeric, 0::numeric, 0::numeric, 0::numeric),
+          ('c3000000-0000-0000-0000-000000000010'::uuid, 50::numeric, 0::numeric, 0::numeric, 16::numeric),
+          ('c3000000-0000-0000-0000-000000000011'::uuid, 0::numeric, 0::numeric, 0::numeric, 0::numeric),
+          ('c3000000-0000-0000-0000-000000000012'::uuid, 0::numeric, 0::numeric, 0::numeric, 0::numeric)
+      ) AS expected_progress(
+        user_id,
+        theory_percent,
+        exercise_percent,
+        quiz_percent,
+        overall_percent
+      )
+      LEFT JOIN public.chapter_progress AS progress_entry
+        ON progress_entry.user_id = expected_progress.user_id
+       AND progress_entry.chapter_id =
+         'c3200000-0000-0000-0000-000000000001'::uuid
+      WHERE progress_entry.user_id IS NULL
+        OR progress_entry.theory_percent <> expected_progress.theory_percent
+        OR progress_entry.exercise_percent <> expected_progress.exercise_percent
+        OR progress_entry.quiz_percent <> expected_progress.quiz_percent
+        OR progress_entry.overall_percent <> expected_progress.overall_percent
+        OR progress_entry.completed_at IS NOT NULL
+    )
+    OR NOT EXISTS (
+      SELECT 1
+      FROM public.chapter_progress AS progress_entry
+      WHERE progress_entry.user_id =
+          'c3000000-0000-0000-0000-000000000001'::uuid
+        AND progress_entry.chapter_id =
+          'c3200000-0000-0000-0000-000000000001'::uuid
+        AND progress_entry.first_completed_at::text = pg_catalog.current_setting(
+          'coditza.slice23_first_completed_at',
+          true
+        )
+        AND progress_entry.completed_at IS NULL
+    ) THEN
+    RAISE EXCEPTION 'effective quiz publication did not recalculate every source arm correctly';
+  END IF;
+
+  PERFORM pg_catalog.set_config(
+    'coditza.slice23_c460_updated_at',
+    v_target_updated_at,
+    true
+  );
+  PERFORM pg_catalog.set_config(
+    'coditza.slice23_c460_updated_by',
+    v_target_updated_by,
+    true
+  );
+  PERFORM pg_catalog.set_config(
+    'coditza.slice23_c460_published_at',
+    v_target_published_at,
+    true
+  );
+  PERFORM pg_catalog.set_config(
+    'coditza.slice23_c460_progress_fingerprint',
+    v_progress_fingerprint,
+    true
+  );
+  PERFORM pg_catalog.set_config(
+    'coditza.slice23_effective_metric_snapshot',
+    v_metric_snapshot::text,
+    true
+  );
+  PERFORM pg_catalog.set_config(
+    'coditza.slice23_effective_progress_updated_at',
+    v_progress_updated_at_snapshot::text,
+    true
+  );
+END;
+$assessment_publish_quiz_effective_snapshot$;
+RESET ROLE;
+
+SET LOCAL ROLE service_role;
+DO $assessment_publish_quiz_retry_success$
+DECLARE
+  v_retry record;
+BEGIN
+  SELECT * INTO v_retry
+  FROM public.assessment_publish_quiz(
+    'c3000000-0000-0000-0000-000000000005',
+    'c4600000-0000-0000-0000-000000000001',
+    1,
+    'c5020000-0000-0000-0000-000000000041'
+  );
+
+  IF v_retry.response_status <> 200
+    OR v_retry.response_body IS DISTINCT FROM pg_catalog.jsonb_build_object(
+      'id', 'c4600000-0000-0000-0000-000000000001',
+      'rowVersion', 2
+    ) THEN
+    RAISE EXCEPTION 'quiz publication retry did not return its current safe result';
+  END IF;
+END;
+$assessment_publish_quiz_retry_success$;
+RESET ROLE;
+
+SET LOCAL ROLE coditza_owner;
+DO $assessment_publish_quiz_retry_state_preservation$
+DECLARE
+  v_progress_fingerprint text;
+BEGIN
+  SELECT pg_catalog.md5(
+    COALESCE(
+      pg_catalog.jsonb_agg(
+        pg_catalog.to_jsonb(progress_entry)
+        ORDER BY progress_entry.user_id
+      )::text,
+      '[]'
+    )
+  )
+  INTO v_progress_fingerprint
+  FROM public.chapter_progress AS progress_entry
+  WHERE progress_entry.chapter_id =
+    'c3200000-0000-0000-0000-000000000001'::uuid;
+
+  IF NOT EXISTS (
+    SELECT 1
+    FROM public.quizzes AS quiz_entry
+    WHERE quiz_entry.id = 'c4600000-0000-0000-0000-000000000001'
+      AND quiz_entry.updated_at::text = pg_catalog.current_setting(
+        'coditza.slice23_c460_updated_at',
+        true
+      )
+      AND quiz_entry.updated_by::text = pg_catalog.current_setting(
+        'coditza.slice23_c460_updated_by',
+        true
+      )
+      AND quiz_entry.published_at::text = pg_catalog.current_setting(
+        'coditza.slice23_c460_published_at',
+        true
+      )
+      AND quiz_entry.row_version = 2
+    )
+    OR v_progress_fingerprint IS DISTINCT FROM pg_catalog.current_setting(
+      'coditza.slice23_c460_progress_fingerprint',
+      true
+    )
+    OR (
+      SELECT pg_catalog.count(*)
+      FROM private.audit_events AS audit_entry
+      WHERE audit_entry.action = 'quiz_published'
+        AND audit_entry.entity_type = 'quiz'
+        AND audit_entry.entity_id =
+          'c4600000-0000-0000-0000-000000000001'::uuid
+    ) <> 1 THEN
+    RAISE EXCEPTION 'quiz publication retry changed lifecycle metadata, progress, or audit state';
+  END IF;
+END;
+$assessment_publish_quiz_retry_state_preservation$;
+RESET ROLE;
+
+SET LOCAL ROLE service_role;
+DO $assessment_publish_quiz_optional_and_ineffective_parent_successes$
+DECLARE
+  v_optional record;
+  v_published_under_published_draft record;
+  v_published_under_draft_published record;
+  v_published_under_draft_draft record;
+  v_published_draft_retry record;
+  v_draft_published_retry record;
+  v_draft_draft_retry record;
+BEGIN
+  SELECT * INTO v_optional
+  FROM public.assessment_publish_quiz(
+    'c3000000-0000-0000-0000-000000000005',
+    'c4690000-0000-0000-0000-000000000001',
+    1,
+    'c5020000-0000-0000-0000-000000000042'
+  );
+  SELECT * INTO v_published_under_published_draft
+  FROM public.assessment_publish_quiz(
+    'c3000000-0000-0000-0000-000000000005',
+    'c4610000-0000-0000-0000-000000000001',
+    1,
+    'c5020000-0000-0000-0000-000000000043'
+  );
+  SELECT * INTO v_published_under_draft_published
+  FROM public.assessment_publish_quiz(
+    'c3000000-0000-0000-0000-000000000004',
+    'c4620000-0000-0000-0000-000000000001',
+    1,
+    'c5020000-0000-0000-0000-000000000044'
+  );
+  SELECT * INTO v_published_under_draft_draft
+  FROM public.assessment_publish_quiz(
+    'c3000000-0000-0000-0000-000000000005',
+    'c4630000-0000-0000-0000-000000000001',
+    1,
+    'c5020000-0000-0000-0000-000000000045'
+  );
+  SELECT * INTO v_published_draft_retry
+  FROM public.assessment_publish_quiz(
+    'c3000000-0000-0000-0000-000000000005',
+    'c4610000-0000-0000-0000-000000000001',
+    1,
+    'c5020000-0000-0000-0000-000000000046'
+  );
+  SELECT * INTO v_draft_published_retry
+  FROM public.assessment_publish_quiz(
+    'c3000000-0000-0000-0000-000000000004',
+    'c4620000-0000-0000-0000-000000000001',
+    1,
+    'c5020000-0000-0000-0000-000000000047'
+  );
+  SELECT * INTO v_draft_draft_retry
+  FROM public.assessment_publish_quiz(
+    'c3000000-0000-0000-0000-000000000005',
+    'c4630000-0000-0000-0000-000000000001',
+    1,
+    'c5020000-0000-0000-0000-000000000048'
+  );
+
+  IF v_optional.response_status <> 200
+    OR v_optional.response_body IS DISTINCT FROM pg_catalog.jsonb_build_object(
+      'id', 'c4690000-0000-0000-0000-000000000001',
+      'rowVersion', 2
+    )
+    OR v_published_under_published_draft.response_status <> 200
+    OR v_published_under_published_draft.response_body IS DISTINCT FROM
+      pg_catalog.jsonb_build_object(
+        'id', 'c4610000-0000-0000-0000-000000000001',
+        'rowVersion', 2
+      )
+    OR v_published_under_draft_published.response_status <> 200
+    OR v_published_under_draft_published.response_body IS DISTINCT FROM
+      pg_catalog.jsonb_build_object(
+        'id', 'c4620000-0000-0000-0000-000000000001',
+        'rowVersion', 2
+      )
+    OR v_published_under_draft_draft.response_status <> 200
+    OR v_published_under_draft_draft.response_body IS DISTINCT FROM
+      pg_catalog.jsonb_build_object(
+        'id', 'c4630000-0000-0000-0000-000000000001',
+        'rowVersion', 2
+      )
+    OR v_published_draft_retry.response_status <> 200
+    OR v_published_draft_retry.response_body IS DISTINCT FROM
+      pg_catalog.jsonb_build_object(
+        'id', 'c4610000-0000-0000-0000-000000000001',
+        'rowVersion', 2
+      )
+    OR v_draft_published_retry.response_status <> 200
+    OR v_draft_published_retry.response_body IS DISTINCT FROM
+      pg_catalog.jsonb_build_object(
+        'id', 'c4620000-0000-0000-0000-000000000001',
+        'rowVersion', 2
+      )
+    OR v_draft_draft_retry.response_status <> 200
+    OR v_draft_draft_retry.response_body IS DISTINCT FROM
+      pg_catalog.jsonb_build_object(
+        'id', 'c4630000-0000-0000-0000-000000000001',
+        'rowVersion', 2
+      ) THEN
+    RAISE EXCEPTION 'quiz publication did not preserve retry or ineffective-parent success semantics';
+  END IF;
+END;
+$assessment_publish_quiz_optional_and_ineffective_parent_successes$;
+RESET ROLE;
+
+SET LOCAL ROLE coditza_owner;
+DO $assessment_publish_quiz_state_preservation$
+DECLARE
+  v_c460_root_snapshot jsonb;
+  v_c460_tree_snapshot jsonb;
+  v_parent_snapshot jsonb;
+  v_ineffective_progress_snapshot jsonb;
+  v_source_fingerprint text;
+  v_effective_metric_snapshot jsonb;
+  v_optional_progress_recalculated boolean;
+BEGIN
+  SELECT pg_catalog.jsonb_build_object(
+    'chapterId', quiz_entry.chapter_id::text,
+    'slug', quiz_entry.slug,
+    'title', quiz_entry.title,
+    'instructionsMarkdown', quiz_entry.instructions_markdown,
+    'position', quiz_entry.position,
+    'passingPercent', quiz_entry.passing_percent,
+    'maxAttempts', quiz_entry.max_attempts,
+    'timeLimitSeconds', quiz_entry.time_limit_seconds,
+    'isRequired', quiz_entry.is_required,
+    'definitionVersion', quiz_entry.definition_version,
+    'createdAt', quiz_entry.created_at::text,
+    'createdBy', quiz_entry.created_by::text
+  )
+  INTO v_c460_root_snapshot
+  FROM public.quizzes AS quiz_entry
+  WHERE quiz_entry.id = 'c4600000-0000-0000-0000-000000000001';
+
+  SELECT pg_catalog.jsonb_build_object(
+    'questions',
+    COALESCE(
+      (
+        SELECT pg_catalog.jsonb_agg(
+          pg_catalog.to_jsonb(question_entry)
+          ORDER BY question_entry.id
+        )
+        FROM public.quiz_questions AS question_entry
+        WHERE question_entry.quiz_id =
+          'c4600000-0000-0000-0000-000000000001'::uuid
+      ),
+      '[]'::jsonb
+    ),
+    'options',
+    COALESCE(
+      (
+        SELECT pg_catalog.jsonb_agg(
+          pg_catalog.to_jsonb(option_entry)
+          ORDER BY option_entry.id
+        )
+        FROM public.quiz_question_options AS option_entry
+        JOIN public.quiz_questions AS question_entry
+          ON question_entry.id = option_entry.question_id
+        WHERE question_entry.quiz_id =
+          'c4600000-0000-0000-0000-000000000001'::uuid
+      ),
+      '[]'::jsonb
+    ),
+    'answerKeys',
+    COALESCE(
+      (
+        SELECT pg_catalog.jsonb_agg(
+          pg_catalog.to_jsonb(answer_key)
+          ORDER BY answer_key.question_id
+        )
+        FROM private.quiz_question_answer_keys AS answer_key
+        JOIN public.quiz_questions AS question_entry
+          ON question_entry.id = answer_key.question_id
+        WHERE question_entry.quiz_id =
+          'c4600000-0000-0000-0000-000000000001'::uuid
+      ),
+      '[]'::jsonb
+    )
+  )
+  INTO v_c460_tree_snapshot;
+
+  SELECT pg_catalog.jsonb_build_object(
+    'modules',
+    (
+      SELECT pg_catalog.jsonb_agg(
+        pg_catalog.to_jsonb(module_entry)
+        ORDER BY module_entry.id
+      )
+      FROM public.modules AS module_entry
+      WHERE module_entry.id IN (
+        'c3100000-0000-0000-0000-000000000001'::uuid,
+        'c31e0000-0000-0000-0000-000000000001'::uuid,
+        'c4100000-0000-0000-0000-000000000001'::uuid,
+        'c31f0000-0000-0000-0000-000000000001'::uuid
+      )
+    ),
+    'chapters',
+    (
+      SELECT pg_catalog.jsonb_agg(
+        pg_catalog.to_jsonb(chapter_entry)
+        ORDER BY chapter_entry.id
+      )
+      FROM public.chapters AS chapter_entry
+      WHERE chapter_entry.id IN (
+        'c3200000-0000-0000-0000-000000000001'::uuid,
+        'c32f0000-0000-0000-0000-000000000001'::uuid,
+        'c4200000-0000-0000-0000-000000000001'::uuid,
+        'c32e0000-0000-0000-0000-000000000001'::uuid,
+        'c32c0000-0000-0000-0000-000000000001'::uuid,
+        'c3310000-0000-0000-0000-000000000001'::uuid
+      )
+    )
+  )
+  INTO v_parent_snapshot;
+
+  SELECT COALESCE(
+    pg_catalog.jsonb_agg(
+      pg_catalog.to_jsonb(progress_entry)
+      ORDER BY progress_entry.chapter_id, progress_entry.user_id
+    ),
+    '[]'::jsonb
+  )
+  INTO v_ineffective_progress_snapshot
+  FROM public.chapter_progress AS progress_entry
+  WHERE progress_entry.chapter_id IN (
+    'c32f0000-0000-0000-0000-000000000001'::uuid,
+    'c4200000-0000-0000-0000-000000000001'::uuid,
+    'c32e0000-0000-0000-0000-000000000001'::uuid
+  );
+
+  SELECT pg_catalog.md5(
+    COALESCE(
+      pg_catalog.jsonb_agg(
+        pg_catalog.jsonb_build_object(
+          'kind',
+          source_entry.kind,
+          'state',
+          source_entry.state
+        )
+        ORDER BY source_entry.kind, source_entry.state::text
+      )::text,
+      '[]'
+    )
+  )
+  INTO v_source_fingerprint
+  FROM (
+    SELECT
+      'theory_completion'::text AS kind,
+      pg_catalog.to_jsonb(completion_entry) AS state
+    FROM public.theory_section_completions AS completion_entry
+    JOIN public.theory_sections AS theory_entry
+      ON theory_entry.id = completion_entry.theory_section_id
+    WHERE theory_entry.chapter_id =
+      'c3200000-0000-0000-0000-000000000001'::uuid
+
+    UNION ALL
+
+    SELECT
+      'exercise_attempt'::text,
+      pg_catalog.to_jsonb(attempt_entry)
+    FROM public.exercise_attempts AS attempt_entry
+    JOIN public.exercises AS exercise_entry
+      ON exercise_entry.id = attempt_entry.exercise_id
+    WHERE exercise_entry.chapter_id =
+      'c3200000-0000-0000-0000-000000000001'::uuid
+
+    UNION ALL
+
+    SELECT
+      'quiz_attempt'::text,
+      pg_catalog.to_jsonb(attempt_entry)
+    FROM public.quiz_attempts AS attempt_entry
+    JOIN public.quizzes AS quiz_entry
+      ON quiz_entry.id = attempt_entry.quiz_id
+    WHERE quiz_entry.chapter_id =
+      'c3200000-0000-0000-0000-000000000001'::uuid
+  ) AS source_entry;
+
+  SELECT COALESCE(
+    pg_catalog.jsonb_agg(
+      pg_catalog.jsonb_build_object(
+        'userId', progress_entry.user_id::text,
+        'theoryPercent', progress_entry.theory_percent,
+        'exercisePercent', progress_entry.exercise_percent,
+        'quizPercent', progress_entry.quiz_percent,
+        'overallPercent', progress_entry.overall_percent,
+        'firstCompletedAt', progress_entry.first_completed_at::text,
+        'completedAt', progress_entry.completed_at::text
+      )
+      ORDER BY progress_entry.user_id
+    ),
+    '[]'::jsonb
+  )
+  INTO v_effective_metric_snapshot
+  FROM public.chapter_progress AS progress_entry
+  WHERE progress_entry.chapter_id =
+    'c3200000-0000-0000-0000-000000000001'::uuid;
+
+  SELECT pg_catalog.count(*) = 10
+    AND pg_catalog.bool_and(
+      progress_entry.updated_at > (
+        pg_catalog.current_setting(
+          'coditza.slice23_effective_progress_updated_at',
+          true
+        )::jsonb ->> progress_entry.user_id::text
+      )::timestamptz
+    )
+  INTO v_optional_progress_recalculated
+  FROM public.chapter_progress AS progress_entry
+  WHERE progress_entry.chapter_id =
+    'c3200000-0000-0000-0000-000000000001'::uuid;
+
+  IF v_c460_root_snapshot IS DISTINCT FROM pg_catalog.current_setting(
+      'coditza.slice23_c460_root_snapshot',
+      true
+    )::jsonb
+    OR v_c460_tree_snapshot IS DISTINCT FROM pg_catalog.current_setting(
+      'coditza.slice23_c460_tree_snapshot',
+      true
+    )::jsonb
+    OR v_parent_snapshot IS DISTINCT FROM pg_catalog.current_setting(
+      'coditza.slice23_parent_snapshot',
+      true
+    )::jsonb
+    OR v_ineffective_progress_snapshot IS DISTINCT FROM pg_catalog.current_setting(
+      'coditza.slice23_ineffective_progress_snapshot',
+      true
+    )::jsonb
+    OR v_source_fingerprint IS DISTINCT FROM pg_catalog.current_setting(
+      'coditza.slice23_source_fingerprint',
+      true
+    )
+    OR v_effective_metric_snapshot IS DISTINCT FROM pg_catalog.current_setting(
+      'coditza.slice23_effective_metric_snapshot',
+      true
+    )::jsonb
+    OR NOT v_optional_progress_recalculated
+    OR NOT EXISTS (
+      SELECT 1
+      FROM public.quizzes AS quiz_entry
+      WHERE quiz_entry.id = 'c4600000-0000-0000-0000-000000000001'
+        AND quiz_entry.status = 'published'::public.content_status
+        AND quiz_entry.row_version = 2
+        AND quiz_entry.definition_version = 1
+        AND quiz_entry.published_at IS NOT NULL
+        AND quiz_entry.updated_by =
+          'c3000000-0000-0000-0000-000000000004'::uuid
+    )
+    OR (
+      SELECT pg_catalog.count(*)
+      FROM public.quizzes AS quiz_entry
+      WHERE quiz_entry.id IN (
+        'c4690000-0000-0000-0000-000000000001'::uuid,
+        'c4610000-0000-0000-0000-000000000001'::uuid,
+        'c4620000-0000-0000-0000-000000000001'::uuid,
+        'c4630000-0000-0000-0000-000000000001'::uuid
+      )
+        AND quiz_entry.status = 'published'::public.content_status
+        AND quiz_entry.row_version = 2
+        AND quiz_entry.definition_version = 1
+        AND quiz_entry.published_at IS NOT NULL
+    ) <> 4
+    OR NOT EXISTS (
+      SELECT 1
+      FROM public.quizzes AS quiz_entry
+      WHERE quiz_entry.id = 'c4660000-0000-0000-0000-000000000001'
+        AND quiz_entry.status = 'archived'::public.content_status
+        AND quiz_entry.row_version = 2
+        AND quiz_entry.definition_version = 1
+        AND quiz_entry.published_at IS NULL
+    )
+    OR (
+      SELECT pg_catalog.count(*)
+      FROM public.quizzes AS quiz_entry
+      WHERE quiz_entry.id IN (
+        'c4640000-0000-0000-0000-000000000001'::uuid,
+        'c4650000-0000-0000-0000-000000000001'::uuid,
+        'c46a0000-0000-0000-0000-000000000001'::uuid,
+        'c4670000-0000-0000-0000-000000000001'::uuid,
+        'c4680000-0000-0000-0000-000000000001'::uuid,
+        'c46d0000-0000-0000-0000-000000000001'::uuid
+      )
+        AND quiz_entry.status = 'draft'::public.content_status
+        AND quiz_entry.row_version = 1
+        AND quiz_entry.definition_version = 1
+        AND quiz_entry.published_at IS NULL
+    ) <> 6
+    OR NOT EXISTS (
+      SELECT 1
+      FROM public.quizzes AS quiz_entry
+      WHERE quiz_entry.id = 'c46d0000-0000-0000-0000-000000000001'
+        AND quiz_entry.position = 96
+    )
+    OR (
+      SELECT pg_catalog.count(*)
+      FROM public.quizzes AS quiz_entry
+      WHERE quiz_entry.id IN (
+        'c46b0000-0000-0000-0000-000000000001'::uuid,
+        'c46c0000-0000-0000-0000-000000000001'::uuid
+      )
+        AND quiz_entry.status = 'published'::public.content_status
+        AND quiz_entry.row_version = 2
+        AND quiz_entry.definition_version = 1
+        AND quiz_entry.published_at IS NOT NULL
+    ) <> 2
+    OR EXISTS (
+      SELECT 1
+      FROM private.quiz_question_answer_keys AS answer_key
+      WHERE answer_key.question_id =
+        'c4770000-0000-0000-0000-000000000001'::uuid
+    )
+    OR (
+      SELECT pg_catalog.count(*)
+      FROM public.quiz_questions AS question_entry
+      WHERE question_entry.quiz_id =
+        'c46a0000-0000-0000-0000-000000000001'::uuid
+    ) <> 0
+    OR (
+      SELECT pg_catalog.count(*)
+      FROM public.quiz_question_options AS option_entry
+      WHERE option_entry.question_id =
+        'c4780000-0000-0000-0000-000000000001'::uuid
+    ) <> 1 THEN
+    RAISE EXCEPTION 'quiz publication changed a protected root, definition tree, parent, source, or ineffective-parent snapshot';
+  END IF;
+
+  IF (
+    SELECT pg_catalog.count(*)
+    FROM private.audit_events AS audit_entry
+    WHERE audit_entry.entity_type = 'quiz'
+      AND audit_entry.entity_id IN (
+        'c4600000-0000-0000-0000-000000000001'::uuid,
+        'c4690000-0000-0000-0000-000000000001'::uuid,
+        'c4610000-0000-0000-0000-000000000001'::uuid,
+        'c4620000-0000-0000-0000-000000000001'::uuid,
+        'c4630000-0000-0000-0000-000000000001'::uuid,
+        'c4640000-0000-0000-0000-000000000001'::uuid,
+        'c4650000-0000-0000-0000-000000000001'::uuid,
+        'c4660000-0000-0000-0000-000000000001'::uuid,
+        'c4670000-0000-0000-0000-000000000001'::uuid,
+        'c4680000-0000-0000-0000-000000000001'::uuid,
+        'c4690000-0000-0000-0000-000000000001'::uuid,
+        'c46a0000-0000-0000-0000-000000000001'::uuid,
+        'c46b0000-0000-0000-0000-000000000001'::uuid,
+        'c46c0000-0000-0000-0000-000000000001'::uuid,
+        'c46d0000-0000-0000-0000-000000000001'::uuid
+      )
+  ) <> 5
+    OR NOT (
+      SELECT pg_catalog.count(*) = 5
+        AND pg_catalog.bool_and(
+          audit_entry.actor_kind = 'user'
+          AND audit_entry.action = 'quiz_published'
+          AND audit_entry.entity_type = 'quiz'
+          AND audit_entry.changed_fields = ARRAY['status']::text[]
+          AND audit_entry.change_summary =
+            '{"status":{"before":"draft","after":"published"}}'::jsonb
+          AND audit_entry.reason IS NULL
+          AND (
+            (
+              audit_entry.actor_user_id =
+                'c3000000-0000-0000-0000-000000000004'::uuid
+              AND audit_entry.entity_id =
+                'c4600000-0000-0000-0000-000000000001'::uuid
+              AND audit_entry.request_id =
+                'c5020000-0000-0000-0000-000000000040'::uuid
+            )
+            OR (
+              audit_entry.actor_user_id =
+                'c3000000-0000-0000-0000-000000000005'::uuid
+              AND audit_entry.entity_id =
+                'c4690000-0000-0000-0000-000000000001'::uuid
+              AND audit_entry.request_id =
+                'c5020000-0000-0000-0000-000000000042'::uuid
+            )
+            OR (
+              audit_entry.actor_user_id =
+                'c3000000-0000-0000-0000-000000000005'::uuid
+              AND audit_entry.entity_id =
+                'c4610000-0000-0000-0000-000000000001'::uuid
+              AND audit_entry.request_id =
+                'c5020000-0000-0000-0000-000000000043'::uuid
+            )
+            OR (
+              audit_entry.actor_user_id =
+                'c3000000-0000-0000-0000-000000000004'::uuid
+              AND audit_entry.entity_id =
+                'c4620000-0000-0000-0000-000000000001'::uuid
+              AND audit_entry.request_id =
+                'c5020000-0000-0000-0000-000000000044'::uuid
+            )
+            OR (
+              audit_entry.actor_user_id =
+                'c3000000-0000-0000-0000-000000000005'::uuid
+              AND audit_entry.entity_id =
+                'c4630000-0000-0000-0000-000000000001'::uuid
+              AND audit_entry.request_id =
+                'c5020000-0000-0000-0000-000000000045'::uuid
+            )
+          )
+        )
+      FROM private.audit_events AS audit_entry
+      WHERE audit_entry.entity_type = 'quiz'
+        AND audit_entry.entity_id IN (
+          'c4600000-0000-0000-0000-000000000001'::uuid,
+          'c4690000-0000-0000-0000-000000000001'::uuid,
+          'c4610000-0000-0000-0000-000000000001'::uuid,
+          'c4620000-0000-0000-0000-000000000001'::uuid,
+          'c4630000-0000-0000-0000-000000000001'::uuid
+        )
+    )
+    OR EXISTS (
+      SELECT 1
+      FROM private.audit_events AS audit_entry
+      WHERE audit_entry.request_id IN (
+        'c5020000-0000-0000-0000-000000000001'::uuid,
+        'c5020000-0000-0000-0000-000000000002'::uuid,
+        'c5020000-0000-0000-0000-000000000003'::uuid,
+        'c5020000-0000-0000-0000-000000000004'::uuid,
+        'c5020000-0000-0000-0000-000000000005'::uuid,
+        'c5020000-0000-0000-0000-000000000006'::uuid,
+        'c5020000-0000-0000-0000-000000000007'::uuid,
+        'c5020000-0000-0000-0000-000000000008'::uuid,
+        'c5020000-0000-0000-0000-000000000009'::uuid,
+        'c5020000-0000-0000-0000-000000000010'::uuid,
+        'c5020000-0000-0000-0000-000000000011'::uuid,
+        'c5020000-0000-0000-0000-000000000012'::uuid,
+        'c5020000-0000-0000-0000-000000000013'::uuid,
+        'c5020000-0000-0000-0000-000000000014'::uuid,
+        'c5020000-0000-0000-0000-000000000015'::uuid,
+        'c5020000-0000-0000-0000-000000000016'::uuid,
+        'c5020000-0000-0000-0000-000000000017'::uuid,
+        'c5020000-0000-0000-0000-000000000018'::uuid,
+        'c5020000-0000-0000-0000-000000000019'::uuid,
+        'c5020000-0000-0000-0000-000000000020'::uuid,
+        'c5020000-0000-0000-0000-000000000041'::uuid,
+        'c5020000-0000-0000-0000-000000000046'::uuid,
+        'c5020000-0000-0000-0000-000000000047'::uuid,
+        'c5020000-0000-0000-0000-000000000048'::uuid
+      )
+    )
+    OR EXISTS (
+      SELECT 1
+      FROM private.idempotency_records AS record_entry
+      WHERE record_entry.result_resource_id IN (
+        'c4600000-0000-0000-0000-000000000001'::uuid,
+        'c4610000-0000-0000-0000-000000000001'::uuid,
+        'c4620000-0000-0000-0000-000000000001'::uuid,
+        'c4630000-0000-0000-0000-000000000001'::uuid,
+        'c4640000-0000-0000-0000-000000000001'::uuid,
+        'c4650000-0000-0000-0000-000000000001'::uuid,
+        'c4660000-0000-0000-0000-000000000001'::uuid,
+        'c4670000-0000-0000-0000-000000000001'::uuid,
+        'c4680000-0000-0000-0000-000000000001'::uuid,
+        'c4690000-0000-0000-0000-000000000001'::uuid,
+        'c46a0000-0000-0000-0000-000000000001'::uuid,
+        'c46b0000-0000-0000-0000-000000000001'::uuid,
+        'c46c0000-0000-0000-0000-000000000001'::uuid,
+        'c46d0000-0000-0000-0000-000000000001'::uuid
+      )
+    )
+    OR COALESCE(
+      pg_catalog.current_setting('coditza.learning_write', true),
+      ''
+    ) <> '' THEN
+    RAISE EXCEPTION 'quiz publication did not preserve audit, replay, or learning-write boundaries';
+  END IF;
+END;
+$assessment_publish_quiz_state_preservation$;
+RESET ROLE;
+
+SELECT extensions.ok(
+  TRUE,
+  'quiz publication locks the full path, validates root and tree readiness, recalculates every effective-progress source once, preserves optional and ineffective-parent semantics, audits only real transitions, and uses state-based retry without replay records'
 );
 
 SELECT * FROM extensions.finish();
