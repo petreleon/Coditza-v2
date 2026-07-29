@@ -17,7 +17,8 @@ staff-authorization primitive cluster, root draft-module creation cluster,
 draft-chapter creation cluster, draft-theory-section creation cluster, scalar
 draft-exercise and complete draft-quiz creation clusters, scalar
 draft-exercise and draft-quiz PATCH clusters, protected assessment authoring
-reads, and draft-module/chapter/theory-section PATCH clusters, documented in
+reads, draft-module/chapter/theory-section PATCH clusters, and
+published-module/chapter correction clusters, documented in
 [slice 01](../docs/implementation/SUP-FUNCTIONS-001-slice-01.md),
 [slice 02](../docs/implementation/SUP-FUNCTIONS-001-slice-02.md), and
 [slice 03](../docs/implementation/SUP-FUNCTIONS-001-slice-03.md), and
@@ -35,38 +36,39 @@ reads, and draft-module/chapter/theory-section PATCH clusters, documented in
 [slice 15](../docs/implementation/SUP-FUNCTIONS-001-slice-15.md), and
 [slice 16](../docs/implementation/SUP-FUNCTIONS-001-slice-16.md), and
 [slice 17](../docs/implementation/SUP-FUNCTIONS-001-slice-17.md), and
-[slice 18](../docs/implementation/SUP-FUNCTIONS-001-slice-18.md). Continue
+[slice 18](../docs/implementation/SUP-FUNCTIONS-001-slice-18.md), and
+[slice 19](../docs/implementation/SUP-FUNCTIONS-001-slice-19.md). Continue
 from those bounded baselines with the curriculum-owned
-curriculum_correct_published_chapter facade. It must require a server-generated
-request UUID, non-null actor and chapter identifiers, a positive expected row
-version, and the exact reason code content_correction. It must recheck the live
-active editor/admin actor before any chapter content access, discover the
-current parent, lock module then chapter in canonical order, and recheck the
-chapter-to-module relationship under those locks. It must reject missing or
-reparented hierarchy, draft, archived, and stale chapters, and an archived
-module ancestor. A draft or published non-archived parent remains valid.
+curriculum_correct_published_theory_section facade. It must require a
+server-generated request UUID, non-null actor and theory-section identifiers, a
+positive expected row version, and the exact reason code content_correction. It
+must recheck the live active editor/admin actor before any hierarchy or theory
+content access, discover the current section-to-chapter-to-module path, lock
+module then chapter then theory section in canonical order, and recheck both
+hierarchy edges under those locks. It must reject missing or reparented
+hierarchy, draft, archived, and stale theory sections, and an archived module
+or chapter ancestor. Draft or published non-archived ancestors remain valid.
 
 The facade must accept a nonempty partial JSON object whose only accepted fields
-are title, summaryMarkdown, and estimatedMinutes. Every supplied field must
-pass the exact draft-chapter scalar validation: trimmed 1..160 title; nonblank
-Markdown of at most 5,000 characters; and a JSON integer from 1 through 1,440.
-SQL NULL input, non-object input, JSON nulls, unknown fields, and all
-server-owned fields including slug must be rejected. Resolve omitted fields from
-the locked row. A current-version semantic no-op must return only id and
-rowVersion without an UPDATE, row-version/timestamp or updated_by change, or
-audit; a stale no-op must be rejected. A real change must update only title,
-summary_markdown, estimated_minutes, and updated_by, advance row_version once
-through the existing trigger, and append exactly one closed-contract
-chapter_corrected audit event with changed_fields ['content'], the redacted
-content delta, and reason content_correction. Execution must be granted only to
-service_role.
+are title, bodyMarkdown, and estimatedMinutes. Every supplied field must pass
+the exact draft-theory-section scalar validation: trimmed 1..160 title;
+nonblank Markdown of at most 100,000 characters; and a JSON integer from 1
+through 1,440. SQL NULL input, non-object input, JSON nulls, unknown fields,
+and all server-owned fields including chapterId and position must be rejected.
+Resolve omitted fields from the locked row. A current-version semantic no-op
+must return only id and rowVersion without an UPDATE, row-version/timestamp or
+updated_by change, or audit; a stale no-op must be rejected. A real change must
+update only title, body_markdown, estimated_minutes, and updated_by, advance
+row_version once through the existing trigger, and append exactly one
+closed-contract theory_section_corrected audit event with changed_fields
+['content'], the redacted content delta, and reason content_correction.
+Execution must be granted only to service_role.
 
-This correction must preserve slug, position, status, published_at, IDs,
-created_at, module relationship, theory/assessment descendants, theory
-completions, and all learner progress. It must not create replay/idempotency
-behavior, correct module/theory content, reparent, reorder, publish, archive,
-add a generic curriculum facade, or add Fastify/HTTP/direct-client/Python/SMTP/
-MFA/Vercel behavior.
+This correction must preserve chapter relationship, position, status,
+published_at, IDs, created_at, theory completions, and chapter progress. It
+must not create replay/idempotency behavior, correct module/chapter content,
+reparent, reorder, publish, archive, add a generic curriculum facade, or add
+Fastify/HTTP/direct-client/Python/SMTP/MFA/Vercel behavior.
 
 ## Read first
 

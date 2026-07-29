@@ -13,9 +13,10 @@
   draft-exercise PATCH, draft-quiz root PATCH, and complete draft-quiz
   definition-replacement and protected draft-exercise and draft-quiz
   authoring-read and draft-module/draft-chapter/draft-theory-section PATCH and
-  published-module correction slices are implemented and verified; remaining
-  owner families and real concurrency proof are still required.
-- Last verified implementation slice: SUP-FUNCTIONS-001 published-module
+  published-module/published-chapter correction slices are implemented and
+  verified; remaining owner families and real concurrency proof are still
+  required.
+- Last verified implementation slice: SUP-FUNCTIONS-001 published-chapter
   correction facade with protected local and Docker verification
 - Last updated: 2026-07-29
 
@@ -247,6 +248,12 @@ to the deadlines in that file.
   learning state, returns safe no-op/version results, writes a redacted
   required-reason audit only for real changes, and passes protected
   local/Docker proof.
+- [SUP-FUNCTIONS-001 published-chapter correction slice report](../docs/implementation/SUP-FUNCTIONS-001-slice-19.md);
+  a service-role-only facade now locks module then chapter, accepts a closed
+  correction envelope/reason, permits draft or published non-archived parents,
+  preserves the root, descendants, and learning state, returns safe
+  no-op/version results, writes a redacted required-reason audit only for real
+  changes, and passes protected local/Docker proof.
 - [G1 completion record](08-execution/00-roadmap.md#g1-completion-record);
   Foundation reproducibility is recorded from the accepted architecture/product
   contracts, current checks, Docker evidence, and scope review.

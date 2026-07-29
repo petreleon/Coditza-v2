@@ -4,7 +4,7 @@ BEGIN;
 -- and the only runtime role used for successful calls is service_role.
 GRANT USAGE ON SCHEMA extensions TO coditza_owner;
 
-SELECT extensions.plan(48);
+SELECT extensions.plan(50);
 
 SET LOCAL ROLE coditza_owner;
 DO $normalization_golden_vectors$
@@ -707,6 +707,42 @@ SELECT extensions.ok(
   'published-module correction facade is owner-controlled, fixed-path, exact-name, and server-only'
 );
 
+SELECT extensions.ok(
+  (
+    SELECT procedure_entry.proowner = 'coditza_owner'::pg_catalog.regrole
+      AND procedure_entry.prosecdef
+      AND procedure_entry.proconfig = ARRAY['search_path=""']::text[]
+    FROM pg_catalog.pg_proc AS procedure_entry
+    WHERE procedure_entry.oid =
+      'public.curriculum_correct_published_chapter(uuid,uuid,integer,text,jsonb,uuid)'::pg_catalog.regprocedure
+  )
+  AND (
+    SELECT pg_catalog.count(*) = 1
+    FROM pg_catalog.pg_proc AS procedure_entry
+    JOIN pg_catalog.pg_namespace AS procedure_namespace
+      ON procedure_namespace.oid = procedure_entry.pronamespace
+    WHERE procedure_namespace.nspname = 'public'
+      AND procedure_entry.proname = 'curriculum_correct_published_chapter'
+  )
+  AND NOT EXISTS (
+    SELECT 1
+    FROM (
+      VALUES ('anon'), ('authenticated'), ('authenticator')
+    ) AS runtime_role(rolname)
+    WHERE pg_catalog.has_function_privilege(
+      runtime_role.rolname,
+      'public.curriculum_correct_published_chapter(uuid,uuid,integer,text,jsonb,uuid)'::pg_catalog.regprocedure,
+      'EXECUTE'
+    )
+  )
+  AND pg_catalog.has_function_privilege(
+    'service_role',
+    'public.curriculum_correct_published_chapter(uuid,uuid,integer,text,jsonb,uuid)'::pg_catalog.regprocedure,
+    'EXECUTE'
+  ),
+  'published-chapter correction facade is owner-controlled, fixed-path, exact-name, and server-only'
+);
+
 SET LOCAL ROLE authenticated;
 DO $authenticated_facade_denial$
 DECLARE
@@ -1001,6 +1037,24 @@ BEGIN
   END;
   IF NOT v_rejected THEN
     RAISE EXCEPTION 'authenticated role unexpectedly executed a published module correction facade';
+  END IF;
+
+  v_rejected := false;
+  BEGIN
+    PERFORM *
+    FROM public.curriculum_correct_published_chapter(
+      'c3000000-0000-0000-0000-000000000005',
+      'c3200000-0000-0000-0000-000000000001',
+      2,
+      'content_correction',
+      '{"title":"Denied published chapter correction"}'::jsonb,
+      'c3fe0000-0000-0000-0000-000000000001'
+    );
+  EXCEPTION WHEN insufficient_privilege THEN
+    v_rejected := true;
+  END;
+  IF NOT v_rejected THEN
+    RAISE EXCEPTION 'authenticated role unexpectedly executed a published chapter correction facade';
   END IF;
 END;
 $authenticated_facade_denial$;
@@ -12001,6 +12055,1207 @@ SELECT extensions.ok(
   TRUE,
   'operation-specific idempotency validators reject hidden answer material and null enum values'
 );
+
+-- The published-chapter correction reuses the stable public chapter fixture
+-- after all preceding slices have completed. A separate draft-parent target
+-- proves the allowed nonarchived parent state; a separate archived-parent
+-- target isolates lifecycle denial without weakening the rooted-state proof.
+SET LOCAL ROLE coditza_owner;
+INSERT INTO public.modules (
+  id,
+  slug,
+  title,
+  description_markdown,
+  position,
+  created_by,
+  updated_by
+)
+VALUES
+  (
+    'c3a10000-0000-0000-0000-000000000001',
+    'published-chapter-correction-draft-parent',
+    'Published chapter correction draft parent',
+    'A draft parent is valid for a published chapter correction.',
+    1901,
+    'c3000000-0000-0000-0000-000000000004',
+    'c3000000-0000-0000-0000-000000000004'
+  ),
+  (
+    'c3a20000-0000-0000-0000-000000000001',
+    'published-chapter-correction-archived-parent',
+    'Published chapter correction archived parent',
+    'An archived parent must reject every chapter correction.',
+    1902,
+    'c3000000-0000-0000-0000-000000000004',
+    'c3000000-0000-0000-0000-000000000004'
+  );
+INSERT INTO public.chapters (
+  id,
+  module_id,
+  slug,
+  title,
+  summary_markdown,
+  position,
+  estimated_minutes,
+  created_by,
+  updated_by
+)
+VALUES
+  (
+    'c3a30000-0000-0000-0000-000000000001',
+    'c3a10000-0000-0000-0000-000000000001',
+    'draft-parent-published-correction-target',
+    'Draft-parent published correction target',
+    'This published target proves a draft parent remains valid.',
+    0,
+    17,
+    'c3000000-0000-0000-0000-000000000004',
+    'c3000000-0000-0000-0000-000000000004'
+  ),
+  (
+    'c3a40000-0000-0000-0000-000000000001',
+    'c3a10000-0000-0000-0000-000000000001',
+    'draft-correction-denial-target',
+    'Draft correction denial target',
+    'A draft chapter cannot use the published correction facade.',
+    1,
+    18,
+    'c3000000-0000-0000-0000-000000000004',
+    'c3000000-0000-0000-0000-000000000004'
+  ),
+  (
+    'c3a50000-0000-0000-0000-000000000001',
+    'c3a10000-0000-0000-0000-000000000001',
+    'archived-correction-denial-target',
+    'Archived correction denial target',
+    'An archived chapter cannot use the published correction facade.',
+    2,
+    19,
+    'c3000000-0000-0000-0000-000000000004',
+    'c3000000-0000-0000-0000-000000000004'
+  ),
+  (
+    'c3a60000-0000-0000-0000-000000000001',
+    'c3a20000-0000-0000-0000-000000000001',
+    'archived-parent-published-correction-target',
+    'Archived-parent published correction target',
+    'This published target must remain immutable under an archived parent.',
+    0,
+    20,
+    'c3000000-0000-0000-0000-000000000004',
+    'c3000000-0000-0000-0000-000000000004'
+  );
+UPDATE public.chapters
+SET status = 'published'::public.content_status,
+    published_at = pg_catalog.clock_timestamp()
+WHERE id IN (
+  'c3a30000-0000-0000-0000-000000000001'::uuid,
+  'c3a60000-0000-0000-0000-000000000001'::uuid
+);
+UPDATE public.chapters
+SET status = 'archived'::public.content_status
+WHERE id = 'c3a50000-0000-0000-0000-000000000001';
+UPDATE public.modules
+SET status = 'archived'::public.content_status
+WHERE id = 'c3a20000-0000-0000-0000-000000000001';
+
+DO $published_chapter_correction_initial_snapshot$
+DECLARE
+  v_chapter_snapshot jsonb;
+  v_parent_snapshot jsonb;
+  v_rooted_fingerprint text;
+BEGIN
+  SELECT pg_catalog.jsonb_build_object(
+    'moduleId', chapter_entry.module_id::text,
+    'slug', chapter_entry.slug,
+    'position', chapter_entry.position,
+    'status', chapter_entry.status::text,
+    'publishedAt', chapter_entry.published_at::text,
+    'createdAt', chapter_entry.created_at::text,
+    'createdBy', chapter_entry.created_by::text
+  )
+  INTO v_chapter_snapshot
+  FROM public.chapters AS chapter_entry
+  WHERE chapter_entry.id = 'c3200000-0000-0000-0000-000000000001';
+
+  IF v_chapter_snapshot IS NULL THEN
+    RAISE EXCEPTION 'published chapter correction fixture is missing';
+  END IF;
+
+  SELECT pg_catalog.to_jsonb(module_entry)
+  INTO v_parent_snapshot
+  FROM public.modules AS module_entry
+  WHERE module_entry.id = 'c3100000-0000-0000-0000-000000000001';
+
+  IF v_parent_snapshot IS NULL THEN
+    RAISE EXCEPTION 'published chapter correction parent fixture is missing';
+  END IF;
+
+  PERFORM pg_catalog.set_config(
+    'coditza.slice19_chapter_snapshot',
+    v_chapter_snapshot::text,
+    true
+  );
+  PERFORM pg_catalog.set_config(
+    'coditza.slice19_parent_snapshot',
+    v_parent_snapshot::text,
+    true
+  );
+
+  SELECT pg_catalog.md5(
+    COALESCE(
+      pg_catalog.jsonb_agg(
+        pg_catalog.jsonb_build_object(
+          'kind',
+          rooted_entry.kind,
+          'stateDigest',
+          pg_catalog.md5(rooted_entry.state::text)
+        )
+        ORDER BY rooted_entry.kind, pg_catalog.md5(rooted_entry.state::text)
+      )::text,
+      '[]'
+    )
+  )
+  INTO v_rooted_fingerprint
+  FROM (
+    SELECT
+      'theory_section'::text AS kind,
+      pg_catalog.to_jsonb(theory_entry) AS state
+    FROM public.theory_sections AS theory_entry
+    WHERE theory_entry.chapter_id = 'c3200000-0000-0000-0000-000000000001'
+
+    UNION ALL
+
+    SELECT
+      'exercise'::text,
+      pg_catalog.to_jsonb(exercise_entry)
+    FROM public.exercises AS exercise_entry
+    WHERE exercise_entry.chapter_id = 'c3200000-0000-0000-0000-000000000001'
+
+    UNION ALL
+
+    SELECT
+      'exercise_option'::text,
+      pg_catalog.to_jsonb(option_entry)
+    FROM public.exercise_options AS option_entry
+    JOIN public.exercises AS exercise_entry
+      ON exercise_entry.id = option_entry.exercise_id
+    WHERE exercise_entry.chapter_id = 'c3200000-0000-0000-0000-000000000001'
+
+    UNION ALL
+
+    SELECT
+      'exercise_key'::text,
+      pg_catalog.to_jsonb(answer_key)
+    FROM private.exercise_answer_keys AS answer_key
+    JOIN public.exercises AS exercise_entry
+      ON exercise_entry.id = answer_key.exercise_id
+    WHERE exercise_entry.chapter_id = 'c3200000-0000-0000-0000-000000000001'
+
+    UNION ALL
+
+    SELECT
+      'quiz'::text,
+      pg_catalog.to_jsonb(quiz_entry)
+    FROM public.quizzes AS quiz_entry
+    WHERE quiz_entry.chapter_id = 'c3200000-0000-0000-0000-000000000001'
+
+    UNION ALL
+
+    SELECT
+      'quiz_question'::text,
+      pg_catalog.to_jsonb(question_entry)
+    FROM public.quiz_questions AS question_entry
+    JOIN public.quizzes AS quiz_entry
+      ON quiz_entry.id = question_entry.quiz_id
+    WHERE quiz_entry.chapter_id = 'c3200000-0000-0000-0000-000000000001'
+
+    UNION ALL
+
+    SELECT
+      'quiz_option'::text,
+      pg_catalog.to_jsonb(option_entry)
+    FROM public.quiz_question_options AS option_entry
+    JOIN public.quiz_questions AS question_entry
+      ON question_entry.id = option_entry.question_id
+    JOIN public.quizzes AS quiz_entry
+      ON quiz_entry.id = question_entry.quiz_id
+    WHERE quiz_entry.chapter_id = 'c3200000-0000-0000-0000-000000000001'
+
+    UNION ALL
+
+    SELECT
+      'quiz_key'::text,
+      pg_catalog.to_jsonb(answer_key)
+    FROM private.quiz_question_answer_keys AS answer_key
+    JOIN public.quiz_questions AS question_entry
+      ON question_entry.id = answer_key.question_id
+    JOIN public.quizzes AS quiz_entry
+      ON quiz_entry.id = question_entry.quiz_id
+    WHERE quiz_entry.chapter_id = 'c3200000-0000-0000-0000-000000000001'
+
+    UNION ALL
+
+    SELECT
+      'theory_completion'::text,
+      pg_catalog.to_jsonb(completion_entry)
+    FROM public.theory_section_completions AS completion_entry
+    JOIN public.theory_sections AS theory_entry
+      ON theory_entry.id = completion_entry.theory_section_id
+    WHERE theory_entry.chapter_id = 'c3200000-0000-0000-0000-000000000001'
+
+    UNION ALL
+
+    SELECT
+      'exercise_attempt'::text,
+      pg_catalog.to_jsonb(attempt_entry)
+    FROM public.exercise_attempts AS attempt_entry
+    JOIN public.exercises AS exercise_entry
+      ON exercise_entry.id = attempt_entry.exercise_id
+    WHERE exercise_entry.chapter_id = 'c3200000-0000-0000-0000-000000000001'
+
+    UNION ALL
+
+    SELECT
+      'quiz_attempt'::text,
+      pg_catalog.to_jsonb(attempt_entry)
+    FROM public.quiz_attempts AS attempt_entry
+    JOIN public.quizzes AS quiz_entry
+      ON quiz_entry.id = attempt_entry.quiz_id
+    WHERE quiz_entry.chapter_id = 'c3200000-0000-0000-0000-000000000001'
+
+    UNION ALL
+
+    SELECT
+      'quiz_attempt_answer'::text,
+      pg_catalog.to_jsonb(answer_entry)
+    FROM public.quiz_attempt_answers AS answer_entry
+    JOIN public.quiz_attempts AS attempt_entry
+      ON attempt_entry.id = answer_entry.attempt_id
+    JOIN public.quizzes AS quiz_entry
+      ON quiz_entry.id = attempt_entry.quiz_id
+    WHERE quiz_entry.chapter_id = 'c3200000-0000-0000-0000-000000000001'
+
+    UNION ALL
+
+    SELECT
+      'chapter_progress'::text,
+      pg_catalog.to_jsonb(progress_entry)
+    FROM public.chapter_progress AS progress_entry
+    WHERE progress_entry.chapter_id = 'c3200000-0000-0000-0000-000000000001'
+  ) AS rooted_entry;
+
+  PERFORM pg_catalog.set_config(
+    'coditza.slice19_rooted_fingerprint',
+    v_rooted_fingerprint,
+    true
+  );
+END;
+$published_chapter_correction_initial_snapshot$;
+RESET ROLE;
+
+SET LOCAL ROLE service_role;
+DO $curriculum_correct_published_chapter_validation_and_full_updates$
+DECLARE
+  v_invalid_case record;
+  v_rejected boolean;
+  v_full_update record;
+  v_draft_parent_update record;
+BEGIN
+  FOR v_invalid_case IN
+    SELECT *
+    FROM (
+      VALUES
+        (
+          'empty input',
+          'c3000000-0000-0000-0000-000000000005'::uuid,
+          'c3200000-0000-0000-0000-000000000001'::uuid,
+          2::integer,
+          'content_correction'::text,
+          '{}'::jsonb,
+          'c3fe0000-0000-0000-0000-000000000002'::uuid
+        ),
+        (
+          'array input',
+          'c3000000-0000-0000-0000-000000000005'::uuid,
+          'c3200000-0000-0000-0000-000000000001'::uuid,
+          2::integer,
+          'content_correction'::text,
+          '[]'::jsonb,
+          'c3fe0000-0000-0000-0000-000000000003'::uuid
+        ),
+        (
+          'JSON null input',
+          'c3000000-0000-0000-0000-000000000005'::uuid,
+          'c3200000-0000-0000-0000-000000000001'::uuid,
+          2::integer,
+          'content_correction'::text,
+          'null'::jsonb,
+          'c3fe0000-0000-0000-0000-000000000004'::uuid
+        ),
+        (
+          'immutable slug',
+          'c3000000-0000-0000-0000-000000000005'::uuid,
+          'c3200000-0000-0000-0000-000000000001'::uuid,
+          2::integer,
+          'content_correction'::text,
+          '{"slug":"immutable"}'::jsonb,
+          'c3fe0000-0000-0000-0000-000000000005'::uuid
+        ),
+        (
+          'server status',
+          'c3000000-0000-0000-0000-000000000005'::uuid,
+          'c3200000-0000-0000-0000-000000000001'::uuid,
+          2::integer,
+          'content_correction'::text,
+          '{"status":"draft"}'::jsonb,
+          'c3fe0000-0000-0000-0000-000000000006'::uuid
+        ),
+        (
+          'hierarchy field',
+          'c3000000-0000-0000-0000-000000000005'::uuid,
+          'c3200000-0000-0000-0000-000000000001'::uuid,
+          2::integer,
+          'content_correction'::text,
+          '{"moduleId":"c3a10000-0000-0000-0000-000000000001"}'::jsonb,
+          'c3fe0000-0000-0000-0000-000000000007'::uuid
+        ),
+        (
+          'untrimmed title',
+          'c3000000-0000-0000-0000-000000000005'::uuid,
+          'c3200000-0000-0000-0000-000000000001'::uuid,
+          2::integer,
+          'content_correction'::text,
+          '{"title":" Untrimmed published chapter title"}'::jsonb,
+          'c3fe0000-0000-0000-0000-000000000008'::uuid
+        ),
+        (
+          'blank title',
+          'c3000000-0000-0000-0000-000000000005'::uuid,
+          'c3200000-0000-0000-0000-000000000001'::uuid,
+          2::integer,
+          'content_correction'::text,
+          '{"title":"   "}'::jsonb,
+          'c3fe0000-0000-0000-0000-000000000009'::uuid
+        ),
+        (
+          'overlong title',
+          'c3000000-0000-0000-0000-000000000005'::uuid,
+          'c3200000-0000-0000-0000-000000000001'::uuid,
+          2::integer,
+          'content_correction'::text,
+          pg_catalog.jsonb_build_object('title', pg_catalog.repeat('x', 161)),
+          'c3fe0000-0000-0000-0000-000000000010'::uuid
+        ),
+        (
+          'wrong title type',
+          'c3000000-0000-0000-0000-000000000005'::uuid,
+          'c3200000-0000-0000-0000-000000000001'::uuid,
+          2::integer,
+          'content_correction'::text,
+          '{"title":1}'::jsonb,
+          'c3fe0000-0000-0000-0000-000000000011'::uuid
+        ),
+        (
+          'blank summary',
+          'c3000000-0000-0000-0000-000000000005'::uuid,
+          'c3200000-0000-0000-0000-000000000001'::uuid,
+          2::integer,
+          'content_correction'::text,
+          '{"summaryMarkdown":"   "}'::jsonb,
+          'c3fe0000-0000-0000-0000-000000000012'::uuid
+        ),
+        (
+          'overlong summary',
+          'c3000000-0000-0000-0000-000000000005'::uuid,
+          'c3200000-0000-0000-0000-000000000001'::uuid,
+          2::integer,
+          'content_correction'::text,
+          pg_catalog.jsonb_build_object(
+            'summaryMarkdown',
+            pg_catalog.repeat('x', 5001)
+          ),
+          'c3fe0000-0000-0000-0000-000000000013'::uuid
+        ),
+        (
+          'wrong summary type',
+          'c3000000-0000-0000-0000-000000000005'::uuid,
+          'c3200000-0000-0000-0000-000000000001'::uuid,
+          2::integer,
+          'content_correction'::text,
+          '{"summaryMarkdown":1}'::jsonb,
+          'c3fe0000-0000-0000-0000-000000000014'::uuid
+        ),
+        (
+          'zero minutes',
+          'c3000000-0000-0000-0000-000000000005'::uuid,
+          'c3200000-0000-0000-0000-000000000001'::uuid,
+          2::integer,
+          'content_correction'::text,
+          '{"estimatedMinutes":0}'::jsonb,
+          'c3fe0000-0000-0000-0000-000000000015'::uuid
+        ),
+        (
+          'high minutes',
+          'c3000000-0000-0000-0000-000000000005'::uuid,
+          'c3200000-0000-0000-0000-000000000001'::uuid,
+          2::integer,
+          'content_correction'::text,
+          '{"estimatedMinutes":1441}'::jsonb,
+          'c3fe0000-0000-0000-0000-000000000016'::uuid
+        ),
+        (
+          'wrong minutes type',
+          'c3000000-0000-0000-0000-000000000005'::uuid,
+          'c3200000-0000-0000-0000-000000000001'::uuid,
+          2::integer,
+          'content_correction'::text,
+          '{"estimatedMinutes":"10"}'::jsonb,
+          'c3fe0000-0000-0000-0000-000000000017'::uuid
+        ),
+        (
+          'fractional minutes',
+          'c3000000-0000-0000-0000-000000000005'::uuid,
+          'c3200000-0000-0000-0000-000000000001'::uuid,
+          2::integer,
+          'content_correction'::text,
+          '{"estimatedMinutes":10.5}'::jsonb,
+          'c3fe0000-0000-0000-0000-000000000018'::uuid
+        ),
+        (
+          'JSON null title',
+          'c3000000-0000-0000-0000-000000000005'::uuid,
+          'c3200000-0000-0000-0000-000000000001'::uuid,
+          2::integer,
+          'content_correction'::text,
+          '{"title":null}'::jsonb,
+          'c3fe0000-0000-0000-0000-000000000019'::uuid
+        ),
+        (
+          'JSON null summary',
+          'c3000000-0000-0000-0000-000000000005'::uuid,
+          'c3200000-0000-0000-0000-000000000001'::uuid,
+          2::integer,
+          'content_correction'::text,
+          '{"summaryMarkdown":null}'::jsonb,
+          'c3fe0000-0000-0000-0000-000000000020'::uuid
+        ),
+        (
+          'JSON null minutes',
+          'c3000000-0000-0000-0000-000000000005'::uuid,
+          'c3200000-0000-0000-0000-000000000001'::uuid,
+          2::integer,
+          'content_correction'::text,
+          '{"estimatedMinutes":null}'::jsonb,
+          'c3fe0000-0000-0000-0000-000000000021'::uuid
+        ),
+        (
+          'wrong reason',
+          'c3000000-0000-0000-0000-000000000005'::uuid,
+          'c3200000-0000-0000-0000-000000000001'::uuid,
+          2::integer,
+          'content_archive'::text,
+          '{"title":"Wrong correction reason"}'::jsonb,
+          'c3fe0000-0000-0000-0000-000000000022'::uuid
+        ),
+        (
+          'null reason',
+          'c3000000-0000-0000-0000-000000000005'::uuid,
+          'c3200000-0000-0000-0000-000000000001'::uuid,
+          2::integer,
+          NULL::text,
+          '{"title":"Null correction reason"}'::jsonb,
+          'c3fe0000-0000-0000-0000-000000000023'::uuid
+        ),
+        (
+          'learner actor',
+          'c3000000-0000-0000-0000-000000000001'::uuid,
+          'c3200000-0000-0000-0000-000000000001'::uuid,
+          2::integer,
+          'content_correction'::text,
+          '{"title":"Learners cannot correct published chapters"}'::jsonb,
+          'c3fe0000-0000-0000-0000-000000000024'::uuid
+        ),
+        (
+          'held actor',
+          'c3000000-0000-0000-0000-000000000006'::uuid,
+          'c3200000-0000-0000-0000-000000000001'::uuid,
+          2::integer,
+          'content_correction'::text,
+          '{"title":"Held staff cannot correct published chapters"}'::jsonb,
+          'c3fe0000-0000-0000-0000-000000000025'::uuid
+        ),
+        (
+          'null actor',
+          NULL::uuid,
+          'c3200000-0000-0000-0000-000000000001'::uuid,
+          2::integer,
+          'content_correction'::text,
+          '{"title":"Null actor"}'::jsonb,
+          'c3fe0000-0000-0000-0000-000000000026'::uuid
+        ),
+        (
+          'missing actor',
+          'c3000000-0000-0000-0000-000000000999'::uuid,
+          'c3200000-0000-0000-0000-000000000001'::uuid,
+          2::integer,
+          'content_correction'::text,
+          '{"title":"Missing actor"}'::jsonb,
+          'c3fe0000-0000-0000-0000-000000000027'::uuid
+        ),
+        (
+          'null chapter',
+          'c3000000-0000-0000-0000-000000000005'::uuid,
+          NULL::uuid,
+          2::integer,
+          'content_correction'::text,
+          '{"title":"Null chapter"}'::jsonb,
+          'c3fe0000-0000-0000-0000-000000000028'::uuid
+        ),
+        (
+          'missing chapter',
+          'c3000000-0000-0000-0000-000000000005'::uuid,
+          'c3a90000-0000-0000-0000-000000000001'::uuid,
+          2::integer,
+          'content_correction'::text,
+          '{"title":"Missing chapter"}'::jsonb,
+          'c3fe0000-0000-0000-0000-000000000029'::uuid
+        ),
+        (
+          'null version',
+          'c3000000-0000-0000-0000-000000000005'::uuid,
+          'c3200000-0000-0000-0000-000000000001'::uuid,
+          NULL::integer,
+          'content_correction'::text,
+          '{"title":"Null version"}'::jsonb,
+          'c3fe0000-0000-0000-0000-000000000030'::uuid
+        ),
+        (
+          'zero version',
+          'c3000000-0000-0000-0000-000000000005'::uuid,
+          'c3200000-0000-0000-0000-000000000001'::uuid,
+          0::integer,
+          'content_correction'::text,
+          '{"title":"Zero version"}'::jsonb,
+          'c3fe0000-0000-0000-0000-000000000031'::uuid
+        ),
+        (
+          'negative version',
+          'c3000000-0000-0000-0000-000000000005'::uuid,
+          'c3200000-0000-0000-0000-000000000001'::uuid,
+          (-1)::integer,
+          'content_correction'::text,
+          '{"title":"Negative version"}'::jsonb,
+          'c3fe0000-0000-0000-0000-000000000032'::uuid
+        ),
+        (
+          'SQL null input',
+          'c3000000-0000-0000-0000-000000000005'::uuid,
+          'c3200000-0000-0000-0000-000000000001'::uuid,
+          2::integer,
+          'content_correction'::text,
+          NULL::jsonb,
+          'c3fe0000-0000-0000-0000-000000000033'::uuid
+        ),
+        (
+          'null request',
+          'c3000000-0000-0000-0000-000000000005'::uuid,
+          'c3200000-0000-0000-0000-000000000001'::uuid,
+          2::integer,
+          'content_correction'::text,
+          '{"title":"Null request"}'::jsonb,
+          NULL::uuid
+        ),
+        (
+          'draft target',
+          'c3000000-0000-0000-0000-000000000005'::uuid,
+          'c3a40000-0000-0000-0000-000000000001'::uuid,
+          1::integer,
+          'content_correction'::text,
+          '{"title":"Draft chapters are not published corrections"}'::jsonb,
+          'c3fe0000-0000-0000-0000-000000000035'::uuid
+        ),
+        (
+          'archived target',
+          'c3000000-0000-0000-0000-000000000005'::uuid,
+          'c3a50000-0000-0000-0000-000000000001'::uuid,
+          2::integer,
+          'content_correction'::text,
+          '{"title":"Archived chapters are not published corrections"}'::jsonb,
+          'c3fe0000-0000-0000-0000-000000000036'::uuid
+        ),
+        (
+          'archived parent',
+          'c3000000-0000-0000-0000-000000000005'::uuid,
+          'c3a60000-0000-0000-0000-000000000001'::uuid,
+          2::integer,
+          'content_correction'::text,
+          '{"title":"Archived parents block published chapter corrections"}'::jsonb,
+          'c3fe0000-0000-0000-0000-000000000037'::uuid
+        )
+    ) AS invalid_case(
+      label,
+      actor_user_id,
+      chapter_id,
+      expected_row_version,
+      reason_code,
+      input_value,
+      request_id
+    )
+  LOOP
+    v_rejected := false;
+    BEGIN
+      PERFORM *
+      FROM public.curriculum_correct_published_chapter(
+        v_invalid_case.actor_user_id,
+        v_invalid_case.chapter_id,
+        v_invalid_case.expected_row_version,
+        v_invalid_case.reason_code,
+        v_invalid_case.input_value,
+        v_invalid_case.request_id
+      );
+    EXCEPTION WHEN raise_exception THEN
+      v_rejected := true;
+    END;
+
+    IF NOT v_rejected THEN
+      RAISE EXCEPTION 'published chapter correction unexpectedly accepted invalid case: %',
+        v_invalid_case.label;
+    END IF;
+  END LOOP;
+
+  SELECT * INTO v_full_update
+  FROM public.curriculum_correct_published_chapter(
+    'c3000000-0000-0000-0000-000000000004',
+    'c3200000-0000-0000-0000-000000000001',
+    2,
+    'content_correction',
+    '{"title":"Corrected published chapter title","summaryMarkdown":"Corrected published chapter summary.","estimatedMinutes":1440}'::jsonb,
+    'c3fe0000-0000-0000-0000-000000000040'
+  );
+
+  SELECT * INTO v_draft_parent_update
+  FROM public.curriculum_correct_published_chapter(
+    'c3000000-0000-0000-0000-000000000005',
+    'c3a30000-0000-0000-0000-000000000001',
+    2,
+    'content_correction',
+    '{"estimatedMinutes":27}'::jsonb,
+    'c3fe0000-0000-0000-0000-000000000041'
+  );
+
+  IF v_full_update.response_status <> 200
+    OR v_full_update.response_body IS DISTINCT FROM pg_catalog.jsonb_build_object(
+      'id', 'c3200000-0000-0000-0000-000000000001',
+      'rowVersion', 3
+    )
+    OR v_draft_parent_update.response_status <> 200
+    OR v_draft_parent_update.response_body IS DISTINCT FROM pg_catalog.jsonb_build_object(
+      'id', 'c3a30000-0000-0000-0000-000000000001',
+      'rowVersion', 3
+    ) THEN
+    RAISE EXCEPTION 'published chapter correction did not preserve its exact validation or allowed-parent update contract';
+  END IF;
+END;
+$curriculum_correct_published_chapter_validation_and_full_updates$;
+RESET ROLE;
+
+-- Capture root metadata after the real correction. The following no-op must
+-- not run the shared UPDATE trigger or change either timestamp or attribution.
+SET LOCAL ROLE coditza_owner;
+DO $published_chapter_correction_noop_snapshot$
+DECLARE
+  v_updated_at text;
+  v_updated_by text;
+BEGIN
+  SELECT
+    chapter_entry.updated_at::text,
+    chapter_entry.updated_by::text
+  INTO
+    v_updated_at,
+    v_updated_by
+  FROM public.chapters AS chapter_entry
+  WHERE chapter_entry.id = 'c3200000-0000-0000-0000-000000000001';
+
+  IF v_updated_at IS NULL OR v_updated_by IS NULL THEN
+    RAISE EXCEPTION 'published chapter correction no-op fixture is missing root metadata';
+  END IF;
+
+  PERFORM pg_catalog.set_config(
+    'coditza.slice19_noop_updated_at',
+    v_updated_at,
+    true
+  );
+  PERFORM pg_catalog.set_config(
+    'coditza.slice19_noop_updated_by',
+    v_updated_by,
+    true
+  );
+END;
+$published_chapter_correction_noop_snapshot$;
+RESET ROLE;
+
+SET LOCAL ROLE service_role;
+DO $published_chapter_correction_noop$
+DECLARE
+  v_noop record;
+BEGIN
+  SELECT * INTO v_noop
+  FROM public.curriculum_correct_published_chapter(
+    'c3000000-0000-0000-0000-000000000005',
+    'c3200000-0000-0000-0000-000000000001',
+    3,
+    'content_correction',
+    '{"title":"Corrected published chapter title","estimatedMinutes":1440}'::jsonb,
+    'c3fe0000-0000-0000-0000-000000000042'
+  );
+
+  IF v_noop.response_status <> 200
+    OR v_noop.response_body IS DISTINCT FROM pg_catalog.jsonb_build_object(
+      'id', 'c3200000-0000-0000-0000-000000000001',
+      'rowVersion', 3
+    ) THEN
+    RAISE EXCEPTION 'published chapter correction no-op did not return the current safe version';
+  END IF;
+END;
+$published_chapter_correction_noop$;
+RESET ROLE;
+
+SET LOCAL ROLE coditza_owner;
+DO $published_chapter_correction_noop_preservation$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1
+    FROM public.chapters AS chapter_entry
+    WHERE chapter_entry.id = 'c3200000-0000-0000-0000-000000000001'
+      AND chapter_entry.row_version = 3
+      AND chapter_entry.updated_at::text =
+        pg_catalog.current_setting('coditza.slice19_noop_updated_at', true)
+      AND chapter_entry.updated_by::text =
+        pg_catalog.current_setting('coditza.slice19_noop_updated_by', true)
+  ) THEN
+    RAISE EXCEPTION 'published chapter correction no-op unexpectedly wrote root metadata';
+  END IF;
+END;
+$published_chapter_correction_noop_preservation$;
+RESET ROLE;
+
+SET LOCAL ROLE service_role;
+DO $published_chapter_correction_followup$
+DECLARE
+  v_partial_update record;
+  v_stale_rejected boolean := false;
+  v_stale_noop_rejected boolean := false;
+BEGIN
+  SELECT * INTO v_partial_update
+  FROM public.curriculum_correct_published_chapter(
+    'c3000000-0000-0000-0000-000000000005',
+    'c3200000-0000-0000-0000-000000000001',
+    3,
+    'content_correction',
+    '{"summaryMarkdown":"Corrected published chapter summary again.","estimatedMinutes":1}'::jsonb,
+    'c3fe0000-0000-0000-0000-000000000043'
+  );
+
+  BEGIN
+    PERFORM *
+    FROM public.curriculum_correct_published_chapter(
+      'c3000000-0000-0000-0000-000000000004',
+      'c3200000-0000-0000-0000-000000000001',
+      2,
+      'content_correction',
+      '{"title":"Corrected published chapter title","summaryMarkdown":"Corrected published chapter summary.","estimatedMinutes":1440}'::jsonb,
+      'c3fe0000-0000-0000-0000-000000000044'
+    );
+  EXCEPTION WHEN raise_exception THEN
+    v_stale_rejected := true;
+  END;
+
+  BEGIN
+    PERFORM *
+    FROM public.curriculum_correct_published_chapter(
+      'c3000000-0000-0000-0000-000000000005',
+      'c3200000-0000-0000-0000-000000000001',
+      3,
+      'content_correction',
+      '{"title":"Corrected published chapter title"}'::jsonb,
+      'c3fe0000-0000-0000-0000-000000000045'
+    );
+  EXCEPTION WHEN raise_exception THEN
+    v_stale_noop_rejected := true;
+  END;
+
+  IF v_partial_update.response_status <> 200
+    OR v_partial_update.response_body IS DISTINCT FROM pg_catalog.jsonb_build_object(
+      'id', 'c3200000-0000-0000-0000-000000000001',
+      'rowVersion', 4
+    )
+    OR NOT v_stale_rejected
+    OR NOT v_stale_noop_rejected THEN
+    RAISE EXCEPTION 'published chapter correction did not preserve partial or stale-version behavior';
+  END IF;
+END;
+$published_chapter_correction_followup$;
+RESET ROLE;
+
+SET LOCAL ROLE coditza_owner;
+DO $published_chapter_correction_rooted_state_preservation$
+DECLARE
+  v_rooted_fingerprint text;
+BEGIN
+  SELECT pg_catalog.md5(
+    COALESCE(
+      pg_catalog.jsonb_agg(
+        pg_catalog.jsonb_build_object(
+          'kind',
+          rooted_entry.kind,
+          'stateDigest',
+          pg_catalog.md5(rooted_entry.state::text)
+        )
+        ORDER BY rooted_entry.kind, pg_catalog.md5(rooted_entry.state::text)
+      )::text,
+      '[]'
+    )
+  )
+  INTO v_rooted_fingerprint
+  FROM (
+    SELECT
+      'theory_section'::text AS kind,
+      pg_catalog.to_jsonb(theory_entry) AS state
+    FROM public.theory_sections AS theory_entry
+    WHERE theory_entry.chapter_id = 'c3200000-0000-0000-0000-000000000001'
+
+    UNION ALL
+
+    SELECT
+      'exercise'::text,
+      pg_catalog.to_jsonb(exercise_entry)
+    FROM public.exercises AS exercise_entry
+    WHERE exercise_entry.chapter_id = 'c3200000-0000-0000-0000-000000000001'
+
+    UNION ALL
+
+    SELECT
+      'exercise_option'::text,
+      pg_catalog.to_jsonb(option_entry)
+    FROM public.exercise_options AS option_entry
+    JOIN public.exercises AS exercise_entry
+      ON exercise_entry.id = option_entry.exercise_id
+    WHERE exercise_entry.chapter_id = 'c3200000-0000-0000-0000-000000000001'
+
+    UNION ALL
+
+    SELECT
+      'exercise_key'::text,
+      pg_catalog.to_jsonb(answer_key)
+    FROM private.exercise_answer_keys AS answer_key
+    JOIN public.exercises AS exercise_entry
+      ON exercise_entry.id = answer_key.exercise_id
+    WHERE exercise_entry.chapter_id = 'c3200000-0000-0000-0000-000000000001'
+
+    UNION ALL
+
+    SELECT
+      'quiz'::text,
+      pg_catalog.to_jsonb(quiz_entry)
+    FROM public.quizzes AS quiz_entry
+    WHERE quiz_entry.chapter_id = 'c3200000-0000-0000-0000-000000000001'
+
+    UNION ALL
+
+    SELECT
+      'quiz_question'::text,
+      pg_catalog.to_jsonb(question_entry)
+    FROM public.quiz_questions AS question_entry
+    JOIN public.quizzes AS quiz_entry
+      ON quiz_entry.id = question_entry.quiz_id
+    WHERE quiz_entry.chapter_id = 'c3200000-0000-0000-0000-000000000001'
+
+    UNION ALL
+
+    SELECT
+      'quiz_option'::text,
+      pg_catalog.to_jsonb(option_entry)
+    FROM public.quiz_question_options AS option_entry
+    JOIN public.quiz_questions AS question_entry
+      ON question_entry.id = option_entry.question_id
+    JOIN public.quizzes AS quiz_entry
+      ON quiz_entry.id = question_entry.quiz_id
+    WHERE quiz_entry.chapter_id = 'c3200000-0000-0000-0000-000000000001'
+
+    UNION ALL
+
+    SELECT
+      'quiz_key'::text,
+      pg_catalog.to_jsonb(answer_key)
+    FROM private.quiz_question_answer_keys AS answer_key
+    JOIN public.quiz_questions AS question_entry
+      ON question_entry.id = answer_key.question_id
+    JOIN public.quizzes AS quiz_entry
+      ON quiz_entry.id = question_entry.quiz_id
+    WHERE quiz_entry.chapter_id = 'c3200000-0000-0000-0000-000000000001'
+
+    UNION ALL
+
+    SELECT
+      'theory_completion'::text,
+      pg_catalog.to_jsonb(completion_entry)
+    FROM public.theory_section_completions AS completion_entry
+    JOIN public.theory_sections AS theory_entry
+      ON theory_entry.id = completion_entry.theory_section_id
+    WHERE theory_entry.chapter_id = 'c3200000-0000-0000-0000-000000000001'
+
+    UNION ALL
+
+    SELECT
+      'exercise_attempt'::text,
+      pg_catalog.to_jsonb(attempt_entry)
+    FROM public.exercise_attempts AS attempt_entry
+    JOIN public.exercises AS exercise_entry
+      ON exercise_entry.id = attempt_entry.exercise_id
+    WHERE exercise_entry.chapter_id = 'c3200000-0000-0000-0000-000000000001'
+
+    UNION ALL
+
+    SELECT
+      'quiz_attempt'::text,
+      pg_catalog.to_jsonb(attempt_entry)
+    FROM public.quiz_attempts AS attempt_entry
+    JOIN public.quizzes AS quiz_entry
+      ON quiz_entry.id = attempt_entry.quiz_id
+    WHERE quiz_entry.chapter_id = 'c3200000-0000-0000-0000-000000000001'
+
+    UNION ALL
+
+    SELECT
+      'quiz_attempt_answer'::text,
+      pg_catalog.to_jsonb(answer_entry)
+    FROM public.quiz_attempt_answers AS answer_entry
+    JOIN public.quiz_attempts AS attempt_entry
+      ON attempt_entry.id = answer_entry.attempt_id
+    JOIN public.quizzes AS quiz_entry
+      ON quiz_entry.id = attempt_entry.quiz_id
+    WHERE quiz_entry.chapter_id = 'c3200000-0000-0000-0000-000000000001'
+
+    UNION ALL
+
+    SELECT
+      'chapter_progress'::text,
+      pg_catalog.to_jsonb(progress_entry)
+    FROM public.chapter_progress AS progress_entry
+    WHERE progress_entry.chapter_id = 'c3200000-0000-0000-0000-000000000001'
+  ) AS rooted_entry;
+
+  IF v_rooted_fingerprint IS DISTINCT FROM
+      pg_catalog.current_setting('coditza.slice19_rooted_fingerprint', true) THEN
+    RAISE EXCEPTION 'published chapter correction unexpectedly changed rooted descendant or learning metadata';
+  END IF;
+END;
+$published_chapter_correction_rooted_state_preservation$;
+
+SELECT extensions.ok(
+  EXISTS (
+    SELECT 1
+    FROM public.chapters AS chapter_entry
+    WHERE chapter_entry.id = 'c3200000-0000-0000-0000-000000000001'
+      AND chapter_entry.title = 'Corrected published chapter title'
+      AND chapter_entry.summary_markdown =
+        'Corrected published chapter summary again.'
+      AND chapter_entry.estimated_minutes = 1
+      AND chapter_entry.status = 'published'::public.content_status
+      AND chapter_entry.row_version = 4
+      AND chapter_entry.updated_by =
+        'c3000000-0000-0000-0000-000000000005'::uuid
+      AND pg_catalog.jsonb_build_object(
+        'moduleId', chapter_entry.module_id::text,
+        'slug', chapter_entry.slug,
+        'position', chapter_entry.position,
+        'status', chapter_entry.status::text,
+        'publishedAt', chapter_entry.published_at::text,
+        'createdAt', chapter_entry.created_at::text,
+        'createdBy', chapter_entry.created_by::text
+      ) = pg_catalog.current_setting(
+        'coditza.slice19_chapter_snapshot',
+        true
+      )::jsonb
+  )
+  AND EXISTS (
+    SELECT 1
+    FROM public.modules AS module_entry
+    WHERE module_entry.id = 'c3100000-0000-0000-0000-000000000001'
+      AND pg_catalog.to_jsonb(module_entry) = pg_catalog.current_setting(
+        'coditza.slice19_parent_snapshot',
+        true
+      )::jsonb
+  )
+  AND EXISTS (
+    SELECT 1
+    FROM public.modules AS module_entry
+    WHERE module_entry.id = 'c3a10000-0000-0000-0000-000000000001'
+      AND module_entry.status = 'draft'::public.content_status
+      AND module_entry.row_version = 1
+  )
+  AND EXISTS (
+    SELECT 1
+    FROM public.chapters AS chapter_entry
+    WHERE chapter_entry.id = 'c3a30000-0000-0000-0000-000000000001'
+      AND chapter_entry.module_id = 'c3a10000-0000-0000-0000-000000000001'
+      AND chapter_entry.slug = 'draft-parent-published-correction-target'
+      AND chapter_entry.title = 'Draft-parent published correction target'
+      AND chapter_entry.summary_markdown =
+        'This published target proves a draft parent remains valid.'
+      AND chapter_entry.position = 0
+      AND chapter_entry.estimated_minutes = 27
+      AND chapter_entry.status = 'published'::public.content_status
+      AND chapter_entry.row_version = 3
+      AND chapter_entry.created_by =
+        'c3000000-0000-0000-0000-000000000004'::uuid
+      AND chapter_entry.updated_by =
+        'c3000000-0000-0000-0000-000000000005'::uuid
+  )
+  AND EXISTS (
+    SELECT 1
+    FROM public.chapters AS chapter_entry
+    WHERE chapter_entry.id = 'c3a40000-0000-0000-0000-000000000001'
+      AND chapter_entry.status = 'draft'::public.content_status
+      AND chapter_entry.row_version = 1
+  )
+  AND EXISTS (
+    SELECT 1
+    FROM public.chapters AS chapter_entry
+    WHERE chapter_entry.id = 'c3a50000-0000-0000-0000-000000000001'
+      AND chapter_entry.status = 'archived'::public.content_status
+      AND chapter_entry.row_version = 2
+  )
+  AND EXISTS (
+    SELECT 1
+    FROM public.modules AS module_entry
+    WHERE module_entry.id = 'c3a20000-0000-0000-0000-000000000001'
+      AND module_entry.status = 'archived'::public.content_status
+      AND module_entry.row_version = 2
+  )
+  AND EXISTS (
+    SELECT 1
+    FROM public.chapters AS chapter_entry
+    WHERE chapter_entry.id = 'c3a60000-0000-0000-0000-000000000001'
+      AND chapter_entry.module_id = 'c3a20000-0000-0000-0000-000000000001'
+      AND chapter_entry.status = 'published'::public.content_status
+      AND chapter_entry.row_version = 2
+  )
+  AND (
+    SELECT pg_catalog.count(*) = 3
+      AND pg_catalog.bool_and(
+        audit_entry.actor_kind = 'user'
+        AND audit_entry.action = 'chapter_corrected'
+        AND audit_entry.entity_type = 'chapter'
+        AND audit_entry.changed_fields = ARRAY['content']::text[]
+        AND audit_entry.change_summary =
+          '{"content":{"before":"redacted","after":"redacted"}}'::jsonb
+        AND audit_entry.reason = 'content_correction'
+        AND (
+          (
+            audit_entry.actor_user_id =
+              'c3000000-0000-0000-0000-000000000004'::uuid
+            AND audit_entry.entity_id =
+              'c3200000-0000-0000-0000-000000000001'::uuid
+            AND audit_entry.request_id =
+              'c3fe0000-0000-0000-0000-000000000040'::uuid
+          )
+          OR (
+            audit_entry.actor_user_id =
+              'c3000000-0000-0000-0000-000000000005'::uuid
+            AND audit_entry.entity_id =
+              'c3a30000-0000-0000-0000-000000000001'::uuid
+            AND audit_entry.request_id =
+              'c3fe0000-0000-0000-0000-000000000041'::uuid
+          )
+          OR (
+            audit_entry.actor_user_id =
+              'c3000000-0000-0000-0000-000000000005'::uuid
+            AND audit_entry.entity_id =
+              'c3200000-0000-0000-0000-000000000001'::uuid
+            AND audit_entry.request_id =
+              'c3fe0000-0000-0000-0000-000000000043'::uuid
+          )
+        )
+      )
+    FROM private.audit_events AS audit_entry
+    WHERE audit_entry.action = 'chapter_corrected'
+      AND audit_entry.entity_type = 'chapter'
+      AND audit_entry.entity_id IN (
+        'c3200000-0000-0000-0000-000000000001'::uuid,
+        'c3a30000-0000-0000-0000-000000000001'::uuid
+      )
+  )
+  AND (
+    SELECT pg_catalog.count(*) = 3
+    FROM private.audit_events AS audit_entry
+    WHERE audit_entry.request_id IN (
+      'c3fe0000-0000-0000-0000-000000000040'::uuid,
+      'c3fe0000-0000-0000-0000-000000000041'::uuid,
+      'c3fe0000-0000-0000-0000-000000000043'::uuid
+    )
+  )
+  AND NOT EXISTS (
+    SELECT 1
+    FROM private.audit_events AS audit_entry
+    WHERE audit_entry.request_id IN (
+      'c3fe0000-0000-0000-0000-000000000001'::uuid,
+      'c3fe0000-0000-0000-0000-000000000002'::uuid,
+      'c3fe0000-0000-0000-0000-000000000003'::uuid,
+      'c3fe0000-0000-0000-0000-000000000004'::uuid,
+      'c3fe0000-0000-0000-0000-000000000005'::uuid,
+      'c3fe0000-0000-0000-0000-000000000006'::uuid,
+      'c3fe0000-0000-0000-0000-000000000007'::uuid,
+      'c3fe0000-0000-0000-0000-000000000008'::uuid,
+      'c3fe0000-0000-0000-0000-000000000009'::uuid,
+      'c3fe0000-0000-0000-0000-000000000010'::uuid,
+      'c3fe0000-0000-0000-0000-000000000011'::uuid,
+      'c3fe0000-0000-0000-0000-000000000012'::uuid,
+      'c3fe0000-0000-0000-0000-000000000013'::uuid,
+      'c3fe0000-0000-0000-0000-000000000014'::uuid,
+      'c3fe0000-0000-0000-0000-000000000015'::uuid,
+      'c3fe0000-0000-0000-0000-000000000016'::uuid,
+      'c3fe0000-0000-0000-0000-000000000017'::uuid,
+      'c3fe0000-0000-0000-0000-000000000018'::uuid,
+      'c3fe0000-0000-0000-0000-000000000019'::uuid,
+      'c3fe0000-0000-0000-0000-000000000020'::uuid,
+      'c3fe0000-0000-0000-0000-000000000021'::uuid,
+      'c3fe0000-0000-0000-0000-000000000022'::uuid,
+      'c3fe0000-0000-0000-0000-000000000023'::uuid,
+      'c3fe0000-0000-0000-0000-000000000024'::uuid,
+      'c3fe0000-0000-0000-0000-000000000025'::uuid,
+      'c3fe0000-0000-0000-0000-000000000026'::uuid,
+      'c3fe0000-0000-0000-0000-000000000027'::uuid,
+      'c3fe0000-0000-0000-0000-000000000028'::uuid,
+      'c3fe0000-0000-0000-0000-000000000029'::uuid,
+      'c3fe0000-0000-0000-0000-000000000030'::uuid,
+      'c3fe0000-0000-0000-0000-000000000031'::uuid,
+      'c3fe0000-0000-0000-0000-000000000032'::uuid,
+      'c3fe0000-0000-0000-0000-000000000033'::uuid,
+      'c3fe0000-0000-0000-0000-000000000035'::uuid,
+      'c3fe0000-0000-0000-0000-000000000036'::uuid,
+      'c3fe0000-0000-0000-0000-000000000037'::uuid,
+      'c3fe0000-0000-0000-0000-000000000042'::uuid,
+      'c3fe0000-0000-0000-0000-000000000044'::uuid,
+      'c3fe0000-0000-0000-0000-000000000045'::uuid
+    )
+  )
+  AND NOT EXISTS (
+    SELECT 1
+    FROM private.idempotency_records AS record_entry
+    WHERE record_entry.result_resource_id IN (
+      'c3200000-0000-0000-0000-000000000001'::uuid,
+      'c3a30000-0000-0000-0000-000000000001'::uuid
+    )
+  )
+  AND COALESCE(
+    pg_catalog.current_setting('coditza.learning_write', true),
+    ''
+  ) = '',
+  'published-chapter correction locks module then chapter, permits a draft nonarchived parent, preserves the root and rooted descendant/learning state, audits redacted content safely, and has no replay'
+);
+RESET ROLE;
 
 SELECT * FROM extensions.finish();
 
