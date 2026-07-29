@@ -9,10 +9,11 @@
   server-only transactional workflow facades, grants, normalization, and proof.
   Its assessment learner-mutation, learner-progress, learner-history,
   staff-authorization primitive, curriculum draft-module, draft-chapter, and
-  draft-theory-section slices are implemented and verified; remaining owner
-  families and real concurrency proof are still required.
-- Last verified implementation slice: SUP-FUNCTIONS-001 curriculum
-  draft-theory-section creation facade with protected local verification
+  draft-theory-section, and scalar draft-exercise slices are implemented and
+  verified; remaining owner families and real concurrency proof are still
+  required.
+- Last verified implementation slice: SUP-FUNCTIONS-001 scalar draft-exercise
+  creation facade with protected local verification
 - Last updated: 2026-07-29
 
 ## Phase status
@@ -189,6 +190,11 @@ to the deadlines in that file.
   draft theory section across all sibling states, validates exact input,
   preserves a safe replay after later ancestor archive, denies held replay, and
   appends a sanitized audit transition.
+- [SUP-FUNCTIONS-001 scalar draft-exercise slice report](../docs/implementation/SUP-FUNCTIONS-001-slice-08.md);
+  a service-role-only facade now creates complete scalar exercise trees under a
+  marker-gated private key, remaps client option references to stored IDs,
+  preserves initial row/definition version one, rejects Python before writes,
+  and passes protected local reset and Docker foundation verification.
 - [G1 completion record](08-execution/00-roadmap.md#g1-completion-record);
   Foundation reproducibility is recorded from the accepted architecture/product
   contracts, current checks, Docker evidence, and scope review.

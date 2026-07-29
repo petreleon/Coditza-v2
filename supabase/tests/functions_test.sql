@@ -4,7 +4,7 @@ BEGIN;
 -- and the only runtime role used for successful calls is service_role.
 GRANT USAGE ON SCHEMA extensions TO coditza_owner;
 
-SELECT extensions.plan(26);
+SELECT extensions.plan(28);
 
 SET LOCAL ROLE coditza_owner;
 DO $normalization_golden_vectors$
@@ -297,6 +297,34 @@ SELECT extensions.ok(
   'draft-theory-section facade is owner-controlled, fixed-path, and server-only'
 );
 
+SELECT extensions.ok(
+  (
+    SELECT procedure_entry.proowner = 'coditza_owner'::pg_catalog.regrole
+      AND procedure_entry.prosecdef
+      AND procedure_entry.proconfig = ARRAY['search_path=""']::text[]
+    FROM pg_catalog.pg_proc AS procedure_entry
+    WHERE procedure_entry.oid =
+      'public.assessment_create_draft_exercise(uuid,uuid,jsonb,uuid,integer,bytea,uuid)'::pg_catalog.regprocedure
+  )
+  AND NOT EXISTS (
+    SELECT 1
+    FROM (
+      VALUES ('anon'), ('authenticated'), ('authenticator')
+    ) AS runtime_role(rolname)
+    WHERE pg_catalog.has_function_privilege(
+      runtime_role.rolname,
+      'public.assessment_create_draft_exercise(uuid,uuid,jsonb,uuid,integer,bytea,uuid)'::pg_catalog.regprocedure,
+      'EXECUTE'
+    )
+  )
+  AND pg_catalog.has_function_privilege(
+    'service_role',
+    'public.assessment_create_draft_exercise(uuid,uuid,jsonb,uuid,integer,bytea,uuid)'::pg_catalog.regprocedure,
+    'EXECUTE'
+  ),
+  'draft-exercise facade is owner-controlled, fixed-path, and server-only'
+);
+
 SET LOCAL ROLE authenticated;
 DO $authenticated_facade_denial$
 DECLARE
@@ -405,6 +433,25 @@ BEGIN
   END;
   IF NOT v_rejected THEN
     RAISE EXCEPTION 'authenticated role unexpectedly executed a theory-section authoring facade';
+  END IF;
+
+  v_rejected := false;
+  BEGIN
+    PERFORM *
+    FROM public.assessment_create_draft_exercise(
+      'c3000000-0000-0000-0000-000000000005',
+      'c3250000-0000-0000-0000-000000000001',
+      '{"title":"Denied exercise","promptMarkdown":"Denied.","exerciseType":"short_text","points":1,"isRequired":true,"options":[],"answerSpec":{"acceptedAnswers":["yes"],"normalization":"nfkc_ascii_ws_ascii_lower_v1"}}'::jsonb,
+      'c3e30000-0000-0000-0000-000000000001',
+      1,
+      pg_catalog.decode(pg_catalog.repeat('a5', 32), 'hex'),
+      'c3f30000-0000-0000-0000-000000000001'
+    );
+  EXCEPTION WHEN insufficient_privilege THEN
+    v_rejected := true;
+  END;
+  IF NOT v_rejected THEN
+    RAISE EXCEPTION 'authenticated role unexpectedly executed an exercise authoring facade';
   END IF;
 END;
 $authenticated_facade_denial$;
@@ -1822,6 +1869,685 @@ SELECT extensions.ok(
     )
   ),
   'theory-section creation locks module and chapter scopes, accepts draft/published ancestors, preserves safe replay, and denies archived/held writes'
+);
+
+-- The primary draft hierarchy has an archived exercise sibling; the independent
+-- secondary hierarchy isolates archived-module rejection without granting the
+-- runtime role direct public/private table reads.
+INSERT INTO public.modules (
+  id,
+  slug,
+  title,
+  description_markdown,
+  position
+)
+VALUES (
+  'c3150000-0000-0000-0000-000000000001',
+  'authoring-exercise-parent-module',
+  'Authoring exercise parent module',
+  'Draft module for scalar exercise function verification.',
+  5
+), (
+  'c3160000-0000-0000-0000-000000000001',
+  'authoring-exercise-archived-module',
+  'Authoring exercise archived module',
+  'Secondary module for archived-parent verification.',
+  6
+);
+INSERT INTO public.chapters (
+  id,
+  module_id,
+  slug,
+  title,
+  summary_markdown,
+  position,
+  estimated_minutes
+)
+VALUES (
+  'c3250000-0000-0000-0000-000000000001',
+  'c3150000-0000-0000-0000-000000000001',
+  'authoring-exercise-parent-chapter',
+  'Authoring exercise parent chapter',
+  'Draft chapter for scalar exercise function verification.',
+  0,
+  15
+), (
+  'c3260000-0000-0000-0000-000000000001',
+  'c3160000-0000-0000-0000-000000000001',
+  'authoring-exercise-secondary-chapter',
+  'Authoring exercise secondary chapter',
+  'Draft chapter for archived-module verification.',
+  0,
+  15
+);
+INSERT INTO public.exercises (
+  id,
+  chapter_id,
+  title,
+  prompt_markdown,
+  exercise_type,
+  position,
+  points,
+  is_required
+)
+VALUES (
+  'c3420000-0000-0000-0000-000000000001',
+  'c3250000-0000-0000-0000-000000000001',
+  'Archived sibling exercise',
+  'Archived sibling for position verification.',
+  'short_text'::public.exercise_type,
+  0,
+  1,
+  true
+);
+UPDATE public.exercises
+SET status = 'archived'::public.content_status
+WHERE id = 'c3420000-0000-0000-0000-000000000001';
+RESET ROLE;
+
+SET LOCAL ROLE service_role;
+DO $assessment_create_draft_exercise$
+DECLARE
+  v_editor_first record;
+  v_editor_replay record;
+  v_admin_first record;
+  v_different_hash_rejected boolean := false;
+  v_invalid_input_rejected boolean := false;
+  v_learner_rejected boolean := false;
+  v_missing_key_rejected boolean := false;
+  v_missing_parent_rejected boolean := false;
+  v_incomplete_rejected boolean := false;
+  v_python_rejected boolean := false;
+  v_foreign_option_rejected boolean := false;
+BEGIN
+  SELECT * INTO v_editor_first
+  FROM public.assessment_create_draft_exercise(
+    'c3000000-0000-0000-0000-000000000004',
+    'c3250000-0000-0000-0000-000000000001',
+    '{"title":"Authoring editor single exercise","promptMarkdown":"Select the correct scalar answer.","exerciseType":"single_choice","points":5,"isRequired":true,"options":[{"clientRef":"single-a","labelMarkdown":"Incorrect option."},{"clientRef":"single-b","labelMarkdown":"Correct option."}],"answerSpec":{"correctOptionRef":"single-b"},"feedbackCorrectMarkdown":"Correct.","feedbackIncorrectMarkdown":"Try again."}'::jsonb,
+    'c3e30000-0000-0000-0000-000000000001',
+    1,
+    pg_catalog.decode(pg_catalog.repeat('a5', 32), 'hex'),
+    'c3f30000-0000-0000-0000-000000000010'
+  );
+  SELECT * INTO v_editor_replay
+  FROM public.assessment_create_draft_exercise(
+    'c3000000-0000-0000-0000-000000000004',
+    'c3250000-0000-0000-0000-000000000001',
+    '{"title":"Authoring editor single exercise","promptMarkdown":"Select the correct scalar answer.","exerciseType":"single_choice","points":5,"isRequired":true,"options":[{"clientRef":"single-a","labelMarkdown":"Incorrect option."},{"clientRef":"single-b","labelMarkdown":"Correct option."}],"answerSpec":{"correctOptionRef":"single-b"},"feedbackCorrectMarkdown":"Correct.","feedbackIncorrectMarkdown":"Try again."}'::jsonb,
+    'c3e30000-0000-0000-0000-000000000001',
+    1,
+    pg_catalog.decode(pg_catalog.repeat('a5', 32), 'hex'),
+    'c3f30000-0000-0000-0000-000000000011'
+  );
+  SELECT * INTO v_admin_first
+  FROM public.assessment_create_draft_exercise(
+    'c3000000-0000-0000-0000-000000000005',
+    'c3250000-0000-0000-0000-000000000001',
+    '{"title":"Authoring admin multiple exercise","promptMarkdown":"Select both correct options.","exerciseType":"multiple_choice","points":10,"isRequired":false,"options":[{"clientRef":"multiple-a","labelMarkdown":"First correct option."},{"clientRef":"multiple-b","labelMarkdown":"Incorrect option."},{"clientRef":"multiple-c","labelMarkdown":"Second correct option."}],"answerSpec":{"correctOptionRefs":["multiple-c","multiple-a"]},"feedbackCorrectMarkdown":"Correct choices.","feedbackIncorrectMarkdown":"Review the options."}'::jsonb,
+    'c3e30000-0000-0000-0000-000000000002',
+    1,
+    pg_catalog.decode(pg_catalog.repeat('b6', 32), 'hex'),
+    'c3f30000-0000-0000-0000-000000000012'
+  );
+
+  BEGIN
+    PERFORM *
+    FROM public.assessment_create_draft_exercise(
+      'c3000000-0000-0000-0000-000000000004',
+      'c3250000-0000-0000-0000-000000000001',
+      '{"title":"Authoring editor single exercise","promptMarkdown":"Select the correct scalar answer.","exerciseType":"single_choice","points":5,"isRequired":true,"options":[{"clientRef":"single-a","labelMarkdown":"Incorrect option."},{"clientRef":"single-b","labelMarkdown":"Correct option."}],"answerSpec":{"correctOptionRef":"single-b"},"feedbackCorrectMarkdown":"Correct.","feedbackIncorrectMarkdown":"Try again."}'::jsonb,
+      'c3e30000-0000-0000-0000-000000000001',
+      1,
+      pg_catalog.decode(pg_catalog.repeat('c7', 32), 'hex'),
+      'c3f30000-0000-0000-0000-000000000013'
+    );
+  EXCEPTION WHEN raise_exception THEN
+    v_different_hash_rejected := true;
+  END;
+
+  BEGIN
+    PERFORM *
+    FROM public.assessment_create_draft_exercise(
+      'c3000000-0000-0000-0000-000000000005',
+      'c3250000-0000-0000-0000-000000000001',
+      '{"title":"Invalid exercise","promptMarkdown":"Draft.","exerciseType":"short_text","points":1,"isRequired":true,"options":[],"answerSpec":{"acceptedAnswers":["yes"],"normalization":"nfkc_ascii_ws_ascii_lower_v1"},"chapterId":"c3250000-0000-0000-0000-000000000001"}'::jsonb,
+      'c3e30000-0000-0000-0000-000000000003',
+      1,
+      pg_catalog.decode(pg_catalog.repeat('d8', 32), 'hex'),
+      'c3f30000-0000-0000-0000-000000000014'
+    );
+  EXCEPTION WHEN raise_exception THEN
+    v_invalid_input_rejected := true;
+  END;
+
+  BEGIN
+    PERFORM *
+    FROM public.assessment_create_draft_exercise(
+      'c3000000-0000-0000-0000-000000000001',
+      'c3250000-0000-0000-0000-000000000001',
+      '{"title":"Learner exercise","promptMarkdown":"Learners cannot author.","exerciseType":"short_text","points":1,"isRequired":true,"options":[],"answerSpec":{"acceptedAnswers":["yes"],"normalization":"nfkc_ascii_ws_ascii_lower_v1"}}'::jsonb,
+      'c3e30000-0000-0000-0000-000000000004',
+      1,
+      pg_catalog.decode(pg_catalog.repeat('e9', 32), 'hex'),
+      'c3f30000-0000-0000-0000-000000000015'
+    );
+  EXCEPTION WHEN raise_exception THEN
+    v_learner_rejected := true;
+  END;
+
+  BEGIN
+    PERFORM *
+    FROM public.assessment_create_draft_exercise(
+      'c3000000-0000-0000-0000-000000000005',
+      'c3250000-0000-0000-0000-000000000001',
+      '{"title":"Missing key exercise","promptMarkdown":"A key is required.","exerciseType":"short_text","points":1,"isRequired":true,"options":[],"answerSpec":{"acceptedAnswers":["yes"],"normalization":"nfkc_ascii_ws_ascii_lower_v1"}}'::jsonb,
+      NULL,
+      1,
+      pg_catalog.decode(pg_catalog.repeat('fa', 32), 'hex'),
+      'c3f30000-0000-0000-0000-000000000016'
+    );
+  EXCEPTION WHEN raise_exception THEN
+    v_missing_key_rejected := true;
+  END;
+
+  BEGIN
+    PERFORM *
+    FROM public.assessment_create_draft_exercise(
+      'c3000000-0000-0000-0000-000000000005',
+      'c3250000-0000-0000-0000-000000000999',
+      '{"title":"Missing parent exercise","promptMarkdown":"A parent is required.","exerciseType":"short_text","points":1,"isRequired":true,"options":[],"answerSpec":{"acceptedAnswers":["yes"],"normalization":"nfkc_ascii_ws_ascii_lower_v1"}}'::jsonb,
+      'c3e30000-0000-0000-0000-000000000005',
+      1,
+      pg_catalog.decode(pg_catalog.repeat('a6', 32), 'hex'),
+      'c3f30000-0000-0000-0000-000000000017'
+    );
+  EXCEPTION WHEN raise_exception THEN
+    v_missing_parent_rejected := true;
+  END;
+
+  BEGIN
+    PERFORM *
+    FROM public.assessment_create_draft_exercise(
+      'c3000000-0000-0000-0000-000000000005',
+      'c3250000-0000-0000-0000-000000000001',
+      '{"title":"Incomplete scalar exercise","promptMarkdown":"Incomplete definitions are rejected.","exerciseType":"short_text","points":1,"isRequired":true,"options":[],"answerSpec":null}'::jsonb,
+      'c3e30000-0000-0000-0000-000000000009',
+      1,
+      pg_catalog.decode(pg_catalog.repeat('b7', 32), 'hex'),
+      'c3f30000-0000-0000-0000-000000000023'
+    );
+  EXCEPTION WHEN raise_exception THEN
+    v_incomplete_rejected := true;
+  END;
+
+  BEGIN
+    PERFORM *
+    FROM public.assessment_create_draft_exercise(
+      'c3000000-0000-0000-0000-000000000005',
+      'c3250000-0000-0000-0000-000000000001',
+      '{"title":"Python exercise","promptMarkdown":"Python belongs to the separate WASM task.","exerciseType":"python_code","points":1,"isRequired":true,"options":[],"answerSpec":null}'::jsonb,
+      'c3e30000-0000-0000-0000-000000000010',
+      1,
+      pg_catalog.decode(pg_catalog.repeat('c8', 32), 'hex'),
+      'c3f30000-0000-0000-0000-000000000024'
+    );
+  EXCEPTION WHEN raise_exception THEN
+    v_python_rejected := true;
+  END;
+
+  BEGIN
+    PERFORM *
+    FROM public.assessment_create_draft_exercise(
+      'c3000000-0000-0000-0000-000000000005',
+      'c3250000-0000-0000-0000-000000000001',
+      '{"title":"Foreign option exercise","promptMarkdown":"Foreign option references are rejected.","exerciseType":"single_choice","points":1,"isRequired":true,"options":[{"clientRef":"foreign-a","labelMarkdown":"First option."},{"clientRef":"foreign-b","labelMarkdown":"Second option."}],"answerSpec":{"correctOptionRef":"missing-option"}}'::jsonb,
+      'c3e30000-0000-0000-0000-000000000012',
+      1,
+      pg_catalog.decode(pg_catalog.repeat('d9', 32), 'hex'),
+      'c3f30000-0000-0000-0000-000000000025'
+    );
+  EXCEPTION WHEN raise_exception THEN
+    v_foreign_option_rejected := true;
+  END;
+
+  IF v_editor_first.response_status <> 201
+    OR v_editor_first.idempotency_replayed
+    OR v_editor_first.response_body ->> 'id' IS NULL
+    OR v_editor_first.response_location IS DISTINCT FROM
+      '/api/v1/admin/exercises/' || (v_editor_first.response_body ->> 'id')
+    OR v_editor_first.response_body IS DISTINCT FROM pg_catalog.jsonb_build_object(
+      'id',
+      v_editor_first.response_body ->> 'id'
+    )
+    OR NOT v_editor_replay.idempotency_replayed
+    OR v_editor_replay.response_status IS DISTINCT FROM v_editor_first.response_status
+    OR v_editor_replay.response_location IS DISTINCT FROM v_editor_first.response_location
+    OR v_editor_replay.response_body IS DISTINCT FROM v_editor_first.response_body
+    OR v_admin_first.response_status <> 201
+    OR v_admin_first.idempotency_replayed
+    OR v_admin_first.response_body ->> 'id' IS NULL
+    OR v_admin_first.response_location IS DISTINCT FROM
+      '/api/v1/admin/exercises/' || (v_admin_first.response_body ->> 'id')
+    OR v_admin_first.response_body IS DISTINCT FROM pg_catalog.jsonb_build_object(
+      'id',
+      v_admin_first.response_body ->> 'id'
+    )
+    OR NOT v_different_hash_rejected
+    OR NOT v_invalid_input_rejected
+    OR NOT v_learner_rejected
+    OR NOT v_missing_key_rejected
+    OR NOT v_missing_parent_rejected
+    OR NOT v_incomplete_rejected
+    OR NOT v_python_rejected
+    OR NOT v_foreign_option_rejected THEN
+    RAISE EXCEPTION 'draft-exercise authoring facade did not preserve its secure scalar creation and replay contract';
+  END IF;
+END;
+$assessment_create_draft_exercise$;
+RESET ROLE;
+
+SET LOCAL ROLE coditza_owner;
+UPDATE public.modules
+SET
+  status = 'published'::public.content_status,
+  published_at = pg_catalog.clock_timestamp()
+WHERE id = 'c3150000-0000-0000-0000-000000000001';
+UPDATE public.chapters
+SET
+  status = 'published'::public.content_status,
+  published_at = pg_catalog.clock_timestamp()
+WHERE id = 'c3250000-0000-0000-0000-000000000001';
+RESET ROLE;
+
+SET LOCAL ROLE service_role;
+DO $published_hierarchy_exercise_creation$
+DECLARE
+  v_created record;
+BEGIN
+  SELECT * INTO v_created
+  FROM public.assessment_create_draft_exercise(
+    'c3000000-0000-0000-0000-000000000005',
+    'c3250000-0000-0000-0000-000000000001',
+    '{"title":"Published hierarchy short exercise","promptMarkdown":"Normalize the accepted short-text answers.","exerciseType":"short_text","points":3,"isRequired":true,"options":[],"answerSpec":{"acceptedAnswers":["  Da\t","NU"],"normalization":"nfkc_ascii_ws_ascii_lower_v1"}}'::jsonb,
+    'c3e30000-0000-0000-0000-000000000007',
+    1,
+    pg_catalog.decode(pg_catalog.repeat('c9', 32), 'hex'),
+    'c3f30000-0000-0000-0000-000000000021'
+  );
+
+  IF v_created.response_status <> 201
+    OR v_created.idempotency_replayed
+    OR v_created.response_body ->> 'id' IS NULL
+    OR v_created.response_location IS DISTINCT FROM
+      '/api/v1/admin/exercises/' || (v_created.response_body ->> 'id')
+    OR v_created.response_body IS DISTINCT FROM pg_catalog.jsonb_build_object(
+      'id',
+      v_created.response_body ->> 'id'
+    ) THEN
+    RAISE EXCEPTION 'a published hierarchy unexpectedly rejected a scalar draft exercise';
+  END IF;
+END;
+$published_hierarchy_exercise_creation$;
+RESET ROLE;
+
+SET LOCAL ROLE coditza_owner;
+UPDATE public.chapters
+SET status = 'archived'::public.content_status
+WHERE id = 'c3250000-0000-0000-0000-000000000001';
+RESET ROLE;
+
+SET LOCAL ROLE service_role;
+DO $archived_exercise_chapter_replay$
+DECLARE
+  v_replay record;
+  v_archived_chapter_rejected boolean := false;
+BEGIN
+  SELECT * INTO v_replay
+  FROM public.assessment_create_draft_exercise(
+    'c3000000-0000-0000-0000-000000000004',
+    'c3250000-0000-0000-0000-000000000001',
+    '{"title":"Authoring editor single exercise","promptMarkdown":"Select the correct scalar answer.","exerciseType":"single_choice","points":5,"isRequired":true,"options":[{"clientRef":"single-a","labelMarkdown":"Incorrect option."},{"clientRef":"single-b","labelMarkdown":"Correct option."}],"answerSpec":{"correctOptionRef":"single-b"},"feedbackCorrectMarkdown":"Correct.","feedbackIncorrectMarkdown":"Try again."}'::jsonb,
+    'c3e30000-0000-0000-0000-000000000001',
+    1,
+    pg_catalog.decode(pg_catalog.repeat('a5', 32), 'hex'),
+    'c3f30000-0000-0000-0000-000000000018'
+  );
+
+  BEGIN
+    PERFORM *
+    FROM public.assessment_create_draft_exercise(
+      'c3000000-0000-0000-0000-000000000005',
+      'c3250000-0000-0000-0000-000000000001',
+      '{"title":"Archived chapter exercise","promptMarkdown":"An archived chapter rejects new exercises.","exerciseType":"short_text","points":1,"isRequired":true,"options":[],"answerSpec":{"acceptedAnswers":["yes"],"normalization":"nfkc_ascii_ws_ascii_lower_v1"}}'::jsonb,
+      'c3e30000-0000-0000-0000-000000000006',
+      1,
+      pg_catalog.decode(pg_catalog.repeat('b5', 32), 'hex'),
+      'c3f30000-0000-0000-0000-000000000019'
+    );
+  EXCEPTION WHEN raise_exception THEN
+    v_archived_chapter_rejected := true;
+  END;
+
+  IF NOT v_replay.idempotency_replayed
+    OR v_replay.response_status <> 201
+    OR v_replay.response_body ->> 'id' IS NULL
+    OR NOT v_archived_chapter_rejected THEN
+    RAISE EXCEPTION 'exercise replay did not remain stable across a later chapter archive';
+  END IF;
+END;
+$archived_exercise_chapter_replay$;
+RESET ROLE;
+
+SET LOCAL ROLE coditza_owner;
+UPDATE public.modules
+SET status = 'archived'::public.content_status
+WHERE id = 'c3150000-0000-0000-0000-000000000001';
+UPDATE public.modules
+SET status = 'archived'::public.content_status
+WHERE id = 'c3160000-0000-0000-0000-000000000001';
+RESET ROLE;
+
+SET LOCAL ROLE service_role;
+DO $archived_exercise_module_replay$
+DECLARE
+  v_replay record;
+  v_archived_module_rejected boolean := false;
+BEGIN
+  SELECT * INTO v_replay
+  FROM public.assessment_create_draft_exercise(
+    'c3000000-0000-0000-0000-000000000004',
+    'c3250000-0000-0000-0000-000000000001',
+    '{"title":"Authoring editor single exercise","promptMarkdown":"Select the correct scalar answer.","exerciseType":"single_choice","points":5,"isRequired":true,"options":[{"clientRef":"single-a","labelMarkdown":"Incorrect option."},{"clientRef":"single-b","labelMarkdown":"Correct option."}],"answerSpec":{"correctOptionRef":"single-b"},"feedbackCorrectMarkdown":"Correct.","feedbackIncorrectMarkdown":"Try again."}'::jsonb,
+    'c3e30000-0000-0000-0000-000000000001',
+    1,
+    pg_catalog.decode(pg_catalog.repeat('a5', 32), 'hex'),
+    'c3f30000-0000-0000-0000-000000000026'
+  );
+
+  BEGIN
+    PERFORM *
+    FROM public.assessment_create_draft_exercise(
+      'c3000000-0000-0000-0000-000000000005',
+      'c3260000-0000-0000-0000-000000000001',
+      '{"title":"Archived module exercise","promptMarkdown":"An archived module rejects new exercises.","exerciseType":"short_text","points":1,"isRequired":true,"options":[],"answerSpec":{"acceptedAnswers":["yes"],"normalization":"nfkc_ascii_ws_ascii_lower_v1"}}'::jsonb,
+      'c3e30000-0000-0000-0000-000000000008',
+      1,
+      pg_catalog.decode(pg_catalog.repeat('c6', 32), 'hex'),
+      'c3f30000-0000-0000-0000-000000000022'
+    );
+  EXCEPTION WHEN raise_exception THEN
+    v_archived_module_rejected := true;
+  END;
+
+  IF NOT v_replay.idempotency_replayed
+    OR v_replay.response_status <> 201
+    OR v_replay.response_body ->> 'id' IS NULL
+    OR NOT v_archived_module_rejected THEN
+    RAISE EXCEPTION 'exercise replay did not remain stable across a later module archive';
+  END IF;
+END;
+$archived_exercise_module_replay$;
+RESET ROLE;
+
+SET LOCAL ROLE coditza_owner;
+UPDATE public.profiles
+SET security_hold_at = pg_catalog.clock_timestamp()
+WHERE id = 'c3000000-0000-0000-0000-000000000004';
+RESET ROLE;
+
+SET LOCAL ROLE service_role;
+DO $held_staff_exercise_replay_denial$
+DECLARE
+  v_rejected boolean := false;
+BEGIN
+  BEGIN
+    PERFORM *
+    FROM public.assessment_create_draft_exercise(
+      'c3000000-0000-0000-0000-000000000004',
+      'c3250000-0000-0000-0000-000000000001',
+      '{"title":"Authoring editor single exercise","promptMarkdown":"Select the correct scalar answer.","exerciseType":"single_choice","points":5,"isRequired":true,"options":[{"clientRef":"single-a","labelMarkdown":"Incorrect option."},{"clientRef":"single-b","labelMarkdown":"Correct option."}],"answerSpec":{"correctOptionRef":"single-b"},"feedbackCorrectMarkdown":"Correct.","feedbackIncorrectMarkdown":"Try again."}'::jsonb,
+      'c3e30000-0000-0000-0000-000000000001',
+      1,
+      pg_catalog.decode(pg_catalog.repeat('a5', 32), 'hex'),
+      'c3f30000-0000-0000-0000-000000000020'
+    );
+  EXCEPTION WHEN raise_exception THEN
+    v_rejected := true;
+  END;
+
+  IF NOT v_rejected THEN
+    RAISE EXCEPTION 'held staff actor unexpectedly received an exercise-create replay';
+  END IF;
+END;
+$held_staff_exercise_replay_denial$;
+RESET ROLE;
+
+SET LOCAL ROLE coditza_owner;
+UPDATE public.profiles
+SET security_hold_at = NULL
+WHERE id = 'c3000000-0000-0000-0000-000000000004';
+
+SELECT extensions.ok(
+  EXISTS (
+    SELECT 1
+    FROM public.exercises AS exercise
+    WHERE exercise.id = 'c3420000-0000-0000-0000-000000000001'
+      AND exercise.status = 'archived'::public.content_status
+      AND exercise.position = 0
+  )
+  AND (
+    SELECT pg_catalog.count(*) = 3
+      AND pg_catalog.bool_and(
+        exercise.chapter_id = 'c3250000-0000-0000-0000-000000000001'
+        AND exercise.status = 'draft'::public.content_status
+        AND exercise.published_at IS NULL
+        AND exercise.row_version = 1
+        AND exercise.definition_version = 1
+      )
+    FROM public.exercises AS exercise
+    WHERE exercise.title IN (
+      'Authoring editor single exercise',
+      'Authoring admin multiple exercise',
+      'Published hierarchy short exercise'
+    )
+  )
+  AND EXISTS (
+    SELECT 1
+    FROM public.exercises AS exercise
+    JOIN private.exercise_answer_keys AS answer_key
+      ON answer_key.exercise_id = exercise.id
+    WHERE exercise.title = 'Authoring editor single exercise'
+      AND exercise.position = 1
+      AND exercise.exercise_type = 'single_choice'::public.exercise_type
+      AND exercise.points = 5
+      AND exercise.is_required
+      AND exercise.created_by = 'c3000000-0000-0000-0000-000000000004'
+      AND exercise.updated_by = 'c3000000-0000-0000-0000-000000000004'
+      AND answer_key.answer_spec = pg_catalog.jsonb_build_object(
+        'correctOptionId',
+        (
+          SELECT option_entry.id::text
+          FROM public.exercise_options AS option_entry
+          WHERE option_entry.exercise_id = exercise.id
+            AND option_entry.position = 1
+        )
+      )
+      AND NOT (answer_key.answer_spec OPERATOR(pg_catalog.?) 'correctOptionRef')
+      AND answer_key.feedback_correct_markdown = 'Correct.'
+      AND answer_key.feedback_incorrect_markdown = 'Try again.'
+      AND answer_key.created_by = 'c3000000-0000-0000-0000-000000000004'
+      AND answer_key.updated_by = 'c3000000-0000-0000-0000-000000000004'
+      AND (
+        SELECT pg_catalog.count(*) = 2
+          AND pg_catalog.array_agg(option_entry.position ORDER BY option_entry.position)
+            = ARRAY[0, 1]::integer[]
+        FROM public.exercise_options AS option_entry
+        WHERE option_entry.exercise_id = exercise.id
+      )
+  )
+  AND EXISTS (
+    SELECT 1
+    FROM public.exercises AS exercise
+    JOIN private.exercise_answer_keys AS answer_key
+      ON answer_key.exercise_id = exercise.id
+    WHERE exercise.title = 'Authoring admin multiple exercise'
+      AND exercise.position = 2
+      AND exercise.exercise_type = 'multiple_choice'::public.exercise_type
+      AND exercise.points = 10
+      AND NOT exercise.is_required
+      AND exercise.created_by = 'c3000000-0000-0000-0000-000000000005'
+      AND exercise.updated_by = 'c3000000-0000-0000-0000-000000000005'
+      AND answer_key.answer_spec = pg_catalog.jsonb_build_object(
+        'correctOptionIds',
+        (
+          SELECT pg_catalog.jsonb_agg(
+            pg_catalog.to_jsonb(option_entry.id::text)
+            ORDER BY option_entry.id::text COLLATE "C"
+          )
+          FROM public.exercise_options AS option_entry
+          WHERE option_entry.exercise_id = exercise.id
+            AND option_entry.position IN (0, 2)
+        )
+      )
+      AND NOT (answer_key.answer_spec OPERATOR(pg_catalog.?) 'correctOptionRefs')
+      AND answer_key.feedback_correct_markdown = 'Correct choices.'
+      AND answer_key.feedback_incorrect_markdown = 'Review the options.'
+      AND answer_key.created_by = 'c3000000-0000-0000-0000-000000000005'
+      AND answer_key.updated_by = 'c3000000-0000-0000-0000-000000000005'
+      AND (
+        SELECT pg_catalog.count(*) = 3
+          AND pg_catalog.array_agg(option_entry.position ORDER BY option_entry.position)
+            = ARRAY[0, 1, 2]::integer[]
+        FROM public.exercise_options AS option_entry
+        WHERE option_entry.exercise_id = exercise.id
+      )
+  )
+  AND EXISTS (
+    SELECT 1
+    FROM public.exercises AS exercise
+    JOIN private.exercise_answer_keys AS answer_key
+      ON answer_key.exercise_id = exercise.id
+    WHERE exercise.title = 'Published hierarchy short exercise'
+      AND exercise.position = 3
+      AND exercise.exercise_type = 'short_text'::public.exercise_type
+      AND exercise.points = 3
+      AND exercise.is_required
+      AND exercise.created_by = 'c3000000-0000-0000-0000-000000000005'
+      AND exercise.updated_by = 'c3000000-0000-0000-0000-000000000005'
+      AND answer_key.answer_spec =
+        '{"acceptedAnswers":["da","nu"],"normalization":"nfkc_ascii_ws_ascii_lower_v1"}'::jsonb
+      AND answer_key.feedback_correct_markdown IS NULL
+      AND answer_key.feedback_incorrect_markdown IS NULL
+      AND answer_key.created_by = 'c3000000-0000-0000-0000-000000000005'
+      AND answer_key.updated_by = 'c3000000-0000-0000-0000-000000000005'
+      AND NOT EXISTS (
+        SELECT 1
+        FROM public.exercise_options AS option_entry
+        WHERE option_entry.exercise_id = exercise.id
+      )
+  )
+  AND EXISTS (
+    SELECT 1
+    FROM public.modules AS module_entry
+    WHERE module_entry.id = 'c3150000-0000-0000-0000-000000000001'
+      AND module_entry.status = 'archived'::public.content_status
+      AND module_entry.published_at IS NOT NULL
+  )
+  AND EXISTS (
+    SELECT 1
+    FROM public.chapters AS chapter_entry
+    WHERE chapter_entry.id = 'c3250000-0000-0000-0000-000000000001'
+      AND chapter_entry.status = 'archived'::public.content_status
+      AND chapter_entry.published_at IS NOT NULL
+  )
+  AND EXISTS (
+    SELECT 1
+    FROM public.modules AS module_entry
+    WHERE module_entry.id = 'c3160000-0000-0000-0000-000000000001'
+      AND module_entry.status = 'archived'::public.content_status
+  )
+  AND (
+    SELECT pg_catalog.count(*) = 3
+      AND pg_catalog.bool_and(
+        record_entry.response_status = 201
+        AND record_entry.response_location =
+          '/api/v1/admin/exercises/' || record_entry.result_resource_id::text
+        AND record_entry.response_body = pg_catalog.jsonb_build_object(
+          'id',
+          record_entry.result_resource_id::text
+        )
+      )
+    FROM private.idempotency_records AS record_entry
+    WHERE record_entry.operation = 'admin_create_exercise'
+      AND record_entry.idempotency_key IN (
+        'c3e30000-0000-0000-0000-000000000001',
+        'c3e30000-0000-0000-0000-000000000002',
+        'c3e30000-0000-0000-0000-000000000007'
+      )
+  )
+  AND NOT EXISTS (
+    SELECT 1
+    FROM private.idempotency_records AS record_entry
+    WHERE record_entry.operation = 'admin_create_exercise'
+      AND record_entry.idempotency_key IN (
+        'c3e30000-0000-0000-0000-000000000003',
+        'c3e30000-0000-0000-0000-000000000004',
+        'c3e30000-0000-0000-0000-000000000005',
+        'c3e30000-0000-0000-0000-000000000006',
+        'c3e30000-0000-0000-0000-000000000008',
+        'c3e30000-0000-0000-0000-000000000009',
+        'c3e30000-0000-0000-0000-000000000010',
+        'c3e30000-0000-0000-0000-000000000012'
+      )
+  )
+  AND NOT EXISTS (
+    SELECT 1
+    FROM public.exercises AS exercise
+    WHERE exercise.title IN (
+      'Incomplete scalar exercise',
+      'Python exercise',
+      'Foreign option exercise',
+      'Archived chapter exercise',
+      'Archived module exercise'
+    )
+  )
+  AND (
+    SELECT pg_catalog.count(*) = 3
+      AND pg_catalog.bool_and(
+        audit_entry.changed_fields = ARRAY['status']::text[]
+        AND audit_entry.change_summary =
+          '{"status":{"before":"none","after":"draft"}}'::jsonb
+        AND audit_entry.reason IS NULL
+      )
+    FROM private.audit_events AS audit_entry
+    WHERE audit_entry.action = 'exercise_created'
+      AND audit_entry.entity_type = 'exercise'
+      AND audit_entry.entity_id IN (
+        SELECT exercise.id
+        FROM public.exercises AS exercise
+        WHERE exercise.title IN (
+          'Authoring editor single exercise',
+          'Authoring admin multiple exercise',
+          'Published hierarchy short exercise'
+        )
+      )
+  )
+  AND NOT EXISTS (
+    SELECT 1
+    FROM private.audit_events AS audit_entry
+    WHERE audit_entry.request_id IN (
+      'c3f30000-0000-0000-0000-000000000011',
+      'c3f30000-0000-0000-0000-000000000018',
+      'c3f30000-0000-0000-0000-000000000026',
+      'c3f30000-0000-0000-0000-000000000020'
+    )
+  )
+  AND COALESCE(
+    pg_catalog.current_setting('coditza.assessment_tree_root', true),
+    ''
+  ) = '',
+  'scalar exercise creation locks the module and chapter scope, materializes private definitions, preserves safe replay, and denies archived or held writes'
 );
 
 INSERT INTO public.modules (

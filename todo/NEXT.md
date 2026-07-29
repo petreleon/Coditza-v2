@@ -14,26 +14,25 @@ This task builds the named server-only transaction facades over those existing
 tables. Its completed slices are the structured idempotency/assessment learner
 mutation cluster, learner progress cluster, own assessment-history cluster,
 staff-authorization primitive cluster, root draft-module creation cluster,
-draft-chapter creation cluster, and draft-theory-section creation cluster
-documented in [slice 01](../docs/implementation/SUP-FUNCTIONS-001-slice-01.md),
+draft-chapter creation cluster, draft-theory-section creation cluster, and
+scalar draft-exercise creation cluster documented in
+[slice 01](../docs/implementation/SUP-FUNCTIONS-001-slice-01.md),
 [slice 02](../docs/implementation/SUP-FUNCTIONS-001-slice-02.md), and
 [slice 03](../docs/implementation/SUP-FUNCTIONS-001-slice-03.md), and
 [slice 04](../docs/implementation/SUP-FUNCTIONS-001-slice-04.md),
 [slice 05](../docs/implementation/SUP-FUNCTIONS-001-slice-05.md),
-[slice 06](../docs/implementation/SUP-FUNCTIONS-001-slice-06.md), and
-[slice 07](../docs/implementation/SUP-FUNCTIONS-001-slice-07.md). Continue
+[slice 06](../docs/implementation/SUP-FUNCTIONS-001-slice-06.md),
+[slice 07](../docs/implementation/SUP-FUNCTIONS-001-slice-07.md), and
+[slice 08](../docs/implementation/SUP-FUNCTIONS-001-slice-08.md). Continue
 from those bounded baselines with the assessment-owned
-`assessment_create_draft_exercise` facade, limited to scalar exercise types.
-It must assert active staff before replay or hierarchy access, validate an exact
-server-owned create body, preserve idempotency/safe replay/sanitized audit, and
-use canonical `module -> chapter` locking before selecting the exercise sibling
-position across every status. It must create the exercise plus its complete
-scalar options/answer-key definition atomically while leaving initial
-`row_version` and `definition_version` at one; do not blindly call a draft
-replacement helper that increments versions. `python_code` is exclusively owned
-by SUP-WASM-001 and must be rejected without creating partial state. This is not
-permission to add HTTP routes, direct client policies, hosted configuration,
-Python/WASM jobs, or identity/bootstrap workflows.
+`assessment_create_draft_quiz` facade. First record its exact flat,
+server-owned input and complete draft-tree contract; do not reuse a generic
+type-switched create RPC. It must assert active staff before replay or hierarchy
+access, preserve idempotency/safe replay/sanitized audit, use canonical
+`module -> chapter` locking before selecting the quiz sibling position across
+every status, and keep any initial root/version semantics explicit. It may not
+expose question keys, add HTTP routes/direct client policies, start Python/WASM
+work, or change identity/hosted configuration.
 
 ## Read first
 
