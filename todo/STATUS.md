@@ -10,11 +10,11 @@
   Its assessment learner-mutation, learner-progress, learner-history,
   staff-authorization primitive, curriculum draft-module, draft-chapter, and
   draft-theory-section, scalar draft-exercise, complete draft-quiz, scalar
-  draft-exercise PATCH, and draft-quiz root PATCH slices are implemented and
-  verified; remaining owner families and real concurrency proof are still
-  required.
-- Last verified implementation slice: SUP-FUNCTIONS-001 draft-quiz root PATCH
-  facade with protected local verification
+  draft-exercise PATCH, draft-quiz root PATCH, and complete draft-quiz
+  definition-replacement slices are implemented and verified; remaining owner
+  families and real concurrency proof are still required.
+- Last verified implementation slice: SUP-FUNCTIONS-001 draft-quiz definition
+  replacement facade with protected local verification
 - Last updated: 2026-07-29
 
 ## Phase status
@@ -209,6 +209,11 @@ to the deadlines in that file.
   expected-version locking, safe audit/result behavior, preserved question/key
   trees, retained-attempt denial, no invented idempotency scheme, and protected
   local/Docker proof.
+- [SUP-FUNCTIONS-001 draft-quiz definition replacement slice report](../docs/implementation/SUP-FUNCTIONS-001-slice-12.md);
+  a service-role-only facade now atomically replaces an entire draft
+  question/option/key tree with expected-version locking, preserves intentional
+  incomplete-draft semantics, returns only safe client-reference mappings,
+  denies retained history, and passes protected local/Docker proof.
 - [G1 completion record](08-execution/00-roadmap.md#g1-completion-record);
   Foundation reproducibility is recorded from the accepted architecture/product
   contracts, current checks, Docker evidence, and scope review.

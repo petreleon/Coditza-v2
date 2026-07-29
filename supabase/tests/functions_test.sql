@@ -4,7 +4,7 @@ BEGIN;
 -- and the only runtime role used for successful calls is service_role.
 GRANT USAGE ON SCHEMA extensions TO coditza_owner;
 
-SELECT extensions.plan(34);
+SELECT extensions.plan(36);
 
 SET LOCAL ROLE coditza_owner;
 DO $normalization_golden_vectors$
@@ -436,6 +436,61 @@ SELECT extensions.ok(
   'draft-quiz PATCH facade is owner-controlled, fixed-path, server-only, and has no replay overload'
 );
 
+SELECT extensions.ok(
+  (
+    SELECT procedure_entry.proowner = 'coditza_owner'::pg_catalog.regrole
+      AND procedure_entry.prosecdef
+      AND procedure_entry.proconfig = ARRAY['search_path=""']::text[]
+    FROM pg_catalog.pg_proc AS procedure_entry
+    WHERE procedure_entry.oid =
+      'public.assessment_replace_draft_quiz_definition(uuid,uuid,integer,jsonb,uuid)'::pg_catalog.regprocedure
+  )
+  AND (
+    SELECT pg_catalog.count(*) = 1
+    FROM pg_catalog.pg_proc AS procedure_entry
+    JOIN pg_catalog.pg_namespace AS procedure_namespace
+      ON procedure_namespace.oid = procedure_entry.pronamespace
+    WHERE procedure_namespace.nspname = 'public'
+      AND procedure_entry.proname = 'assessment_replace_draft_quiz_definition'
+  )
+  AND NOT EXISTS (
+    SELECT 1
+    FROM (
+      VALUES ('anon'), ('authenticated'), ('authenticator')
+    ) AS runtime_role(rolname)
+    WHERE pg_catalog.has_function_privilege(
+      runtime_role.rolname,
+      'public.assessment_replace_draft_quiz_definition(uuid,uuid,integer,jsonb,uuid)'::pg_catalog.regprocedure,
+      'EXECUTE'
+    )
+  )
+  AND pg_catalog.has_function_privilege(
+    'service_role',
+    'public.assessment_replace_draft_quiz_definition(uuid,uuid,integer,jsonb,uuid)'::pg_catalog.regprocedure,
+    'EXECUTE'
+  )
+  AND (
+    SELECT procedure_entry.proowner = 'coditza_owner'::pg_catalog.regrole
+      AND NOT procedure_entry.prosecdef
+      AND procedure_entry.proconfig = ARRAY['search_path=""']::text[]
+    FROM pg_catalog.pg_proc AS procedure_entry
+    WHERE procedure_entry.oid =
+      'private.apply_draft_quiz_definition_replacement(uuid,integer,jsonb,uuid)'::pg_catalog.regprocedure
+  )
+  AND NOT EXISTS (
+    SELECT 1
+    FROM (
+      VALUES ('anon'), ('authenticated'), ('service_role'), ('authenticator')
+    ) AS runtime_role(rolname)
+    WHERE pg_catalog.has_function_privilege(
+      runtime_role.rolname,
+      'private.apply_draft_quiz_definition_replacement(uuid,integer,jsonb,uuid)'::pg_catalog.regprocedure,
+      'EXECUTE'
+    )
+  ),
+  'draft-quiz definition replacement facade is server-only while its actor-aware tree helper remains private'
+);
+
 SET LOCAL ROLE authenticated;
 DO $authenticated_facade_denial$
 DECLARE
@@ -617,6 +672,23 @@ BEGIN
   IF NOT v_rejected THEN
     RAISE EXCEPTION 'authenticated role unexpectedly executed a draft quiz PATCH facade';
   END IF;
+
+  v_rejected := false;
+  BEGIN
+    PERFORM *
+    FROM public.assessment_replace_draft_quiz_definition(
+      'c3000000-0000-0000-0000-000000000005',
+      'c3540000-0000-0000-0000-000000000001',
+      1,
+      '{"questions":[]}'::jsonb,
+      'c3f70000-0000-0000-0000-000000000001'
+    );
+  EXCEPTION WHEN insufficient_privilege THEN
+    v_rejected := true;
+  END;
+  IF NOT v_rejected THEN
+    RAISE EXCEPTION 'authenticated role unexpectedly executed a draft quiz definition replacement facade';
+  END IF;
 END;
 $authenticated_facade_denial$;
 RESET ROLE;
@@ -696,6 +768,21 @@ BEGIN
   END;
   IF NOT v_rejected THEN
     RAISE EXCEPTION 'service role unexpectedly executed a private draft exercise patch helper';
+  END IF;
+
+  v_rejected := false;
+  BEGIN
+    PERFORM private.apply_draft_quiz_definition_replacement(
+      'c3540000-0000-0000-0000-000000000001',
+      1,
+      '{"questions":[]}'::jsonb,
+      'c3000000-0000-0000-0000-000000000005'
+    );
+  EXCEPTION WHEN insufficient_privilege THEN
+    v_rejected := true;
+  END;
+  IF NOT v_rejected THEN
+    RAISE EXCEPTION 'service role unexpectedly executed a private draft quiz definition helper';
   END IF;
 END;
 $private_runtime_denial$;
@@ -6072,6 +6159,747 @@ SELECT extensions.ok(
     ''
   ) = '',
   'draft-quiz PATCH keeps root fields atomic, versioned once, history-safe, audited safely, and outside idempotency'
+);
+RESET ROLE;
+
+-- The definition-replacement fixture is intentionally independent of the
+-- preceding root-PATCH fixture, whose parent is archived and whose retained
+-- attempt must continue to deny later definition writes.
+SET LOCAL ROLE coditza_owner;
+INSERT INTO public.modules (
+  id,
+  slug,
+  title,
+  description_markdown,
+  position,
+  created_by,
+  updated_by
+)
+VALUES (
+  'c31b0000-0000-0000-0000-000000000001',
+  'draft-quiz-definition-module',
+  'Draft quiz definition module',
+  'Parent module for the isolated quiz definition replacement proof.',
+  903,
+  'c3000000-0000-0000-0000-000000000004',
+  'c3000000-0000-0000-0000-000000000004'
+);
+INSERT INTO public.chapters (
+  id,
+  module_id,
+  slug,
+  title,
+  summary_markdown,
+  position,
+  estimated_minutes,
+  created_by,
+  updated_by
+)
+VALUES (
+  'c32b0000-0000-0000-0000-000000000001',
+  'c31b0000-0000-0000-0000-000000000001',
+  'draft-quiz-definition-chapter',
+  'Draft quiz definition chapter',
+  'Parent chapter for the isolated quiz definition replacement proof.',
+  0,
+  20,
+  'c3000000-0000-0000-0000-000000000004',
+  'c3000000-0000-0000-0000-000000000004'
+);
+INSERT INTO public.quizzes (
+  id,
+  chapter_id,
+  slug,
+  title,
+  instructions_markdown,
+  position,
+  passing_percent,
+  max_attempts,
+  time_limit_seconds,
+  is_required,
+  created_by,
+  updated_by
+)
+VALUES (
+  'c3540000-0000-0000-0000-000000000001',
+  'c32b0000-0000-0000-0000-000000000001',
+  'draft-quiz-definition',
+  'Original definition quiz',
+  'Original definition replacement instructions.',
+  0,
+  70,
+  3,
+  600,
+  true,
+  'c3000000-0000-0000-0000-000000000004',
+  'c3000000-0000-0000-0000-000000000004'
+);
+SELECT pg_catalog.set_config(
+  'coditza.assessment_tree_root',
+  'quiz:c3540000-0000-0000-0000-000000000001',
+  true
+);
+INSERT INTO public.quiz_questions (
+  id,
+  quiz_id,
+  prompt_markdown,
+  question_type,
+  position,
+  points
+)
+VALUES (
+  'c3640000-0000-0000-0000-000000000001',
+  'c3540000-0000-0000-0000-000000000001',
+  'Original single-choice question.',
+  'single_choice',
+  0,
+  4
+);
+INSERT INTO public.quiz_question_options (
+  id,
+  question_id,
+  label_markdown,
+  position
+)
+VALUES
+  (
+    'c3650000-0000-0000-0000-000000000001',
+    'c3640000-0000-0000-0000-000000000001',
+    'Original incorrect option.',
+    0
+  ),
+  (
+    'c3650000-0000-0000-0000-000000000002',
+    'c3640000-0000-0000-0000-000000000001',
+    'Original correct option.',
+    1
+  );
+INSERT INTO private.quiz_question_answer_keys (
+  question_id,
+  answer_spec,
+  feedback_correct_markdown,
+  feedback_incorrect_markdown,
+  created_by,
+  updated_by
+)
+VALUES (
+  'c3640000-0000-0000-0000-000000000001',
+  '{"correctOptionId":"c3650000-0000-0000-0000-000000000002"}'::jsonb,
+  'Original definition correct feedback.',
+  'Original definition incorrect feedback.',
+  'c3000000-0000-0000-0000-000000000004',
+  'c3000000-0000-0000-0000-000000000004'
+);
+SELECT pg_catalog.set_config('coditza.assessment_tree_root', '', true);
+RESET ROLE;
+
+SET LOCAL ROLE service_role;
+DO $assessment_replace_draft_quiz_definition$
+DECLARE
+  v_empty_tree record;
+  v_full_tree record;
+  v_complete_definition jsonb := '{
+    "questions":[
+      {
+        "clientRef":"replace-single",
+        "promptMarkdown":"Choose the correct single answer.",
+        "questionType":"single_choice",
+        "points":5,
+        "options":[
+          {"clientRef":"single-wrong","labelMarkdown":"Wrong single option."},
+          {"clientRef":"single-right","labelMarkdown":"Correct single option."}
+        ],
+        "answerSpec":{"correctOptionRef":"single-right"},
+        "feedbackCorrectMarkdown":"Single correct feedback.",
+        "feedbackIncorrectMarkdown":"Single incorrect feedback."
+      },
+      {
+        "clientRef":"replace-multiple",
+        "promptMarkdown":"Choose both correct multiple answers.",
+        "questionType":"multiple_choice",
+        "points":6,
+        "options":[
+          {"clientRef":"multiple-a","labelMarkdown":"Multiple A."},
+          {"clientRef":"multiple-b","labelMarkdown":"Multiple B."},
+          {"clientRef":"multiple-c","labelMarkdown":"Multiple C."}
+        ],
+        "answerSpec":{"correctOptionRefs":["multiple-c","multiple-a"]},
+        "feedbackCorrectMarkdown":"Multiple correct feedback.",
+        "feedbackIncorrectMarkdown":"Multiple incorrect feedback."
+      },
+      {
+        "clientRef":"replace-short",
+        "promptMarkdown":"Type the normalized short answer.",
+        "questionType":"short_text",
+        "points":4,
+        "options":[],
+        "answerSpec":{"acceptedAnswers":["  Da\t","NU"],"normalization":"nfkc_ascii_ws_ascii_lower_v1"},
+        "feedbackCorrectMarkdown":"Short correct feedback.",
+        "feedbackIncorrectMarkdown":"Short incorrect feedback."
+      },
+      {
+        "clientRef":"replace-incomplete",
+        "promptMarkdown":"This draft question intentionally has no answer key yet.",
+        "questionType":"short_text",
+        "points":3,
+        "options":[],
+        "answerSpec":null
+      }
+    ]
+  }'::jsonb;
+  v_empty_object_rejected boolean := false;
+  v_unknown_root_rejected boolean := false;
+  v_cross_question_ref_rejected boolean := false;
+  v_learner_rejected boolean := false;
+  v_null_actor_rejected boolean := false;
+  v_missing_rejected boolean := false;
+  v_null_version_rejected boolean := false;
+  v_nonpositive_version_rejected boolean := false;
+  v_null_request_rejected boolean := false;
+  v_stale_rejected boolean := false;
+  v_response_key_count integer;
+  v_single_question_id uuid;
+  v_multiple_question_id uuid;
+  v_short_question_id uuid;
+  v_incomplete_question_id uuid;
+  v_single_right_option_id uuid;
+  v_multiple_a_option_id uuid;
+  v_multiple_c_option_id uuid;
+BEGIN
+  BEGIN
+    PERFORM *
+    FROM public.assessment_replace_draft_quiz_definition(
+      'c3000000-0000-0000-0000-000000000005',
+      'c3540000-0000-0000-0000-000000000001',
+      1,
+      '{}'::jsonb,
+      'c3f70000-0000-0000-0000-000000000001'
+    );
+  EXCEPTION WHEN raise_exception THEN
+    v_empty_object_rejected := true;
+  END;
+
+  BEGIN
+    PERFORM *
+    FROM public.assessment_replace_draft_quiz_definition(
+      'c3000000-0000-0000-0000-000000000005',
+      'c3540000-0000-0000-0000-000000000001',
+      1,
+      '{"questions":[],"title":"forbidden"}'::jsonb,
+      'c3f70000-0000-0000-0000-000000000002'
+    );
+  EXCEPTION WHEN raise_exception THEN
+    v_unknown_root_rejected := true;
+  END;
+
+  BEGIN
+    PERFORM *
+    FROM public.assessment_replace_draft_quiz_definition(
+      'c3000000-0000-0000-0000-000000000005',
+      'c3540000-0000-0000-0000-000000000001',
+      1,
+      '{"questions":[{"clientRef":"left","promptMarkdown":"Left question.","questionType":"single_choice","points":1,"options":[{"clientRef":"left-a","labelMarkdown":"Left A."},{"clientRef":"left-b","labelMarkdown":"Left B."}],"answerSpec":{"correctOptionRef":"right-a"}},{"clientRef":"right","promptMarkdown":"Right question.","questionType":"single_choice","points":1,"options":[{"clientRef":"right-a","labelMarkdown":"Right A."},{"clientRef":"right-b","labelMarkdown":"Right B."}],"answerSpec":{"correctOptionRef":"right-a"}}]}'::jsonb,
+      'c3f70000-0000-0000-0000-000000000003'
+    );
+  EXCEPTION WHEN raise_exception THEN
+    v_cross_question_ref_rejected := true;
+  END;
+
+  BEGIN
+    PERFORM *
+    FROM public.assessment_replace_draft_quiz_definition(
+      'c3000000-0000-0000-0000-000000000001',
+      'c3540000-0000-0000-0000-000000000001',
+      1,
+      '{"questions":[]}'::jsonb,
+      'c3f70000-0000-0000-0000-000000000004'
+    );
+  EXCEPTION WHEN raise_exception THEN
+    v_learner_rejected := true;
+  END;
+
+  BEGIN
+    PERFORM *
+    FROM public.assessment_replace_draft_quiz_definition(
+      NULL::uuid,
+      'c3540000-0000-0000-0000-000000000001',
+      1,
+      '{"questions":[]}'::jsonb,
+      'c3f70000-0000-0000-0000-000000000005'
+    );
+  EXCEPTION WHEN raise_exception THEN
+    v_null_actor_rejected := true;
+  END;
+
+  BEGIN
+    PERFORM *
+    FROM public.assessment_replace_draft_quiz_definition(
+      'c3000000-0000-0000-0000-000000000005',
+      'c3540000-0000-0000-0000-000000000999',
+      1,
+      '{"questions":[]}'::jsonb,
+      'c3f70000-0000-0000-0000-000000000006'
+    );
+  EXCEPTION WHEN raise_exception THEN
+    v_missing_rejected := true;
+  END;
+
+  BEGIN
+    PERFORM *
+    FROM public.assessment_replace_draft_quiz_definition(
+      'c3000000-0000-0000-0000-000000000005',
+      'c3540000-0000-0000-0000-000000000001',
+      NULL::integer,
+      '{"questions":[]}'::jsonb,
+      'c3f70000-0000-0000-0000-000000000007'
+    );
+  EXCEPTION WHEN raise_exception THEN
+    v_null_version_rejected := true;
+  END;
+
+  BEGIN
+    PERFORM *
+    FROM public.assessment_replace_draft_quiz_definition(
+      'c3000000-0000-0000-0000-000000000005',
+      'c3540000-0000-0000-0000-000000000001',
+      0,
+      '{"questions":[]}'::jsonb,
+      'c3f70000-0000-0000-0000-000000000008'
+    );
+  EXCEPTION WHEN raise_exception THEN
+    v_nonpositive_version_rejected := true;
+  END;
+
+  BEGIN
+    PERFORM *
+    FROM public.assessment_replace_draft_quiz_definition(
+      'c3000000-0000-0000-0000-000000000005',
+      'c3540000-0000-0000-0000-000000000001',
+      1,
+      '{"questions":[]}'::jsonb,
+      NULL::uuid
+    );
+  EXCEPTION WHEN raise_exception THEN
+    v_null_request_rejected := true;
+  END;
+
+  SELECT * INTO v_empty_tree
+  FROM public.assessment_replace_draft_quiz_definition(
+    'c3000000-0000-0000-0000-000000000005',
+    'c3540000-0000-0000-0000-000000000001',
+    1,
+    '{"questions":[]}'::jsonb,
+    'c3f70000-0000-0000-0000-000000000010'
+  );
+
+  SELECT * INTO v_full_tree
+  FROM public.assessment_replace_draft_quiz_definition(
+    'c3000000-0000-0000-0000-000000000005',
+    'c3540000-0000-0000-0000-000000000001',
+    2,
+    v_complete_definition,
+    'c3f70000-0000-0000-0000-000000000011'
+  );
+
+  SELECT pg_catalog.count(*)
+  INTO v_response_key_count
+  FROM pg_catalog.jsonb_object_keys(v_full_tree.response_body);
+  SELECT (array_entry.value ->> 'id')::uuid
+  INTO v_single_question_id
+  FROM pg_catalog.jsonb_array_elements(
+    v_full_tree.response_body -> 'questionIdMappings'
+  ) AS array_entry(value)
+  WHERE array_entry.value ->> 'clientRef' = 'replace-single';
+  SELECT (array_entry.value ->> 'id')::uuid
+  INTO v_multiple_question_id
+  FROM pg_catalog.jsonb_array_elements(
+    v_full_tree.response_body -> 'questionIdMappings'
+  ) AS array_entry(value)
+  WHERE array_entry.value ->> 'clientRef' = 'replace-multiple';
+  SELECT (array_entry.value ->> 'id')::uuid
+  INTO v_short_question_id
+  FROM pg_catalog.jsonb_array_elements(
+    v_full_tree.response_body -> 'questionIdMappings'
+  ) AS array_entry(value)
+  WHERE array_entry.value ->> 'clientRef' = 'replace-short';
+  SELECT (array_entry.value ->> 'id')::uuid
+  INTO v_incomplete_question_id
+  FROM pg_catalog.jsonb_array_elements(
+    v_full_tree.response_body -> 'questionIdMappings'
+  ) AS array_entry(value)
+  WHERE array_entry.value ->> 'clientRef' = 'replace-incomplete';
+  SELECT (array_entry.value ->> 'id')::uuid
+  INTO v_single_right_option_id
+  FROM pg_catalog.jsonb_array_elements(
+    v_full_tree.response_body -> 'optionIdMappings'
+  ) AS array_entry(value)
+  WHERE array_entry.value ->> 'questionClientRef' = 'replace-single'
+    AND array_entry.value ->> 'clientRef' = 'single-right';
+  SELECT (array_entry.value ->> 'id')::uuid
+  INTO v_multiple_a_option_id
+  FROM pg_catalog.jsonb_array_elements(
+    v_full_tree.response_body -> 'optionIdMappings'
+  ) AS array_entry(value)
+  WHERE array_entry.value ->> 'questionClientRef' = 'replace-multiple'
+    AND array_entry.value ->> 'clientRef' = 'multiple-a';
+  SELECT (array_entry.value ->> 'id')::uuid
+  INTO v_multiple_c_option_id
+  FROM pg_catalog.jsonb_array_elements(
+    v_full_tree.response_body -> 'optionIdMappings'
+  ) AS array_entry(value)
+  WHERE array_entry.value ->> 'questionClientRef' = 'replace-multiple'
+    AND array_entry.value ->> 'clientRef' = 'multiple-c';
+
+  BEGIN
+    PERFORM *
+    FROM public.assessment_replace_draft_quiz_definition(
+      'c3000000-0000-0000-0000-000000000005',
+      'c3540000-0000-0000-0000-000000000001',
+      1,
+      v_complete_definition,
+      'c3f70000-0000-0000-0000-000000000012'
+    );
+  EXCEPTION WHEN raise_exception THEN
+    v_stale_rejected := true;
+  END;
+
+  IF v_empty_tree.response_status <> 200
+    OR v_empty_tree.response_body IS DISTINCT FROM pg_catalog.jsonb_build_object(
+      'id', 'c3540000-0000-0000-0000-000000000001',
+      'rowVersion', 2,
+      'definitionVersion', 2,
+      'questionIdMappings', '[]'::jsonb,
+      'optionIdMappings', '[]'::jsonb
+    )
+    OR v_full_tree.response_status <> 200
+    OR v_full_tree.response_body ->> 'id' IS DISTINCT FROM
+      'c3540000-0000-0000-0000-000000000001'
+    OR (v_full_tree.response_body ->> 'rowVersion')::integer <> 3
+    OR (v_full_tree.response_body ->> 'definitionVersion')::integer <> 3
+    OR v_response_key_count <> 5
+    OR pg_catalog.jsonb_array_length(
+      v_full_tree.response_body -> 'questionIdMappings'
+    ) <> 4
+    OR pg_catalog.jsonb_array_length(
+      v_full_tree.response_body -> 'optionIdMappings'
+    ) <> 5
+    OR v_full_tree.response_body OPERATOR(pg_catalog.?) 'questions'
+    OR v_full_tree.response_body OPERATOR(pg_catalog.?) 'answerSpec'
+    OR v_full_tree.response_body OPERATOR(pg_catalog.?) 'feedbackCorrectMarkdown'
+    OR v_single_question_id IS NULL
+    OR v_multiple_question_id IS NULL
+    OR v_short_question_id IS NULL
+    OR v_incomplete_question_id IS NULL
+    OR v_single_right_option_id IS NULL
+    OR v_multiple_a_option_id IS NULL
+    OR v_multiple_c_option_id IS NULL
+    OR NOT v_empty_object_rejected
+    OR NOT v_unknown_root_rejected
+    OR NOT v_cross_question_ref_rejected
+    OR NOT v_learner_rejected
+    OR NOT v_null_actor_rejected
+    OR NOT v_missing_rejected
+    OR NOT v_null_version_rejected
+    OR NOT v_nonpositive_version_rejected
+    OR NOT v_null_request_rejected
+    OR NOT v_stale_rejected THEN
+    RAISE EXCEPTION 'draft-quiz definition replacement did not preserve its exact atomic authoring contract';
+  END IF;
+END;
+$assessment_replace_draft_quiz_definition$;
+RESET ROLE;
+
+SET LOCAL ROLE coditza_owner;
+UPDATE public.profiles
+SET security_hold_at = pg_catalog.clock_timestamp()
+WHERE id = 'c3000000-0000-0000-0000-000000000005';
+RESET ROLE;
+
+SET LOCAL ROLE service_role;
+DO $held_staff_draft_quiz_definition_replacement$
+DECLARE
+  v_rejected boolean := false;
+BEGIN
+  BEGIN
+    PERFORM *
+    FROM public.assessment_replace_draft_quiz_definition(
+      'c3000000-0000-0000-0000-000000000005',
+      'c3540000-0000-0000-0000-000000000001',
+      3,
+      '{"questions":[]}'::jsonb,
+      'c3f70000-0000-0000-0000-000000000013'
+    );
+  EXCEPTION WHEN raise_exception THEN
+    v_rejected := true;
+  END;
+  IF NOT v_rejected THEN
+    RAISE EXCEPTION 'held staff actor unexpectedly replaced a draft quiz definition';
+  END IF;
+END;
+$held_staff_draft_quiz_definition_replacement$;
+RESET ROLE;
+
+SET LOCAL ROLE coditza_owner;
+UPDATE public.profiles
+SET security_hold_at = NULL
+WHERE id = 'c3000000-0000-0000-0000-000000000005';
+SELECT pg_catalog.set_config('coditza.learning_write', 'quiz-start', true);
+INSERT INTO public.quiz_attempts (
+  id,
+  user_id,
+  quiz_id,
+  quiz_definition_version,
+  attempt_number
+)
+VALUES (
+  'c3740000-0000-0000-0000-000000000001',
+  'c3000000-0000-0000-0000-000000000001',
+  'c3540000-0000-0000-0000-000000000001',
+  3,
+  1
+);
+SELECT pg_catalog.set_config('coditza.learning_write', '', true);
+RESET ROLE;
+
+SET LOCAL ROLE service_role;
+DO $draft_quiz_definition_history_denial$
+DECLARE
+  v_rejected boolean := false;
+BEGIN
+  BEGIN
+    PERFORM *
+    FROM public.assessment_replace_draft_quiz_definition(
+      'c3000000-0000-0000-0000-000000000005',
+      'c3540000-0000-0000-0000-000000000001',
+      3,
+      '{"questions":[]}'::jsonb,
+      'c3f70000-0000-0000-0000-000000000014'
+    );
+  EXCEPTION WHEN raise_exception THEN
+    v_rejected := true;
+  END;
+  IF NOT v_rejected THEN
+    RAISE EXCEPTION 'draft quiz history unexpectedly allowed a definition replacement';
+  END IF;
+END;
+$draft_quiz_definition_history_denial$;
+RESET ROLE;
+
+SET LOCAL ROLE coditza_owner;
+UPDATE public.modules
+SET status = 'archived'::public.content_status
+WHERE id = 'c31b0000-0000-0000-0000-000000000001';
+RESET ROLE;
+
+SET LOCAL ROLE service_role;
+DO $archived_parent_draft_quiz_definition_denial$
+DECLARE
+  v_parent_rejected boolean := false;
+  v_published_rejected boolean := false;
+BEGIN
+  BEGIN
+    PERFORM *
+    FROM public.assessment_replace_draft_quiz_definition(
+      'c3000000-0000-0000-0000-000000000005',
+      'c3540000-0000-0000-0000-000000000001',
+      3,
+      '{"questions":[]}'::jsonb,
+      'c3f70000-0000-0000-0000-000000000015'
+    );
+  EXCEPTION WHEN raise_exception THEN
+    v_parent_rejected := true;
+  END;
+
+  BEGIN
+    PERFORM *
+    FROM public.assessment_replace_draft_quiz_definition(
+      'c3000000-0000-0000-0000-000000000005',
+      'c3500000-0000-0000-0000-000000000001',
+      2,
+      '{"questions":[]}'::jsonb,
+      'c3f70000-0000-0000-0000-000000000016'
+    );
+  EXCEPTION WHEN raise_exception THEN
+    v_published_rejected := true;
+  END;
+
+  IF NOT v_parent_rejected OR NOT v_published_rejected THEN
+    RAISE EXCEPTION 'archived parents or published quiz roots unexpectedly allowed definition replacement';
+  END IF;
+END;
+$archived_parent_draft_quiz_definition_denial$;
+RESET ROLE;
+
+SET LOCAL ROLE coditza_owner;
+SELECT extensions.ok(
+  EXISTS (
+    SELECT 1
+    FROM public.quizzes AS quiz
+    WHERE quiz.id = 'c3540000-0000-0000-0000-000000000001'
+      AND quiz.chapter_id = 'c32b0000-0000-0000-0000-000000000001'
+      AND quiz.slug = 'draft-quiz-definition'
+      AND quiz.title = 'Original definition quiz'
+      AND quiz.instructions_markdown = 'Original definition replacement instructions.'
+      AND quiz.position = 0
+      AND quiz.passing_percent = 70
+      AND quiz.max_attempts = 3
+      AND quiz.time_limit_seconds = 600
+      AND quiz.is_required
+      AND quiz.status = 'draft'::public.content_status
+      AND quiz.row_version = 3
+      AND quiz.definition_version = 3
+      AND quiz.created_by = 'c3000000-0000-0000-0000-000000000004'
+      AND quiz.updated_by = 'c3000000-0000-0000-0000-000000000005'
+  )
+  AND NOT EXISTS (
+    SELECT 1
+    FROM public.quiz_questions AS question_entry
+    WHERE question_entry.id = 'c3640000-0000-0000-0000-000000000001'
+  )
+  AND NOT EXISTS (
+    SELECT 1
+    FROM public.quiz_question_options AS option_entry
+    WHERE option_entry.id IN (
+      'c3650000-0000-0000-0000-000000000001',
+      'c3650000-0000-0000-0000-000000000002'
+    )
+  )
+  AND NOT EXISTS (
+    SELECT 1
+    FROM private.quiz_question_answer_keys AS answer_key
+    WHERE answer_key.question_id = 'c3640000-0000-0000-0000-000000000001'
+  )
+  AND (
+    SELECT pg_catalog.count(*) = 4
+    FROM public.quiz_questions AS question_entry
+    WHERE question_entry.quiz_id = 'c3540000-0000-0000-0000-000000000001'
+  )
+  AND (
+    SELECT pg_catalog.count(*) = 5
+    FROM public.quiz_question_options AS option_entry
+    JOIN public.quiz_questions AS question_entry
+      ON question_entry.id = option_entry.question_id
+    WHERE question_entry.quiz_id = 'c3540000-0000-0000-0000-000000000001'
+  )
+  AND (
+    SELECT pg_catalog.count(*) = 3
+    FROM private.quiz_question_answer_keys AS answer_key
+    JOIN public.quiz_questions AS question_entry
+      ON question_entry.id = answer_key.question_id
+    WHERE question_entry.quiz_id = 'c3540000-0000-0000-0000-000000000001'
+  )
+  AND (
+    SELECT answer_key.answer_spec = pg_catalog.jsonb_build_object(
+      'correctOptionId',
+      option_entry.id::text
+    )
+      AND answer_key.feedback_correct_markdown = 'Single correct feedback.'
+      AND answer_key.feedback_incorrect_markdown = 'Single incorrect feedback.'
+      AND answer_key.created_by = 'c3000000-0000-0000-0000-000000000005'
+      AND answer_key.updated_by = 'c3000000-0000-0000-0000-000000000005'
+    FROM public.quiz_questions AS question_entry
+    JOIN public.quiz_question_options AS option_entry
+      ON option_entry.question_id = question_entry.id
+    JOIN private.quiz_question_answer_keys AS answer_key
+      ON answer_key.question_id = question_entry.id
+    WHERE question_entry.quiz_id = 'c3540000-0000-0000-0000-000000000001'
+      AND question_entry.prompt_markdown = 'Choose the correct single answer.'
+      AND option_entry.label_markdown = 'Correct single option.'
+  )
+  AND (
+    SELECT answer_key.answer_spec = pg_catalog.jsonb_build_object(
+      'correctOptionIds',
+      (
+        SELECT pg_catalog.jsonb_agg(
+          pg_catalog.to_jsonb(option_entry.id::text)
+          ORDER BY option_entry.id::text COLLATE "C"
+        )
+        FROM public.quiz_question_options AS option_entry
+        WHERE option_entry.question_id = question_entry.id
+          AND option_entry.label_markdown IN ('Multiple A.', 'Multiple C.')
+      )
+    )
+      AND answer_key.feedback_correct_markdown = 'Multiple correct feedback.'
+      AND answer_key.feedback_incorrect_markdown = 'Multiple incorrect feedback.'
+      AND answer_key.created_by = 'c3000000-0000-0000-0000-000000000005'
+      AND answer_key.updated_by = 'c3000000-0000-0000-0000-000000000005'
+    FROM public.quiz_questions AS question_entry
+    JOIN private.quiz_question_answer_keys AS answer_key
+      ON answer_key.question_id = question_entry.id
+    WHERE question_entry.quiz_id = 'c3540000-0000-0000-0000-000000000001'
+      AND question_entry.prompt_markdown =
+        'Choose both correct multiple answers.'
+  )
+  AND (
+    SELECT answer_key.answer_spec =
+      '{"acceptedAnswers":["da","nu"],"normalization":"nfkc_ascii_ws_ascii_lower_v1"}'::jsonb
+      AND answer_key.feedback_correct_markdown = 'Short correct feedback.'
+      AND answer_key.feedback_incorrect_markdown = 'Short incorrect feedback.'
+      AND answer_key.created_by = 'c3000000-0000-0000-0000-000000000005'
+      AND answer_key.updated_by = 'c3000000-0000-0000-0000-000000000005'
+    FROM public.quiz_questions AS question_entry
+    JOIN private.quiz_question_answer_keys AS answer_key
+      ON answer_key.question_id = question_entry.id
+    WHERE question_entry.quiz_id = 'c3540000-0000-0000-0000-000000000001'
+      AND question_entry.prompt_markdown = 'Type the normalized short answer.'
+  )
+  AND EXISTS (
+    SELECT 1
+    FROM public.quiz_questions AS question_entry
+    WHERE question_entry.quiz_id = 'c3540000-0000-0000-0000-000000000001'
+      AND question_entry.prompt_markdown =
+        'This draft question intentionally has no answer key yet.'
+      AND question_entry.question_type = 'short_text'::public.question_type
+      AND question_entry.position = 3
+      AND question_entry.points = 3
+      AND NOT EXISTS (
+        SELECT 1
+        FROM private.quiz_question_answer_keys AS answer_key
+        WHERE answer_key.question_id = question_entry.id
+      )
+  )
+  AND EXISTS (
+    SELECT 1
+    FROM public.quiz_attempts AS attempt
+    WHERE attempt.id = 'c3740000-0000-0000-0000-000000000001'
+      AND attempt.quiz_id = 'c3540000-0000-0000-0000-000000000001'
+      AND attempt.quiz_definition_version = 3
+  )
+  AND EXISTS (
+    SELECT 1
+    FROM public.modules AS module_entry
+    WHERE module_entry.id = 'c31b0000-0000-0000-0000-000000000001'
+      AND module_entry.status = 'archived'::public.content_status
+  )
+  AND (
+    SELECT pg_catalog.count(*) = 2
+      AND pg_catalog.bool_and(
+        audit_entry.actor_kind = 'user'
+        AND audit_entry.actor_user_id = 'c3000000-0000-0000-0000-000000000005'
+        AND audit_entry.changed_fields = ARRAY['definition']::text[]
+        AND audit_entry.change_summary =
+          '{"definition":{"before":"draft","after":"updated"}}'::jsonb
+        AND audit_entry.reason IS NULL
+        AND audit_entry.request_id IN (
+          'c3f70000-0000-0000-0000-000000000010',
+          'c3f70000-0000-0000-0000-000000000011'
+        )
+      )
+    FROM private.audit_events AS audit_entry
+    WHERE audit_entry.action = 'quiz_updated'
+      AND audit_entry.entity_type = 'quiz'
+      AND audit_entry.entity_id = 'c3540000-0000-0000-0000-000000000001'
+  )
+  AND NOT EXISTS (
+    SELECT 1
+    FROM private.idempotency_records AS record_entry
+    WHERE record_entry.result_resource_id = 'c3540000-0000-0000-0000-000000000001'
+  )
+  AND COALESCE(
+    pg_catalog.current_setting('coditza.assessment_tree_root', true),
+    ''
+  ) = '',
+  'draft-quiz definition replacement keeps the full submitted tree atomic, versioned, mapped safely, history-safe, and outside idempotency'
 );
 RESET ROLE;
 

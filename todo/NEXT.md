@@ -27,19 +27,20 @@ draft-exercise and draft-quiz PATCH clusters, documented in
 [slice 08](../docs/implementation/SUP-FUNCTIONS-001-slice-08.md),
 [slice 09](../docs/implementation/SUP-FUNCTIONS-001-slice-09.md),
 [slice 10](../docs/implementation/SUP-FUNCTIONS-001-slice-10.md), and
-[slice 11](../docs/implementation/SUP-FUNCTIONS-001-slice-11.md). Continue
+[slice 11](../docs/implementation/SUP-FUNCTIONS-001-slice-11.md), and
+[slice 12](../docs/implementation/SUP-FUNCTIONS-001-slice-12.md). Continue
 from those bounded baselines with the assessment-owned
-`assessment_replace_draft_quiz_definition` facade. It must establish one exact
-complete question/option/key definition body and expected root-row-version
-contract, assert active staff before content access, lock canonical module,
-chapter, and draft quiz rows, and reject missing/archived ancestors, stale
-versions, non-draft roots, and retained attempt history. It must use the
-reviewed tree marker only while it atomically deletes children in child-first
-order and materializes the complete validated scalar tree. It must advance root
-and definition versions exactly once, return only the safe question/option
-client-reference mappings, append a sanitized audit transition, and not invent
-a retry/replay scheme. This slice may not add HTTP/direct-client behavior,
-introduce Python/WASM work, or change identity/hosted configuration.
+`assessment_get_draft_exercise_authoring` facade. It must require a
+server-generated request UUID, recheck the live active staff actor before
+protected content access, and lock the canonical module, chapter, and draft
+exercise path while rejecting missing/reparented/archived ancestors and
+non-draft roots. It must return only the protected ID-based scalar draft
+exercise definition/key projection required by the server path, append the
+plan-required sanitized access audit without authored or answer material, and
+grant execution only to `service_role`. It must not accept a generic
+assessment type, mutate content, expose a learner/list/detail projection,
+introduce replay/idempotency behavior, implement `python_code`, or add
+HTTP/direct-client behavior.
 
 ## Read first
 
