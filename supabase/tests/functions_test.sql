@@ -4,7 +4,7 @@ BEGIN;
 -- and the only runtime role used for successful calls is service_role.
 GRANT USAGE ON SCHEMA extensions TO coditza_owner;
 
-SELECT extensions.plan(20);
+SELECT extensions.plan(22);
 
 SET LOCAL ROLE coditza_owner;
 DO $normalization_golden_vectors$
@@ -194,6 +194,53 @@ SELECT extensions.ok(
   'staff authorization predicates are owner-controlled private helpers with no runtime execute grant'
 );
 
+SELECT extensions.ok(
+  (
+    SELECT procedure_entry.proowner = 'coditza_owner'::pg_catalog.regrole
+      AND procedure_entry.prosecdef
+      AND procedure_entry.proconfig = ARRAY['search_path=""']::text[]
+    FROM pg_catalog.pg_proc AS procedure_entry
+    WHERE procedure_entry.oid =
+      'public.curriculum_create_draft_module(uuid,jsonb,uuid,integer,bytea,uuid)'::pg_catalog.regprocedure
+  )
+  AND NOT EXISTS (
+    SELECT 1
+    FROM (
+      VALUES ('anon'), ('authenticated'), ('authenticator')
+    ) AS runtime_role(rolname)
+    WHERE pg_catalog.has_function_privilege(
+      runtime_role.rolname,
+      'public.curriculum_create_draft_module(uuid,jsonb,uuid,integer,bytea,uuid)'::pg_catalog.regprocedure,
+      'EXECUTE'
+    )
+  )
+  AND pg_catalog.has_function_privilege(
+    'service_role',
+    'public.curriculum_create_draft_module(uuid,jsonb,uuid,integer,bytea,uuid)'::pg_catalog.regprocedure,
+    'EXECUTE'
+  )
+  AND (
+    SELECT procedure_entry.proowner = 'coditza_owner'::pg_catalog.regrole
+      AND NOT procedure_entry.prosecdef
+      AND procedure_entry.proconfig = ARRAY['search_path=""']::text[]
+    FROM pg_catalog.pg_proc AS procedure_entry
+    WHERE procedure_entry.oid =
+      'private.lock_module_root_scope()'::pg_catalog.regprocedure
+  )
+  AND NOT EXISTS (
+    SELECT 1
+    FROM (
+      VALUES ('anon'), ('authenticated'), ('service_role'), ('authenticator')
+    ) AS runtime_role(rolname)
+    WHERE pg_catalog.has_function_privilege(
+      runtime_role.rolname,
+      'private.lock_module_root_scope()'::pg_catalog.regprocedure,
+      'EXECUTE'
+    )
+  ),
+  'draft-module facade is owner-controlled and server-only while its root lock remains private'
+);
+
 SET LOCAL ROLE authenticated;
 DO $authenticated_facade_denial$
 DECLARE
@@ -247,6 +294,24 @@ BEGIN
   IF NOT v_rejected THEN
     RAISE EXCEPTION 'authenticated role unexpectedly executed a history facade';
   END IF;
+
+  v_rejected := false;
+  BEGIN
+    PERFORM *
+    FROM public.curriculum_create_draft_module(
+      'c3000000-0000-0000-0000-000000000005',
+      '{"slug":"denied-module","title":"Denied module","descriptionMarkdown":"Denied."}'::jsonb,
+      'c3e00000-0000-0000-0000-000000000001',
+      1,
+      pg_catalog.decode(pg_catalog.repeat('aa', 32), 'hex'),
+      'c3f00000-0000-0000-0000-000000000001'
+    );
+  EXCEPTION WHEN insufficient_privilege THEN
+    v_rejected := true;
+  END;
+  IF NOT v_rejected THEN
+    RAISE EXCEPTION 'authenticated role unexpectedly executed a curriculum authoring facade';
+  END IF;
 END;
 $authenticated_facade_denial$;
 RESET ROLE;
@@ -295,6 +360,16 @@ BEGIN
   END;
   IF NOT v_rejected THEN
     RAISE EXCEPTION 'service role unexpectedly executed a private staff helper';
+  END IF;
+
+  v_rejected := false;
+  BEGIN
+    PERFORM private.lock_module_root_scope();
+  EXCEPTION WHEN insufficient_privilege THEN
+    v_rejected := true;
+  END;
+  IF NOT v_rejected THEN
+    RAISE EXCEPTION 'service role unexpectedly executed a private curriculum lock helper';
   END IF;
 END;
 $private_runtime_denial$;
@@ -459,6 +534,260 @@ $staff_authorization_predicates$;
 SELECT extensions.ok(
   TRUE,
   'staff predicates accept active editor/admin profiles and fail closed for learner, absent, held, and live-demoted actors'
+);
+
+-- Restore the editor only after the live-demotion proof above, then exercise
+-- the first authoring facade with two distinct active staff actors.
+SET LOCAL ROLE coditza_owner;
+UPDATE public.profiles
+SET role = 'editor'::public.app_role,
+    security_hold_at = NULL
+WHERE id = 'c3000000-0000-0000-0000-000000000004';
+RESET ROLE;
+
+SET LOCAL ROLE service_role;
+DO $curriculum_create_draft_module$
+DECLARE
+  v_editor_first record;
+  v_editor_replay record;
+  v_admin_first record;
+  v_different_hash_rejected boolean := false;
+  v_invalid_input_rejected boolean := false;
+  v_learner_rejected boolean := false;
+  v_missing_key_rejected boolean := false;
+BEGIN
+  SELECT * INTO v_editor_first
+  FROM public.curriculum_create_draft_module(
+    'c3000000-0000-0000-0000-000000000004',
+    '{"slug":"authoring-editor-module","title":"Authoring editor module","descriptionMarkdown":"Draft content created by an editor."}'::jsonb,
+    'c3e00000-0000-0000-0000-000000000001',
+    1,
+    pg_catalog.decode(pg_catalog.repeat('aa', 32), 'hex'),
+    'c3f00000-0000-0000-0000-000000000010'
+  );
+  SELECT * INTO v_editor_replay
+  FROM public.curriculum_create_draft_module(
+    'c3000000-0000-0000-0000-000000000004',
+    '{"slug":"authoring-editor-module","title":"Authoring editor module","descriptionMarkdown":"Draft content created by an editor."}'::jsonb,
+    'c3e00000-0000-0000-0000-000000000001',
+    1,
+    pg_catalog.decode(pg_catalog.repeat('aa', 32), 'hex'),
+    'c3f00000-0000-0000-0000-000000000011'
+  );
+  SELECT * INTO v_admin_first
+  FROM public.curriculum_create_draft_module(
+    'c3000000-0000-0000-0000-000000000005',
+    '{"slug":"authoring-admin-module","title":"Authoring admin module","descriptionMarkdown":"Draft content created by an administrator."}'::jsonb,
+    'c3e00000-0000-0000-0000-000000000002',
+    1,
+    pg_catalog.decode(pg_catalog.repeat('bb', 32), 'hex'),
+    'c3f00000-0000-0000-0000-000000000012'
+  );
+
+  BEGIN
+    PERFORM *
+    FROM public.curriculum_create_draft_module(
+      'c3000000-0000-0000-0000-000000000004',
+      '{"slug":"authoring-editor-module","title":"Authoring editor module","descriptionMarkdown":"Draft content created by an editor."}'::jsonb,
+      'c3e00000-0000-0000-0000-000000000001',
+      1,
+      pg_catalog.decode(pg_catalog.repeat('cc', 32), 'hex'),
+      'c3f00000-0000-0000-0000-000000000013'
+    );
+  EXCEPTION WHEN raise_exception THEN
+    v_different_hash_rejected := true;
+  END;
+
+  BEGIN
+    PERFORM *
+    FROM public.curriculum_create_draft_module(
+      'c3000000-0000-0000-0000-000000000005',
+      '{"slug":"invalid-module","title":"Invalid module","descriptionMarkdown":"Draft.","status":"published"}'::jsonb,
+      'c3e00000-0000-0000-0000-000000000003',
+      1,
+      pg_catalog.decode(pg_catalog.repeat('dd', 32), 'hex'),
+      'c3f00000-0000-0000-0000-000000000014'
+    );
+  EXCEPTION WHEN raise_exception THEN
+    v_invalid_input_rejected := true;
+  END;
+
+  BEGIN
+    PERFORM *
+    FROM public.curriculum_create_draft_module(
+      'c3000000-0000-0000-0000-000000000001',
+      '{"slug":"learner-module","title":"Learner module","descriptionMarkdown":"Learners cannot author."}'::jsonb,
+      'c3e00000-0000-0000-0000-000000000004',
+      1,
+      pg_catalog.decode(pg_catalog.repeat('ee', 32), 'hex'),
+      'c3f00000-0000-0000-0000-000000000015'
+    );
+  EXCEPTION WHEN raise_exception THEN
+    v_learner_rejected := true;
+  END;
+
+  BEGIN
+    PERFORM *
+    FROM public.curriculum_create_draft_module(
+      'c3000000-0000-0000-0000-000000000005',
+      '{"slug":"missing-key-module","title":"Missing key module","descriptionMarkdown":"A key is required."}'::jsonb,
+      NULL,
+      1,
+      pg_catalog.decode(pg_catalog.repeat('ff', 32), 'hex'),
+      'c3f00000-0000-0000-0000-000000000016'
+    );
+  EXCEPTION WHEN raise_exception THEN
+    v_missing_key_rejected := true;
+  END;
+
+  IF v_editor_first.response_status <> 201
+    OR v_editor_first.idempotency_replayed
+    OR v_editor_first.response_body ->> 'id' IS NULL
+    OR v_editor_first.response_location IS DISTINCT FROM
+      '/api/v1/admin/modules/' || (v_editor_first.response_body ->> 'id')
+    OR v_editor_first.response_body IS DISTINCT FROM pg_catalog.jsonb_build_object(
+      'id',
+      v_editor_first.response_body ->> 'id'
+    )
+    OR NOT v_editor_replay.idempotency_replayed
+    OR v_editor_replay.response_status IS DISTINCT FROM v_editor_first.response_status
+    OR v_editor_replay.response_location IS DISTINCT FROM v_editor_first.response_location
+    OR v_editor_replay.response_body IS DISTINCT FROM v_editor_first.response_body
+    OR v_admin_first.response_status <> 201
+    OR v_admin_first.idempotency_replayed
+    OR v_admin_first.response_body ->> 'id' IS NULL
+    OR v_admin_first.response_body IS DISTINCT FROM pg_catalog.jsonb_build_object(
+      'id',
+      v_admin_first.response_body ->> 'id'
+    )
+    OR NOT v_different_hash_rejected
+    OR NOT v_invalid_input_rejected
+    OR NOT v_learner_rejected
+    OR NOT v_missing_key_rejected THEN
+    RAISE EXCEPTION 'draft-module authoring facade did not preserve its secure creation and replay contract';
+  END IF;
+END;
+$curriculum_create_draft_module$;
+RESET ROLE;
+
+SET LOCAL ROLE coditza_owner;
+UPDATE public.profiles
+SET security_hold_at = pg_catalog.clock_timestamp()
+WHERE id = 'c3000000-0000-0000-0000-000000000004';
+RESET ROLE;
+
+SET LOCAL ROLE service_role;
+DO $held_staff_authoring_replay_denial$
+DECLARE
+  v_rejected boolean := false;
+BEGIN
+  BEGIN
+    PERFORM *
+    FROM public.curriculum_create_draft_module(
+      'c3000000-0000-0000-0000-000000000004',
+      '{"slug":"authoring-editor-module","title":"Authoring editor module","descriptionMarkdown":"Draft content created by an editor."}'::jsonb,
+      'c3e00000-0000-0000-0000-000000000001',
+      1,
+      pg_catalog.decode(pg_catalog.repeat('aa', 32), 'hex'),
+      'c3f00000-0000-0000-0000-000000000017'
+    );
+  EXCEPTION WHEN raise_exception THEN
+    v_rejected := true;
+  END;
+
+  IF NOT v_rejected THEN
+    RAISE EXCEPTION 'held staff actor unexpectedly received a module-create replay';
+  END IF;
+END;
+$held_staff_authoring_replay_denial$;
+RESET ROLE;
+
+SET LOCAL ROLE coditza_owner;
+UPDATE public.profiles
+SET security_hold_at = NULL
+WHERE id = 'c3000000-0000-0000-0000-000000000004';
+
+SELECT extensions.ok(
+  (
+    SELECT pg_catalog.count(*) = 2
+      AND pg_catalog.bool_and(
+        module_entry.status = 'draft'::public.content_status
+        AND module_entry.published_at IS NULL
+        AND module_entry.row_version = 1
+      )
+    FROM public.modules AS module_entry
+    WHERE module_entry.slug IN (
+      'authoring-editor-module',
+      'authoring-admin-module'
+    )
+  )
+  AND EXISTS (
+    SELECT 1
+    FROM public.modules AS module_entry
+    WHERE module_entry.slug = 'authoring-editor-module'
+      AND module_entry.position = 0
+      AND module_entry.created_by = 'c3000000-0000-0000-0000-000000000004'
+      AND module_entry.updated_by = 'c3000000-0000-0000-0000-000000000004'
+  )
+  AND EXISTS (
+    SELECT 1
+    FROM public.modules AS module_entry
+    WHERE module_entry.slug = 'authoring-admin-module'
+      AND module_entry.position = 1
+      AND module_entry.created_by = 'c3000000-0000-0000-0000-000000000005'
+      AND module_entry.updated_by = 'c3000000-0000-0000-0000-000000000005'
+  )
+  AND (
+    SELECT pg_catalog.count(*) = 2
+      AND pg_catalog.bool_and(
+        record_entry.response_status = 201
+        AND record_entry.response_location =
+          '/api/v1/admin/modules/' || record_entry.result_resource_id::text
+        AND record_entry.response_body = pg_catalog.jsonb_build_object(
+          'id',
+          record_entry.result_resource_id::text
+        )
+      )
+    FROM private.idempotency_records AS record_entry
+    WHERE record_entry.operation = 'admin_create_module'
+      AND record_entry.idempotency_key IN (
+        'c3e00000-0000-0000-0000-000000000001',
+        'c3e00000-0000-0000-0000-000000000002'
+      )
+  )
+  AND NOT EXISTS (
+    SELECT 1
+    FROM private.idempotency_records AS record_entry
+    WHERE record_entry.operation = 'admin_create_module'
+      AND record_entry.idempotency_key =
+        'c3e00000-0000-0000-0000-000000000003'
+  )
+  AND (
+    SELECT pg_catalog.count(*) = 2
+      AND pg_catalog.bool_and(
+        audit_entry.changed_fields = ARRAY['status']::text[]
+        AND audit_entry.change_summary =
+          '{"status":{"before":"none","after":"draft"}}'::jsonb
+        AND audit_entry.reason IS NULL
+      )
+    FROM private.audit_events AS audit_entry
+    WHERE audit_entry.action = 'module_created'
+      AND audit_entry.entity_type = 'module'
+      AND audit_entry.entity_id IN (
+        SELECT module_entry.id
+        FROM public.modules AS module_entry
+        WHERE module_entry.slug IN (
+          'authoring-editor-module',
+          'authoring-admin-module'
+        )
+      )
+  )
+  AND NOT EXISTS (
+    SELECT 1
+    FROM private.audit_events AS audit_entry
+    WHERE audit_entry.request_id = 'c3f00000-0000-0000-0000-000000000011'
+  ),
+  'editor/admin draft creation serializes root positions, stores ID-only replay, audits safely, and denies held replay'
 );
 
 INSERT INTO public.modules (

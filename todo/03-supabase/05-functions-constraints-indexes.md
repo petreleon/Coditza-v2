@@ -205,20 +205,22 @@ saved/graded answers so omitted questions cannot disappear.
 - [ ] Grant execution only to the server path and prove direct user denial.
 - [ ] Add concurrency tests before any HTTP mutation task uses a function.
 
-Implementation note (2026-07-29): two forward-only slices are present:
+Implementation note (2026-07-29): five forward-only slices are present:
 structured idempotency replay, exact safe exercise/quiz-start response schemas,
 assessment learner mutations, matching SQL/TypeScript normalization vectors,
 service-role-only theory completion/current-curriculum progress reads with
 source fallback, own archived assessment-history projections, a repaired module
-progress next-cursor, and live locked staff authorization predicates. They are
-documented in
+progress next-cursor, live locked staff authorization predicates, and the first
+named curriculum draft-module facade with a fixed root-scope position lock,
+ID-only replay, and sanitized audit transition. They are documented in
 [slice 01](../../docs/implementation/SUP-FUNCTIONS-001-slice-01.md) and
 [slice 02](../../docs/implementation/SUP-FUNCTIONS-001-slice-02.md) and
 [slice 03](../../docs/implementation/SUP-FUNCTIONS-001-slice-03.md) and
-[slice 04](../../docs/implementation/SUP-FUNCTIONS-001-slice-04.md).
-Authoring/lifecycle/operations facades and real two-session race proof remain
-open; each authoring facade must use the locked active-staff assertion rather
-than a bare role boolean.
+[slice 04](../../docs/implementation/SUP-FUNCTIONS-001-slice-04.md) and
+[slice 05](../../docs/implementation/SUP-FUNCTIONS-001-slice-05.md).
+Remaining authoring/lifecycle/operations facades and real two-session race
+proof remain open; each authoring facade must use the locked active-staff
+assertion rather than a bare role boolean.
 
 ## Constraint checklist
 
