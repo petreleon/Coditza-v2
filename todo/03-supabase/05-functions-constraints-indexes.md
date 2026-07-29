@@ -23,6 +23,9 @@ SQL helpers may live in `private`, but the runtime cannot execute them directly.
   `lower()`.
 - `private.has_role(actor_user_id, app_role)` — checks current profile role.
 - `private.is_staff(actor_user_id)` — true for editor/admin.
+- `private.assert_active_staff_actor(actor_user_id)` — locks the live profile,
+  requires no security hold, and requires editor/admin before authoring reads
+  or writes.
 - `private.is_effectively_published_<resource>(id)` — or equivalent stable SQL
   used consistently by policies and workflows.
 - `private.validate_exercise_definition(id)`.
@@ -206,13 +209,16 @@ Implementation note (2026-07-29): two forward-only slices are present:
 structured idempotency replay, exact safe exercise/quiz-start response schemas,
 assessment learner mutations, matching SQL/TypeScript normalization vectors,
 service-role-only theory completion/current-curriculum progress reads with
-source fallback, own archived assessment-history projections, and a repaired
-module progress next-cursor. They are documented in
+source fallback, own archived assessment-history projections, a repaired module
+progress next-cursor, and live locked staff authorization predicates. They are
+documented in
 [slice 01](../../docs/implementation/SUP-FUNCTIONS-001-slice-01.md) and
 [slice 02](../../docs/implementation/SUP-FUNCTIONS-001-slice-02.md) and
-[slice 03](../../docs/implementation/SUP-FUNCTIONS-001-slice-03.md).
+[slice 03](../../docs/implementation/SUP-FUNCTIONS-001-slice-03.md) and
+[slice 04](../../docs/implementation/SUP-FUNCTIONS-001-slice-04.md).
 Authoring/lifecycle/operations facades and real two-session race proof remain
-open.
+open; each authoring facade must use the locked active-staff assertion rather
+than a bare role boolean.
 
 ## Constraint checklist
 

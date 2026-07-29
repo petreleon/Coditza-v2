@@ -4,7 +4,7 @@ BEGIN;
 -- and the only runtime role used for successful calls is service_role.
 GRANT USAGE ON SCHEMA extensions TO coditza_owner;
 
-SELECT extensions.plan(18);
+SELECT extensions.plan(20);
 
 SET LOCAL ROLE coditza_owner;
 DO $normalization_golden_vectors$
@@ -156,6 +156,44 @@ SELECT extensions.ok(
   'progress learner facades are owner-controlled SECURITY DEFINER entrypoints granted only to service_role'
 );
 
+SELECT extensions.ok(
+  (
+    SELECT pg_catalog.count(*) = 3
+      AND pg_catalog.bool_and(
+        procedure_entry.proowner = 'coditza_owner'::pg_catalog.regrole
+        AND NOT procedure_entry.prosecdef
+        AND procedure_entry.proconfig = ARRAY['search_path=""']::text[]
+      )
+    FROM pg_catalog.pg_proc AS procedure_entry
+    WHERE procedure_entry.oid IN (
+      'private.has_role(uuid,public.app_role)'::pg_catalog.regprocedure,
+      'private.is_staff(uuid)'::pg_catalog.regprocedure,
+      'private.assert_active_staff_actor(uuid)'::pg_catalog.regprocedure
+    )
+  )
+  AND NOT EXISTS (
+    SELECT 1
+    FROM (
+      VALUES (
+        'private.has_role(uuid,public.app_role)'::pg_catalog.regprocedure
+      ), (
+        'private.is_staff(uuid)'::pg_catalog.regprocedure
+      ), (
+        'private.assert_active_staff_actor(uuid)'::pg_catalog.regprocedure
+      )
+    ) AS helper(procedure_oid)
+    CROSS JOIN (
+      VALUES ('anon'), ('authenticated'), ('service_role'), ('authenticator')
+    ) AS runtime_role(rolname)
+    WHERE pg_catalog.has_function_privilege(
+      runtime_role.rolname,
+      helper.procedure_oid,
+      'EXECUTE'
+    )
+  ),
+  'staff authorization predicates are owner-controlled private helpers with no runtime execute grant'
+);
+
 SET LOCAL ROLE authenticated;
 DO $authenticated_facade_denial$
 DECLARE
@@ -246,6 +284,18 @@ BEGIN
   IF NOT v_rejected THEN
     RAISE EXCEPTION 'service role unexpectedly executed a private progress helper';
   END IF;
+
+  v_rejected := false;
+  BEGIN
+    PERFORM private.assert_active_staff_actor(
+      'c3000000-0000-0000-0000-000000000001'
+    );
+  EXCEPTION WHEN insufficient_privilege THEN
+    v_rejected := true;
+  END;
+  IF NOT v_rejected THEN
+    RAISE EXCEPTION 'service role unexpectedly executed a private staff helper';
+  END IF;
 END;
 $private_runtime_denial$;
 RESET ROLE;
@@ -291,9 +341,125 @@ VALUES
     '{"displayName":"Functions Fallback"}'::jsonb,
     pg_catalog.now(),
     pg_catalog.now()
+  ),
+  (
+    'c3000000-0000-0000-0000-000000000004',
+    'authenticated',
+    'authenticated',
+    'functions-editor@coditza.invalid',
+    '{}'::jsonb,
+    '{"displayName":"Functions Editor"}'::jsonb,
+    pg_catalog.now(),
+    pg_catalog.now()
+  ),
+  (
+    'c3000000-0000-0000-0000-000000000005',
+    'authenticated',
+    'authenticated',
+    'functions-admin@coditza.invalid',
+    '{}'::jsonb,
+    '{"displayName":"Functions Admin"}'::jsonb,
+    pg_catalog.now(),
+    pg_catalog.now()
+  ),
+  (
+    'c3000000-0000-0000-0000-000000000006',
+    'authenticated',
+    'authenticated',
+    'functions-held-editor@coditza.invalid',
+    '{}'::jsonb,
+    '{"displayName":"Functions Held Editor"}'::jsonb,
+    pg_catalog.now(),
+    pg_catalog.now()
   );
 
 SET LOCAL ROLE coditza_owner;
+
+UPDATE public.profiles
+SET role = 'editor'::public.app_role
+WHERE id = 'c3000000-0000-0000-0000-000000000004';
+UPDATE public.profiles
+SET role = 'admin'::public.app_role
+WHERE id = 'c3000000-0000-0000-0000-000000000005';
+UPDATE public.profiles
+SET role = 'editor'::public.app_role,
+    security_hold_at = pg_catalog.clock_timestamp()
+WHERE id = 'c3000000-0000-0000-0000-000000000006';
+
+DO $staff_authorization_predicates$
+DECLARE
+  v_learner_rejected boolean := false;
+  v_missing_rejected boolean := false;
+  v_held_rejected boolean := false;
+  v_live_role_rejected boolean := false;
+BEGIN
+  PERFORM private.assert_active_staff_actor(
+    'c3000000-0000-0000-0000-000000000004'
+  );
+  PERFORM private.assert_active_staff_actor(
+    'c3000000-0000-0000-0000-000000000005'
+  );
+
+  IF NOT private.has_role(
+      'c3000000-0000-0000-0000-000000000004',
+      'editor'::public.app_role
+    )
+    OR private.has_role(
+      'c3000000-0000-0000-0000-000000000004',
+      'admin'::public.app_role
+    )
+    OR NOT private.is_staff('c3000000-0000-0000-0000-000000000004')
+    OR NOT private.is_staff('c3000000-0000-0000-0000-000000000005')
+    OR private.is_staff('c3000000-0000-0000-0000-000000000001') THEN
+    RAISE EXCEPTION 'staff role predicates did not read the current profile role';
+  END IF;
+
+  BEGIN
+    PERFORM private.assert_active_staff_actor(
+      'c3000000-0000-0000-0000-000000000001'
+    );
+  EXCEPTION WHEN raise_exception THEN
+    v_learner_rejected := true;
+  END;
+  BEGIN
+    PERFORM private.assert_active_staff_actor(
+      'c3000000-0000-0000-0000-000000000999'
+    );
+  EXCEPTION WHEN raise_exception THEN
+    v_missing_rejected := true;
+  END;
+  BEGIN
+    PERFORM private.assert_active_staff_actor(
+      'c3000000-0000-0000-0000-000000000006'
+    );
+  EXCEPTION WHEN raise_exception THEN
+    v_held_rejected := true;
+  END;
+
+  UPDATE public.profiles
+  SET role = 'learner'::public.app_role
+  WHERE id = 'c3000000-0000-0000-0000-000000000004';
+  BEGIN
+    PERFORM private.assert_active_staff_actor(
+      'c3000000-0000-0000-0000-000000000004'
+    );
+  EXCEPTION WHEN raise_exception THEN
+    v_live_role_rejected := true;
+  END;
+
+  IF NOT v_learner_rejected
+    OR NOT v_missing_rejected
+    OR NOT v_held_rejected
+    OR NOT v_live_role_rejected THEN
+    RAISE EXCEPTION
+      'staff authorization did not deny learner, absent, held, or live-demoted actors';
+  END IF;
+END;
+$staff_authorization_predicates$;
+SELECT extensions.ok(
+  TRUE,
+  'staff predicates accept active editor/admin profiles and fail closed for learner, absent, held, and live-demoted actors'
+);
 
 INSERT INTO public.modules (
   id, slug, title, description_markdown, position
