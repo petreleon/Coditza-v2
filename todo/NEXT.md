@@ -19,7 +19,7 @@ draft-exercise and complete draft-quiz creation clusters, scalar
 draft-exercise and draft-quiz PATCH clusters, protected assessment authoring
 reads, draft-module/chapter/theory-section PATCH clusters,
 published-module/chapter/theory-section correction clusters, and
-theory-section publication, documented in
+theory-section and exercise publication, documented in
 [slice 01](../docs/implementation/SUP-FUNCTIONS-001-slice-01.md),
 [slice 02](../docs/implementation/SUP-FUNCTIONS-001-slice-02.md), and
 [slice 03](../docs/implementation/SUP-FUNCTIONS-001-slice-03.md), and
@@ -40,41 +40,43 @@ theory-section publication, documented in
 [slice 18](../docs/implementation/SUP-FUNCTIONS-001-slice-18.md), and
 [slice 19](../docs/implementation/SUP-FUNCTIONS-001-slice-19.md), and
 [slice 20](../docs/implementation/SUP-FUNCTIONS-001-slice-20.md), and
-[slice 21](../docs/implementation/SUP-FUNCTIONS-001-slice-21.md). Continue
+[slice 21](../docs/implementation/SUP-FUNCTIONS-001-slice-21.md), and
+[slice 22](../docs/implementation/SUP-FUNCTIONS-001-slice-22.md). Continue
 from those bounded baselines with the assessment-owned
-assessment_publish_exercise facade. It must require a server-generated request
-UUID, non-null actor and exercise identifiers, and a positive expected row
-version. It must recheck the live active editor/admin actor before hierarchy,
-exercise-root, definition, or progress-source access; discover the current
-exercise-to-chapter-to-module path; lock module then chapter then exercise in
-canonical order; and recheck both hierarchy edges. Module and chapter may be
-draft or published but must not be archived.
+assessment_publish_quiz facade. It must require a server-generated request
+UUID, non-null actor and quiz identifiers, and a positive expected row version.
+It must recheck the live active editor/admin actor before hierarchy, quiz-root,
+definition, or progress-source access; discover the current
+quiz-to-chapter-to-module path; lock module then chapter then quiz in canonical
+order; and recheck both hierarchy edges. Module and chapter may be draft or
+published but must not be archived.
 
 The target is a closed lifecycle transition: an archived target is rejected;
 an already published target returns only its current id and rowVersion before
 expected-version comparison, with no UPDATE, audit, or progress recalculation;
 and only a current draft with the expected version may publish. Validate the
-locked root title (trimmed 1..160), prompt Markdown (nonblank, at most 50,000
-characters), points (1..1,000), non-null is_required, non-negative unique
-sibling position, and null published_at. It must invoke the existing
-private.validate_exercise_definition(exercise_id) as the authoritative option
-and answer-key completeness check, not duplicate that logic. Python-code
-exercises must fail closed until SUP-WASM-001 provides their digest-pinned
-private definition.
+locked root slug through private.is_valid_slug, title (trimmed 1..160),
+instructions Markdown (nonblank, at most 20,000 characters), non-negative
+unique sibling position, passing_percent (0..100), max_attempts (null or
+1..100), time_limit_seconds (null or 30..86,400), non-null is_required, and
+null published_at. It must invoke the existing
+private.validate_quiz_definition(quiz_id) as the authoritative question,
+option, and answer-key completeness check, not duplicate that logic.
 
 The sole real write changes only status, first published_at, and updated_by;
 the lifecycle triggers advance row_version/updated_at once. It then appends
-exactly one exercise_published audit event with changed_fields ['status'], the
+exactly one quiz_published audit event with changed_fields ['status'], the
 closed draft-to-published status delta, and no reason code. When both ancestors
 are published, it must recalculate every affected learner from the distinct
 UUID-sorted union of chapter_progress, theory completions, exercise attempts,
 and quiz attempts for that chapter, acquiring all progress locks last before
 calling the existing recalculator. Under a draft ancestor it must perform no
-progress source/snapshot reads or writes. It must preserve definition version,
-option/key tree, hierarchy, created fields, attempts/history, and optional
-exercise denominator semantics. It must not add input/reason envelopes,
-idempotency records, hierarchy/reorder/replacement, generic lifecycle,
-Fastify/HTTP/direct-client/Python/SMTP/MFA/Vercel behavior, or WASM work.
+progress source/snapshot reads or writes. It must preserve root/definition
+versions, question/option/key tree, hierarchy, created fields,
+attempts/history, and required versus optional quiz denominator semantics.
+It must not add input/reason envelopes, idempotency records,
+hierarchy/reorder/replacement, generic lifecycle, Fastify/HTTP/direct-client,
+Python/SMTP/MFA/Vercel behavior, or WASM work.
 
 ## Read first
 
