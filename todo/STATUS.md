@@ -11,11 +11,11 @@
   staff-authorization primitive, curriculum draft-module, draft-chapter, and
   draft-theory-section, scalar draft-exercise, complete draft-quiz, scalar
   draft-exercise PATCH, draft-quiz root PATCH, and complete draft-quiz
-  definition-replacement and protected draft-exercise authoring-read slices
-  are implemented and verified; remaining owner families and real concurrency
-  proof are still required.
+  definition-replacement and protected draft-exercise and draft-quiz
+  authoring-read slices are implemented and verified; remaining owner families
+  and real concurrency proof are still required.
 - Last verified implementation slice: SUP-FUNCTIONS-001 protected
-  draft-exercise authoring-read facade with protected local verification
+  draft-quiz authoring-read facade with protected local verification
 - Last updated: 2026-07-29
 
 ## Phase status
@@ -220,6 +220,11 @@ to the deadlines in that file.
   definition/key projection for draft exercises, preserves incomplete drafts
   and retained history without mutation, audits access safely, and passes
   protected local/Docker proof.
+- [SUP-FUNCTIONS-001 draft-quiz authoring-read slice report](../docs/implementation/SUP-FUNCTIONS-001-slice-14.md);
+  a service-role-only facade now returns only a protected ordered nested
+  stored-ID definition/key projection for draft quizzes, preserves empty and
+  incomplete drafts plus retained history without mutation, audits access
+  safely, and passes protected local/Docker proof.
 - [G1 completion record](08-execution/00-roadmap.md#g1-completion-record);
   Foundation reproducibility is recorded from the accepted architecture/product
   contracts, current checks, Docker evidence, and scope review.

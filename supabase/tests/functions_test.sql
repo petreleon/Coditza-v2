@@ -4,7 +4,7 @@ BEGIN;
 -- and the only runtime role used for successful calls is service_role.
 GRANT USAGE ON SCHEMA extensions TO coditza_owner;
 
-SELECT extensions.plan(38);
+SELECT extensions.plan(40);
 
 SET LOCAL ROLE coditza_owner;
 DO $normalization_golden_vectors$
@@ -527,6 +527,42 @@ SELECT extensions.ok(
   'draft-exercise authoring read facade is owner-controlled, fixed-path, exact-name, and server-only'
 );
 
+SELECT extensions.ok(
+  (
+    SELECT procedure_entry.proowner = 'coditza_owner'::pg_catalog.regrole
+      AND procedure_entry.prosecdef
+      AND procedure_entry.proconfig = ARRAY['search_path=""']::text[]
+    FROM pg_catalog.pg_proc AS procedure_entry
+    WHERE procedure_entry.oid =
+      'public.assessment_get_draft_quiz_authoring(uuid,uuid,uuid)'::pg_catalog.regprocedure
+  )
+  AND (
+    SELECT pg_catalog.count(*) = 1
+    FROM pg_catalog.pg_proc AS procedure_entry
+    JOIN pg_catalog.pg_namespace AS procedure_namespace
+      ON procedure_namespace.oid = procedure_entry.pronamespace
+    WHERE procedure_namespace.nspname = 'public'
+      AND procedure_entry.proname = 'assessment_get_draft_quiz_authoring'
+  )
+  AND NOT EXISTS (
+    SELECT 1
+    FROM (
+      VALUES ('anon'), ('authenticated'), ('authenticator')
+    ) AS runtime_role(rolname)
+    WHERE pg_catalog.has_function_privilege(
+      runtime_role.rolname,
+      'public.assessment_get_draft_quiz_authoring(uuid,uuid,uuid)'::pg_catalog.regprocedure,
+      'EXECUTE'
+    )
+  )
+  AND pg_catalog.has_function_privilege(
+    'service_role',
+    'public.assessment_get_draft_quiz_authoring(uuid,uuid,uuid)'::pg_catalog.regprocedure,
+    'EXECUTE'
+  ),
+  'draft-quiz authoring read facade is owner-controlled, fixed-path, exact-name, and server-only'
+);
+
 SET LOCAL ROLE authenticated;
 DO $authenticated_facade_denial$
 DECLARE
@@ -738,6 +774,20 @@ BEGIN
   END;
   IF NOT v_rejected THEN
     RAISE EXCEPTION 'authenticated role unexpectedly executed a draft exercise authoring read facade';
+  END IF;
+
+  v_rejected := false;
+  BEGIN
+    PERFORM public.assessment_get_draft_quiz_authoring(
+      'c3000000-0000-0000-0000-000000000005',
+      'c35d0000-0000-0000-0000-000000000001',
+      'c3f90000-0000-0000-0000-000000000001'
+    );
+  EXCEPTION WHEN insufficient_privilege THEN
+    v_rejected := true;
+  END;
+  IF NOT v_rejected THEN
+    RAISE EXCEPTION 'authenticated role unexpectedly executed a draft quiz authoring read facade';
   END IF;
 END;
 $authenticated_facade_denial$;
@@ -7434,6 +7484,619 @@ SELECT extensions.ok(
     ''
   ) = '',
   'draft-exercise authoring reads return only ordered protected scalar definition keys, preserve drafts and history, audit access safely, and avoid idempotency'
+);
+RESET ROLE;
+
+-- The protected quiz authoring-read fixture remains isolated from every
+-- creation/replacement proof. It deliberately retains a learner attempt:
+-- reading a draft definition neither becomes a history-denying mutation nor
+-- advances a root version.
+SET LOCAL ROLE coditza_owner;
+INSERT INTO public.modules (
+  id,
+  slug,
+  title,
+  description_markdown,
+  position,
+  created_by,
+  updated_by
+)
+VALUES (
+  'c31d0000-0000-0000-0000-000000000001',
+  'draft-quiz-authoring-read-module',
+  'Draft quiz authoring read module',
+  'Independent hierarchy for protected draft quiz authoring reads.',
+  905,
+  'c3000000-0000-0000-0000-000000000004',
+  'c3000000-0000-0000-0000-000000000004'
+);
+INSERT INTO public.chapters (
+  id,
+  module_id,
+  slug,
+  title,
+  summary_markdown,
+  position,
+  estimated_minutes,
+  created_by,
+  updated_by
+)
+VALUES (
+  'c32d0000-0000-0000-0000-000000000001',
+  'c31d0000-0000-0000-0000-000000000001',
+  'draft-quiz-authoring-read-chapter',
+  'Draft quiz authoring read chapter',
+  'Independent parent chapter for protected draft quiz authoring reads.',
+  0,
+  12,
+  'c3000000-0000-0000-0000-000000000004',
+  'c3000000-0000-0000-0000-000000000004'
+);
+INSERT INTO public.quizzes (
+  id,
+  chapter_id,
+  slug,
+  title,
+  instructions_markdown,
+  position,
+  passing_percent,
+  max_attempts,
+  time_limit_seconds,
+  is_required,
+  created_by,
+  updated_by
+)
+VALUES
+  (
+    'c35d0000-0000-0000-0000-000000000001',
+    'c32d0000-0000-0000-0000-000000000001',
+    'protected-mixed-draft-quiz',
+    'Protected mixed draft quiz',
+    'Nested draft definition fixture with every scalar question type.',
+    0,
+    70,
+    NULL,
+    NULL,
+    true,
+    'c3000000-0000-0000-0000-000000000004',
+    'c3000000-0000-0000-0000-000000000004'
+  ),
+  (
+    'c35d0000-0000-0000-0000-000000000002',
+    'c32d0000-0000-0000-0000-000000000001',
+    'protected-empty-draft-quiz',
+    'Protected empty draft quiz',
+    'Empty draft definition fixture.',
+    1,
+    70,
+    NULL,
+    NULL,
+    false,
+    'c3000000-0000-0000-0000-000000000004',
+    'c3000000-0000-0000-0000-000000000004'
+  );
+SELECT pg_catalog.set_config(
+  'coditza.assessment_tree_root',
+  'quiz:c35d0000-0000-0000-0000-000000000001',
+  true
+);
+INSERT INTO public.quiz_questions (
+  id,
+  quiz_id,
+  prompt_markdown,
+  question_type,
+  position,
+  points
+)
+VALUES
+  (
+    'c36d0000-0000-0000-0000-000000000003',
+    'c35d0000-0000-0000-0000-000000000001',
+    'Type the normalized short answer.',
+    'short_text',
+    2,
+    3
+  ),
+  (
+    'c36d0000-0000-0000-0000-000000000001',
+    'c35d0000-0000-0000-0000-000000000001',
+    'Choose the first correct answer.',
+    'single_choice',
+    0,
+    4
+  ),
+  (
+    'c36d0000-0000-0000-0000-000000000004',
+    'c35d0000-0000-0000-0000-000000000001',
+    'This draft question intentionally has no answer key yet.',
+    'short_text',
+    3,
+    2
+  ),
+  (
+    'c36d0000-0000-0000-0000-000000000002',
+    'c35d0000-0000-0000-0000-000000000001',
+    'Choose both correct multiple answers.',
+    'multiple_choice',
+    1,
+    6
+  );
+INSERT INTO public.quiz_question_options (
+  id,
+  question_id,
+  label_markdown,
+  position
+)
+VALUES
+  (
+    'c37d0000-0000-0000-0000-000000000002',
+    'c36d0000-0000-0000-0000-000000000001',
+    'Correct single option.',
+    1
+  ),
+  (
+    'c37d0000-0000-0000-0000-000000000005',
+    'c36d0000-0000-0000-0000-000000000002',
+    'Final correct multiple option.',
+    2
+  ),
+  (
+    'c37d0000-0000-0000-0000-000000000001',
+    'c36d0000-0000-0000-0000-000000000001',
+    'Incorrect single option.',
+    0
+  ),
+  (
+    'c37d0000-0000-0000-0000-000000000004',
+    'c36d0000-0000-0000-0000-000000000002',
+    'Middle incorrect multiple option.',
+    1
+  ),
+  (
+    'c37d0000-0000-0000-0000-000000000003',
+    'c36d0000-0000-0000-0000-000000000002',
+    'First correct multiple option.',
+    0
+  );
+INSERT INTO private.quiz_question_answer_keys (
+  question_id,
+  answer_spec,
+  feedback_correct_markdown,
+  feedback_incorrect_markdown,
+  created_by,
+  updated_by
+)
+VALUES
+  (
+    'c36d0000-0000-0000-0000-000000000001',
+    '{"correctOptionId":"c37d0000-0000-0000-0000-000000000002"}'::jsonb,
+    'Single correct feedback.',
+    'Single incorrect feedback.',
+    'c3000000-0000-0000-0000-000000000004',
+    'c3000000-0000-0000-0000-000000000004'
+  ),
+  (
+    'c36d0000-0000-0000-0000-000000000002',
+    '{"correctOptionIds":["c37d0000-0000-0000-0000-000000000003","c37d0000-0000-0000-0000-000000000005"]}'::jsonb,
+    'Multiple correct feedback.',
+    'Multiple incorrect feedback.',
+    'c3000000-0000-0000-0000-000000000004',
+    'c3000000-0000-0000-0000-000000000004'
+  ),
+  (
+    'c36d0000-0000-0000-0000-000000000003',
+    '{"acceptedAnswers":["da","nu"],"normalization":"nfkc_ascii_ws_ascii_lower_v1"}'::jsonb,
+    NULL,
+    'Short incorrect feedback.',
+    'c3000000-0000-0000-0000-000000000004',
+    'c3000000-0000-0000-0000-000000000004'
+  );
+SELECT pg_catalog.set_config('coditza.assessment_tree_root', '', true);
+SELECT pg_catalog.set_config('coditza.learning_write', 'quiz-start', true);
+INSERT INTO public.quiz_attempts (
+  id,
+  user_id,
+  quiz_id,
+  quiz_definition_version,
+  attempt_number
+)
+VALUES (
+  'c37e0000-0000-0000-0000-000000000001',
+  'c3000000-0000-0000-0000-000000000001',
+  'c35d0000-0000-0000-0000-000000000001',
+  1,
+  1
+);
+SELECT pg_catalog.set_config('coditza.learning_write', '', true);
+RESET ROLE;
+
+SET LOCAL ROLE service_role;
+DO $assessment_get_draft_quiz_authoring$
+DECLARE
+  v_full jsonb;
+  v_empty jsonb;
+  v_learner_rejected boolean := false;
+  v_null_actor_rejected boolean := false;
+  v_missing_actor_rejected boolean := false;
+  v_null_quiz_rejected boolean := false;
+  v_missing_quiz_rejected boolean := false;
+  v_null_request_rejected boolean := false;
+  v_published_rejected boolean := false;
+  v_archived_module_rejected boolean := false;
+BEGIN
+  BEGIN
+    PERFORM public.assessment_get_draft_quiz_authoring(
+      'c3000000-0000-0000-0000-000000000001',
+      'c35d0000-0000-0000-0000-000000000001',
+      'c3f90000-0000-0000-0000-000000000002'
+    );
+  EXCEPTION WHEN raise_exception THEN
+    v_learner_rejected := true;
+  END;
+
+  BEGIN
+    PERFORM public.assessment_get_draft_quiz_authoring(
+      NULL::uuid,
+      'c35d0000-0000-0000-0000-000000000001',
+      'c3f90000-0000-0000-0000-000000000003'
+    );
+  EXCEPTION WHEN raise_exception THEN
+    v_null_actor_rejected := true;
+  END;
+
+  BEGIN
+    PERFORM public.assessment_get_draft_quiz_authoring(
+      'c3000000-0000-0000-0000-000000000999',
+      'c35d0000-0000-0000-0000-000000000001',
+      'c3f90000-0000-0000-0000-000000000004'
+    );
+  EXCEPTION WHEN raise_exception THEN
+    v_missing_actor_rejected := true;
+  END;
+
+  BEGIN
+    PERFORM public.assessment_get_draft_quiz_authoring(
+      'c3000000-0000-0000-0000-000000000004',
+      NULL::uuid,
+      'c3f90000-0000-0000-0000-000000000005'
+    );
+  EXCEPTION WHEN raise_exception THEN
+    v_null_quiz_rejected := true;
+  END;
+
+  BEGIN
+    PERFORM public.assessment_get_draft_quiz_authoring(
+      'c3000000-0000-0000-0000-000000000004',
+      'c35d0000-0000-0000-0000-000000000999',
+      'c3f90000-0000-0000-0000-000000000006'
+    );
+  EXCEPTION WHEN raise_exception THEN
+    v_missing_quiz_rejected := true;
+  END;
+
+  BEGIN
+    PERFORM public.assessment_get_draft_quiz_authoring(
+      'c3000000-0000-0000-0000-000000000004',
+      'c35d0000-0000-0000-0000-000000000001',
+      NULL::uuid
+    );
+  EXCEPTION WHEN raise_exception THEN
+    v_null_request_rejected := true;
+  END;
+
+  BEGIN
+    PERFORM public.assessment_get_draft_quiz_authoring(
+      'c3000000-0000-0000-0000-000000000004',
+      'c3500000-0000-0000-0000-000000000001',
+      'c3f90000-0000-0000-0000-000000000007'
+    );
+  EXCEPTION WHEN raise_exception THEN
+    v_published_rejected := true;
+  END;
+
+  BEGIN
+    PERFORM public.assessment_get_draft_quiz_authoring(
+      'c3000000-0000-0000-0000-000000000004',
+      'c3540000-0000-0000-0000-000000000001',
+      'c3f90000-0000-0000-0000-000000000008'
+    );
+  EXCEPTION WHEN raise_exception THEN
+    v_archived_module_rejected := true;
+  END;
+
+  v_full := public.assessment_get_draft_quiz_authoring(
+    'c3000000-0000-0000-0000-000000000004',
+    'c35d0000-0000-0000-0000-000000000001',
+    'c3f90000-0000-0000-0000-000000000020'
+  );
+  v_empty := public.assessment_get_draft_quiz_authoring(
+    'c3000000-0000-0000-0000-000000000005',
+    'c35d0000-0000-0000-0000-000000000002',
+    'c3f90000-0000-0000-0000-000000000021'
+  );
+
+  IF v_full IS DISTINCT FROM pg_catalog.jsonb_build_object(
+      'questions', pg_catalog.jsonb_build_array(
+        pg_catalog.jsonb_build_object(
+          'id', 'c36d0000-0000-0000-0000-000000000001',
+          'promptMarkdown', 'Choose the first correct answer.',
+          'questionType', 'single_choice',
+          'points', 4,
+          'options', pg_catalog.jsonb_build_array(
+            pg_catalog.jsonb_build_object(
+              'id', 'c37d0000-0000-0000-0000-000000000001',
+              'labelMarkdown', 'Incorrect single option.'
+            ),
+            pg_catalog.jsonb_build_object(
+              'id', 'c37d0000-0000-0000-0000-000000000002',
+              'labelMarkdown', 'Correct single option.'
+            )
+          ),
+          'answerSpec',
+          '{"correctOptionId":"c37d0000-0000-0000-0000-000000000002"}'::jsonb,
+          'feedbackCorrectMarkdown', 'Single correct feedback.',
+          'feedbackIncorrectMarkdown', 'Single incorrect feedback.'
+        ),
+        pg_catalog.jsonb_build_object(
+          'id', 'c36d0000-0000-0000-0000-000000000002',
+          'promptMarkdown', 'Choose both correct multiple answers.',
+          'questionType', 'multiple_choice',
+          'points', 6,
+          'options', pg_catalog.jsonb_build_array(
+            pg_catalog.jsonb_build_object(
+              'id', 'c37d0000-0000-0000-0000-000000000003',
+              'labelMarkdown', 'First correct multiple option.'
+            ),
+            pg_catalog.jsonb_build_object(
+              'id', 'c37d0000-0000-0000-0000-000000000004',
+              'labelMarkdown', 'Middle incorrect multiple option.'
+            ),
+            pg_catalog.jsonb_build_object(
+              'id', 'c37d0000-0000-0000-0000-000000000005',
+              'labelMarkdown', 'Final correct multiple option.'
+            )
+          ),
+          'answerSpec',
+          '{"correctOptionIds":["c37d0000-0000-0000-0000-000000000003","c37d0000-0000-0000-0000-000000000005"]}'::jsonb,
+          'feedbackCorrectMarkdown', 'Multiple correct feedback.',
+          'feedbackIncorrectMarkdown', 'Multiple incorrect feedback.'
+        ),
+        pg_catalog.jsonb_build_object(
+          'id', 'c36d0000-0000-0000-0000-000000000003',
+          'promptMarkdown', 'Type the normalized short answer.',
+          'questionType', 'short_text',
+          'points', 3,
+          'options', '[]'::jsonb,
+          'answerSpec',
+          '{"acceptedAnswers":["da","nu"],"normalization":"nfkc_ascii_ws_ascii_lower_v1"}'::jsonb,
+          'feedbackCorrectMarkdown', NULL::text,
+          'feedbackIncorrectMarkdown', 'Short incorrect feedback.'
+        ),
+        pg_catalog.jsonb_build_object(
+          'id', 'c36d0000-0000-0000-0000-000000000004',
+          'promptMarkdown',
+          'This draft question intentionally has no answer key yet.',
+          'questionType', 'short_text',
+          'points', 2,
+          'options', '[]'::jsonb,
+          'answerSpec', NULL::jsonb,
+          'feedbackCorrectMarkdown', NULL::text,
+          'feedbackIncorrectMarkdown', NULL::text
+        )
+      )
+    )
+    OR v_empty IS DISTINCT FROM pg_catalog.jsonb_build_object(
+      'questions', '[]'::jsonb
+    )
+    OR NOT v_learner_rejected
+    OR NOT v_null_actor_rejected
+    OR NOT v_missing_actor_rejected
+    OR NOT v_null_quiz_rejected
+    OR NOT v_missing_quiz_rejected
+    OR NOT v_null_request_rejected
+    OR NOT v_published_rejected
+    OR NOT v_archived_module_rejected THEN
+    RAISE EXCEPTION 'draft quiz authoring read did not preserve its exact protected nested projection contract';
+  END IF;
+END;
+$assessment_get_draft_quiz_authoring$;
+RESET ROLE;
+
+SET LOCAL ROLE service_role;
+DO $held_staff_draft_quiz_authoring_read$
+DECLARE
+  v_rejected boolean := false;
+BEGIN
+  BEGIN
+    PERFORM public.assessment_get_draft_quiz_authoring(
+      'c3000000-0000-0000-0000-000000000006',
+      'c35d0000-0000-0000-0000-000000000001',
+      'c3f90000-0000-0000-0000-000000000022'
+    );
+  EXCEPTION WHEN raise_exception THEN
+    v_rejected := true;
+  END;
+  IF NOT v_rejected THEN
+    RAISE EXCEPTION 'held staff actor unexpectedly read protected draft quiz authoring data';
+  END IF;
+END;
+$held_staff_draft_quiz_authoring_read$;
+RESET ROLE;
+
+SET LOCAL ROLE coditza_owner;
+UPDATE public.chapters
+SET status = 'archived'::public.content_status
+WHERE id = 'c32d0000-0000-0000-0000-000000000001';
+RESET ROLE;
+
+SET LOCAL ROLE service_role;
+DO $archived_chapter_draft_quiz_authoring_read_denial$
+DECLARE
+  v_rejected boolean := false;
+BEGIN
+  BEGIN
+    PERFORM public.assessment_get_draft_quiz_authoring(
+      'c3000000-0000-0000-0000-000000000005',
+      'c35d0000-0000-0000-0000-000000000002',
+      'c3f90000-0000-0000-0000-000000000023'
+    );
+  EXCEPTION WHEN raise_exception THEN
+    v_rejected := true;
+  END;
+  IF NOT v_rejected THEN
+    RAISE EXCEPTION 'archived chapter unexpectedly exposed draft quiz authoring data';
+  END IF;
+END;
+$archived_chapter_draft_quiz_authoring_read_denial$;
+RESET ROLE;
+
+SET LOCAL ROLE coditza_owner;
+SELECT extensions.ok(
+  EXISTS (
+    SELECT 1
+    FROM public.quizzes AS quiz
+    WHERE quiz.id = 'c35d0000-0000-0000-0000-000000000001'
+      AND quiz.chapter_id = 'c32d0000-0000-0000-0000-000000000001'
+      AND quiz.status = 'draft'::public.content_status
+      AND quiz.row_version = 1
+      AND quiz.definition_version = 1
+  )
+  AND EXISTS (
+    SELECT 1
+    FROM public.quizzes AS quiz
+    WHERE quiz.id = 'c35d0000-0000-0000-0000-000000000002'
+      AND quiz.chapter_id = 'c32d0000-0000-0000-0000-000000000001'
+      AND quiz.status = 'draft'::public.content_status
+      AND quiz.row_version = 1
+      AND quiz.definition_version = 1
+  )
+  AND (
+    SELECT pg_catalog.count(*) = 4
+    FROM public.quiz_questions AS question_entry
+    WHERE question_entry.quiz_id = 'c35d0000-0000-0000-0000-000000000001'
+  )
+  AND (
+    SELECT pg_catalog.count(*) = 5
+    FROM public.quiz_question_options AS option_entry
+    JOIN public.quiz_questions AS question_entry
+      ON question_entry.id = option_entry.question_id
+    WHERE question_entry.quiz_id = 'c35d0000-0000-0000-0000-000000000001'
+  )
+  AND (
+    SELECT pg_catalog.count(*) = 3
+    FROM private.quiz_question_answer_keys AS answer_key
+    JOIN public.quiz_questions AS question_entry
+      ON question_entry.id = answer_key.question_id
+    WHERE question_entry.quiz_id = 'c35d0000-0000-0000-0000-000000000001'
+  )
+  AND EXISTS (
+    SELECT 1
+    FROM private.quiz_question_answer_keys AS answer_key
+    WHERE answer_key.question_id = 'c36d0000-0000-0000-0000-000000000001'
+      AND answer_key.answer_spec =
+        '{"correctOptionId":"c37d0000-0000-0000-0000-000000000002"}'::jsonb
+      AND answer_key.feedback_correct_markdown = 'Single correct feedback.'
+      AND answer_key.feedback_incorrect_markdown = 'Single incorrect feedback.'
+  )
+  AND EXISTS (
+    SELECT 1
+    FROM private.quiz_question_answer_keys AS answer_key
+    WHERE answer_key.question_id = 'c36d0000-0000-0000-0000-000000000002'
+      AND answer_key.answer_spec =
+        '{"correctOptionIds":["c37d0000-0000-0000-0000-000000000003","c37d0000-0000-0000-0000-000000000005"]}'::jsonb
+      AND answer_key.feedback_correct_markdown = 'Multiple correct feedback.'
+      AND answer_key.feedback_incorrect_markdown = 'Multiple incorrect feedback.'
+  )
+  AND EXISTS (
+    SELECT 1
+    FROM private.quiz_question_answer_keys AS answer_key
+    WHERE answer_key.question_id = 'c36d0000-0000-0000-0000-000000000003'
+      AND answer_key.answer_spec =
+        '{"acceptedAnswers":["da","nu"],"normalization":"nfkc_ascii_ws_ascii_lower_v1"}'::jsonb
+      AND answer_key.feedback_correct_markdown IS NULL
+      AND answer_key.feedback_incorrect_markdown = 'Short incorrect feedback.'
+  )
+  AND NOT EXISTS (
+    SELECT 1
+    FROM private.quiz_question_answer_keys AS answer_key
+    WHERE answer_key.question_id = 'c36d0000-0000-0000-0000-000000000004'
+  )
+  AND EXISTS (
+    SELECT 1
+    FROM public.quiz_attempts AS attempt
+    WHERE attempt.id = 'c37e0000-0000-0000-0000-000000000001'
+      AND attempt.quiz_id = 'c35d0000-0000-0000-0000-000000000001'
+      AND attempt.quiz_definition_version = 1
+      AND attempt.attempt_number = 1
+  )
+  AND EXISTS (
+    SELECT 1
+    FROM public.chapters AS chapter
+    WHERE chapter.id = 'c32d0000-0000-0000-0000-000000000001'
+      AND chapter.status = 'archived'::public.content_status
+  )
+  AND (
+    SELECT pg_catalog.count(*) = 2
+      AND pg_catalog.bool_and(
+        audit_entry.actor_kind = 'user'
+        AND audit_entry.action = 'quiz_authoring_accessed'
+        AND audit_entry.entity_type = 'quiz'
+        AND audit_entry.changed_fields = ARRAY[]::text[]
+        AND audit_entry.change_summary = '{}'::jsonb
+        AND audit_entry.reason IS NULL
+        AND (
+          (
+            audit_entry.actor_user_id = 'c3000000-0000-0000-0000-000000000004'
+            AND audit_entry.entity_id = 'c35d0000-0000-0000-0000-000000000001'
+            AND audit_entry.request_id = 'c3f90000-0000-0000-0000-000000000020'
+          )
+          OR (
+            audit_entry.actor_user_id = 'c3000000-0000-0000-0000-000000000005'
+            AND audit_entry.entity_id = 'c35d0000-0000-0000-0000-000000000002'
+            AND audit_entry.request_id = 'c3f90000-0000-0000-0000-000000000021'
+          )
+        )
+      )
+    FROM private.audit_events AS audit_entry
+    WHERE audit_entry.action = 'quiz_authoring_accessed'
+      AND audit_entry.entity_type = 'quiz'
+      AND audit_entry.entity_id IN (
+        'c35d0000-0000-0000-0000-000000000001'::uuid,
+        'c35d0000-0000-0000-0000-000000000002'::uuid
+      )
+  )
+  AND NOT EXISTS (
+    SELECT 1
+    FROM private.audit_events AS audit_entry
+    WHERE audit_entry.request_id IN (
+      'c3f90000-0000-0000-0000-000000000002'::uuid,
+      'c3f90000-0000-0000-0000-000000000003'::uuid,
+      'c3f90000-0000-0000-0000-000000000004'::uuid,
+      'c3f90000-0000-0000-0000-000000000005'::uuid,
+      'c3f90000-0000-0000-0000-000000000006'::uuid,
+      'c3f90000-0000-0000-0000-000000000007'::uuid,
+      'c3f90000-0000-0000-0000-000000000008'::uuid,
+      'c3f90000-0000-0000-0000-000000000022'::uuid,
+      'c3f90000-0000-0000-0000-000000000023'::uuid
+    )
+  )
+  AND NOT EXISTS (
+    SELECT 1
+    FROM private.idempotency_records AS record_entry
+    WHERE record_entry.result_resource_id IN (
+      'c35d0000-0000-0000-0000-000000000001'::uuid,
+      'c35d0000-0000-0000-0000-000000000002'::uuid
+    )
+  )
+  AND COALESCE(
+    pg_catalog.current_setting('coditza.assessment_tree_root', true),
+    ''
+  ) = ''
+  AND COALESCE(
+    pg_catalog.current_setting('coditza.learning_write', true),
+    ''
+  ) = '',
+  'draft-quiz authoring reads return only ordered protected nested keys, preserve drafts and history, audit access safely, and avoid idempotency'
 );
 RESET ROLE;
 
