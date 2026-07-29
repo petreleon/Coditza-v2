@@ -28,19 +28,25 @@ draft-exercise and draft-quiz PATCH clusters, documented in
 [slice 09](../docs/implementation/SUP-FUNCTIONS-001-slice-09.md),
 [slice 10](../docs/implementation/SUP-FUNCTIONS-001-slice-10.md), and
 [slice 11](../docs/implementation/SUP-FUNCTIONS-001-slice-11.md), and
-[slice 12](../docs/implementation/SUP-FUNCTIONS-001-slice-12.md). Continue
+[slice 12](../docs/implementation/SUP-FUNCTIONS-001-slice-12.md), and
+[slice 13](../docs/implementation/SUP-FUNCTIONS-001-slice-13.md). Continue
 from those bounded baselines with the assessment-owned
-`assessment_get_draft_exercise_authoring` facade. It must require a
+`assessment_get_draft_quiz_authoring` facade. It must require a
 server-generated request UUID, recheck the live active staff actor before
 protected content access, and lock the canonical module, chapter, and draft
-exercise path while rejecting missing/reparented/archived ancestors and
-non-draft roots. It must return only the protected ID-based scalar draft
-exercise definition/key projection required by the server path, append the
-plan-required sanitized access audit without authored or answer material, and
-grant execution only to `service_role`. It must not accept a generic
-assessment type, mutate content, expose a learner/list/detail projection,
-introduce replay/idempotency behavior, implement `python_code`, or add
-HTTP/direct-client behavior.
+quiz path while rejecting missing/reparented/archived ancestors and
+non-draft roots. It must return only the protected ID-based nested draft
+quiz definition/key projection required by the server path: questions and
+their options in stored position/ID order, with each stored scalar answer
+spec and feedback or JSON null key fields for an incomplete question. An
+empty draft question array is valid. It may not reconstruct client refs or
+expose root/list/detail, key/audit metadata, or a learner projection. It must
+append exactly one plan-required sanitized `quiz_authoring_accessed` audit
+without authored or answer material and grant execution only to
+`service_role`. This read must not reject retained attempt history or advance
+either version. It must not accept a generic assessment type, mutate content
+or set a tree marker, introduce replay/idempotency behavior, implement Python
+definition data, or add HTTP/direct-client behavior.
 
 ## Read first
 

@@ -4,7 +4,7 @@ BEGIN;
 -- and the only runtime role used for successful calls is service_role.
 GRANT USAGE ON SCHEMA extensions TO coditza_owner;
 
-SELECT extensions.plan(36);
+SELECT extensions.plan(38);
 
 SET LOCAL ROLE coditza_owner;
 DO $normalization_golden_vectors$
@@ -491,6 +491,42 @@ SELECT extensions.ok(
   'draft-quiz definition replacement facade is server-only while its actor-aware tree helper remains private'
 );
 
+SELECT extensions.ok(
+  (
+    SELECT procedure_entry.proowner = 'coditza_owner'::pg_catalog.regrole
+      AND procedure_entry.prosecdef
+      AND procedure_entry.proconfig = ARRAY['search_path=""']::text[]
+    FROM pg_catalog.pg_proc AS procedure_entry
+    WHERE procedure_entry.oid =
+      'public.assessment_get_draft_exercise_authoring(uuid,uuid,uuid)'::pg_catalog.regprocedure
+  )
+  AND (
+    SELECT pg_catalog.count(*) = 1
+    FROM pg_catalog.pg_proc AS procedure_entry
+    JOIN pg_catalog.pg_namespace AS procedure_namespace
+      ON procedure_namespace.oid = procedure_entry.pronamespace
+    WHERE procedure_namespace.nspname = 'public'
+      AND procedure_entry.proname = 'assessment_get_draft_exercise_authoring'
+  )
+  AND NOT EXISTS (
+    SELECT 1
+    FROM (
+      VALUES ('anon'), ('authenticated'), ('authenticator')
+    ) AS runtime_role(rolname)
+    WHERE pg_catalog.has_function_privilege(
+      runtime_role.rolname,
+      'public.assessment_get_draft_exercise_authoring(uuid,uuid,uuid)'::pg_catalog.regprocedure,
+      'EXECUTE'
+    )
+  )
+  AND pg_catalog.has_function_privilege(
+    'service_role',
+    'public.assessment_get_draft_exercise_authoring(uuid,uuid,uuid)'::pg_catalog.regprocedure,
+    'EXECUTE'
+  ),
+  'draft-exercise authoring read facade is owner-controlled, fixed-path, exact-name, and server-only'
+);
+
 SET LOCAL ROLE authenticated;
 DO $authenticated_facade_denial$
 DECLARE
@@ -688,6 +724,20 @@ BEGIN
   END;
   IF NOT v_rejected THEN
     RAISE EXCEPTION 'authenticated role unexpectedly executed a draft quiz definition replacement facade';
+  END IF;
+
+  v_rejected := false;
+  BEGIN
+    PERFORM public.assessment_get_draft_exercise_authoring(
+      'c3000000-0000-0000-0000-000000000005',
+      'c3460000-0000-0000-0000-000000000001',
+      'c3f80000-0000-0000-0000-000000000001'
+    );
+  EXCEPTION WHEN insufficient_privilege THEN
+    v_rejected := true;
+  END;
+  IF NOT v_rejected THEN
+    RAISE EXCEPTION 'authenticated role unexpectedly executed a draft exercise authoring read facade';
   END IF;
 END;
 $authenticated_facade_denial$;
@@ -6900,6 +6950,490 @@ SELECT extensions.ok(
     ''
   ) = '',
   'draft-quiz definition replacement keeps the full submitted tree atomic, versioned, mapped safely, history-safe, and outside idempotency'
+);
+RESET ROLE;
+
+-- The protected authoring-read fixture remains separate from every previous
+-- authoring mutation proof. It includes a retained attempt deliberately:
+-- reads of a still-draft definition must not invent a mutation-only history
+-- denial or advance either root version.
+SET LOCAL ROLE coditza_owner;
+INSERT INTO public.modules (
+  id,
+  slug,
+  title,
+  description_markdown,
+  position,
+  created_by,
+  updated_by
+)
+VALUES (
+  'c31c0000-0000-0000-0000-000000000001',
+  'draft-exercise-authoring-read-module',
+  'Draft exercise authoring read module',
+  'Independent hierarchy for protected draft exercise authoring reads.',
+  904,
+  'c3000000-0000-0000-0000-000000000004',
+  'c3000000-0000-0000-0000-000000000004'
+);
+INSERT INTO public.chapters (
+  id,
+  module_id,
+  slug,
+  title,
+  summary_markdown,
+  position,
+  estimated_minutes,
+  created_by,
+  updated_by
+)
+VALUES (
+  'c32c0000-0000-0000-0000-000000000001',
+  'c31c0000-0000-0000-0000-000000000001',
+  'draft-exercise-authoring-read-chapter',
+  'Draft exercise authoring read chapter',
+  'Independent parent chapter for protected draft exercise authoring reads.',
+  0,
+  12,
+  'c3000000-0000-0000-0000-000000000004',
+  'c3000000-0000-0000-0000-000000000004'
+);
+INSERT INTO public.exercises (
+  id,
+  chapter_id,
+  title,
+  prompt_markdown,
+  exercise_type,
+  position,
+  points,
+  is_required,
+  created_by,
+  updated_by
+)
+VALUES
+  (
+    'c3460000-0000-0000-0000-000000000001',
+    'c32c0000-0000-0000-0000-000000000001',
+    'Complete protected draft exercise',
+    'Choose both stored correct options.',
+    'multiple_choice',
+    0,
+    8,
+    true,
+    'c3000000-0000-0000-0000-000000000004',
+    'c3000000-0000-0000-0000-000000000004'
+  ),
+  (
+    'c3480000-0000-0000-0000-000000000001',
+    'c32c0000-0000-0000-0000-000000000001',
+    'Incomplete protected draft exercise',
+    'This draft intentionally has no answer key yet.',
+    'short_text',
+    1,
+    3,
+    false,
+    'c3000000-0000-0000-0000-000000000004',
+    'c3000000-0000-0000-0000-000000000004'
+  ),
+  (
+    'c3490000-0000-0000-0000-000000000001',
+    'c32c0000-0000-0000-0000-000000000001',
+    'Deferred Python protected draft exercise',
+    'Python authoring remains owned by the separate runtime task.',
+    'python_code',
+    2,
+    5,
+    true,
+    'c3000000-0000-0000-0000-000000000004',
+    'c3000000-0000-0000-0000-000000000004'
+  );
+SELECT pg_catalog.set_config(
+  'coditza.assessment_tree_root',
+  'exercise:c3460000-0000-0000-0000-000000000001',
+  true
+);
+INSERT INTO public.exercise_options (
+  id,
+  exercise_id,
+  label_markdown,
+  position
+)
+VALUES
+  (
+    'c3470000-0000-0000-0000-000000000002',
+    'c3460000-0000-0000-0000-000000000001',
+    'Middle incorrect option.',
+    1
+  ),
+  (
+    'c3470000-0000-0000-0000-000000000003',
+    'c3460000-0000-0000-0000-000000000001',
+    'Final correct option.',
+    2
+  ),
+  (
+    'c3470000-0000-0000-0000-000000000001',
+    'c3460000-0000-0000-0000-000000000001',
+    'First correct option.',
+    0
+  );
+INSERT INTO private.exercise_answer_keys (
+  exercise_id,
+  answer_spec,
+  feedback_correct_markdown,
+  feedback_incorrect_markdown,
+  created_by,
+  updated_by
+)
+VALUES (
+  'c3460000-0000-0000-0000-000000000001',
+  '{"correctOptionIds":["c3470000-0000-0000-0000-000000000001","c3470000-0000-0000-0000-000000000003"]}'::jsonb,
+  'Protected complete correct feedback.',
+  'Protected complete incorrect feedback.',
+  'c3000000-0000-0000-0000-000000000004',
+  'c3000000-0000-0000-0000-000000000004'
+);
+SELECT pg_catalog.set_config('coditza.assessment_tree_root', '', true);
+SELECT pg_catalog.set_config('coditza.learning_write', 'exercise', true);
+INSERT INTO public.exercise_attempts (
+  id,
+  user_id,
+  exercise_id,
+  exercise_definition_version,
+  answer,
+  is_correct,
+  points_earned,
+  points_possible
+)
+VALUES (
+  'c3750000-0000-0000-0000-000000000001',
+  'c3000000-0000-0000-0000-000000000001',
+  'c3460000-0000-0000-0000-000000000001',
+  1,
+  '{"optionIds":["c3470000-0000-0000-0000-000000000001","c3470000-0000-0000-0000-000000000003"]}'::jsonb,
+  true,
+  8,
+  8
+);
+SELECT pg_catalog.set_config('coditza.learning_write', '', true);
+RESET ROLE;
+
+SET LOCAL ROLE service_role;
+DO $assessment_get_draft_exercise_authoring$
+DECLARE
+  v_complete jsonb;
+  v_incomplete jsonb;
+  v_learner_rejected boolean := false;
+  v_null_actor_rejected boolean := false;
+  v_missing_actor_rejected boolean := false;
+  v_null_exercise_rejected boolean := false;
+  v_missing_exercise_rejected boolean := false;
+  v_null_request_rejected boolean := false;
+  v_python_rejected boolean := false;
+  v_published_rejected boolean := false;
+  v_archived_module_rejected boolean := false;
+BEGIN
+  BEGIN
+    PERFORM public.assessment_get_draft_exercise_authoring(
+      'c3000000-0000-0000-0000-000000000001',
+      'c3460000-0000-0000-0000-000000000001',
+      'c3f80000-0000-0000-0000-000000000001'
+    );
+  EXCEPTION WHEN raise_exception THEN
+    v_learner_rejected := true;
+  END;
+
+  BEGIN
+    PERFORM public.assessment_get_draft_exercise_authoring(
+      NULL::uuid,
+      'c3460000-0000-0000-0000-000000000001',
+      'c3f80000-0000-0000-0000-000000000002'
+    );
+  EXCEPTION WHEN raise_exception THEN
+    v_null_actor_rejected := true;
+  END;
+
+  BEGIN
+    PERFORM public.assessment_get_draft_exercise_authoring(
+      'c3000000-0000-0000-0000-000000000999',
+      'c3460000-0000-0000-0000-000000000001',
+      'c3f80000-0000-0000-0000-000000000003'
+    );
+  EXCEPTION WHEN raise_exception THEN
+    v_missing_actor_rejected := true;
+  END;
+
+  BEGIN
+    PERFORM public.assessment_get_draft_exercise_authoring(
+      'c3000000-0000-0000-0000-000000000004',
+      NULL::uuid,
+      'c3f80000-0000-0000-0000-000000000004'
+    );
+  EXCEPTION WHEN raise_exception THEN
+    v_null_exercise_rejected := true;
+  END;
+
+  BEGIN
+    PERFORM public.assessment_get_draft_exercise_authoring(
+      'c3000000-0000-0000-0000-000000000004',
+      'c3460000-0000-0000-0000-000000000999',
+      'c3f80000-0000-0000-0000-000000000005'
+    );
+  EXCEPTION WHEN raise_exception THEN
+    v_missing_exercise_rejected := true;
+  END;
+
+  BEGIN
+    PERFORM public.assessment_get_draft_exercise_authoring(
+      'c3000000-0000-0000-0000-000000000004',
+      'c3460000-0000-0000-0000-000000000001',
+      NULL::uuid
+    );
+  EXCEPTION WHEN raise_exception THEN
+    v_null_request_rejected := true;
+  END;
+
+  BEGIN
+    PERFORM public.assessment_get_draft_exercise_authoring(
+      'c3000000-0000-0000-0000-000000000004',
+      'c3490000-0000-0000-0000-000000000001',
+      'c3f80000-0000-0000-0000-000000000006'
+    );
+  EXCEPTION WHEN raise_exception THEN
+    v_python_rejected := true;
+  END;
+
+  BEGIN
+    PERFORM public.assessment_get_draft_exercise_authoring(
+      'c3000000-0000-0000-0000-000000000004',
+      'c3400000-0000-0000-0000-000000000001',
+      'c3f80000-0000-0000-0000-000000000007'
+    );
+  EXCEPTION WHEN raise_exception THEN
+    v_published_rejected := true;
+  END;
+
+  BEGIN
+    PERFORM public.assessment_get_draft_exercise_authoring(
+      'c3000000-0000-0000-0000-000000000004',
+      'c3430000-0000-0000-0000-000000000001',
+      'c3f80000-0000-0000-0000-000000000008'
+    );
+  EXCEPTION WHEN raise_exception THEN
+    v_archived_module_rejected := true;
+  END;
+
+  v_complete := public.assessment_get_draft_exercise_authoring(
+    'c3000000-0000-0000-0000-000000000004',
+    'c3460000-0000-0000-0000-000000000001',
+    'c3f80000-0000-0000-0000-000000000010'
+  );
+  v_incomplete := public.assessment_get_draft_exercise_authoring(
+    'c3000000-0000-0000-0000-000000000005',
+    'c3480000-0000-0000-0000-000000000001',
+    'c3f80000-0000-0000-0000-000000000011'
+  );
+
+  IF v_complete IS DISTINCT FROM pg_catalog.jsonb_build_object(
+      'options', pg_catalog.jsonb_build_array(
+        pg_catalog.jsonb_build_object(
+          'id', 'c3470000-0000-0000-0000-000000000001',
+          'labelMarkdown', 'First correct option.'
+        ),
+        pg_catalog.jsonb_build_object(
+          'id', 'c3470000-0000-0000-0000-000000000002',
+          'labelMarkdown', 'Middle incorrect option.'
+        ),
+        pg_catalog.jsonb_build_object(
+          'id', 'c3470000-0000-0000-0000-000000000003',
+          'labelMarkdown', 'Final correct option.'
+        )
+      ),
+      'answerSpec', '{"correctOptionIds":["c3470000-0000-0000-0000-000000000001","c3470000-0000-0000-0000-000000000003"]}'::jsonb,
+      'feedbackCorrectMarkdown', 'Protected complete correct feedback.',
+      'feedbackIncorrectMarkdown', 'Protected complete incorrect feedback.'
+    )
+    OR v_incomplete IS DISTINCT FROM pg_catalog.jsonb_build_object(
+      'options', '[]'::jsonb,
+      'answerSpec', NULL::jsonb,
+      'feedbackCorrectMarkdown', NULL::text,
+      'feedbackIncorrectMarkdown', NULL::text
+    )
+    OR NOT v_learner_rejected
+    OR NOT v_null_actor_rejected
+    OR NOT v_missing_actor_rejected
+    OR NOT v_null_exercise_rejected
+    OR NOT v_missing_exercise_rejected
+    OR NOT v_null_request_rejected
+    OR NOT v_python_rejected
+    OR NOT v_published_rejected
+    OR NOT v_archived_module_rejected THEN
+    RAISE EXCEPTION 'draft exercise authoring read did not preserve its exact protected scalar projection contract';
+  END IF;
+END;
+$assessment_get_draft_exercise_authoring$;
+RESET ROLE;
+
+SET LOCAL ROLE service_role;
+DO $held_staff_draft_exercise_authoring_read$
+DECLARE
+  v_rejected boolean := false;
+BEGIN
+  BEGIN
+    PERFORM public.assessment_get_draft_exercise_authoring(
+      'c3000000-0000-0000-0000-000000000006',
+      'c3460000-0000-0000-0000-000000000001',
+      'c3f80000-0000-0000-0000-000000000012'
+    );
+  EXCEPTION WHEN raise_exception THEN
+    v_rejected := true;
+  END;
+  IF NOT v_rejected THEN
+    RAISE EXCEPTION 'held staff actor unexpectedly read protected draft exercise authoring data';
+  END IF;
+END;
+$held_staff_draft_exercise_authoring_read$;
+RESET ROLE;
+
+SET LOCAL ROLE coditza_owner;
+UPDATE public.chapters
+SET status = 'archived'::public.content_status
+WHERE id = 'c32c0000-0000-0000-0000-000000000001';
+RESET ROLE;
+
+SET LOCAL ROLE service_role;
+DO $archived_chapter_draft_exercise_authoring_read_denial$
+DECLARE
+  v_rejected boolean := false;
+BEGIN
+  BEGIN
+    PERFORM public.assessment_get_draft_exercise_authoring(
+      'c3000000-0000-0000-0000-000000000005',
+      'c3480000-0000-0000-0000-000000000001',
+      'c3f80000-0000-0000-0000-000000000013'
+    );
+  EXCEPTION WHEN raise_exception THEN
+    v_rejected := true;
+  END;
+  IF NOT v_rejected THEN
+    RAISE EXCEPTION 'archived chapter unexpectedly exposed draft exercise authoring data';
+  END IF;
+END;
+$archived_chapter_draft_exercise_authoring_read_denial$;
+RESET ROLE;
+
+SET LOCAL ROLE coditza_owner;
+SELECT extensions.ok(
+  EXISTS (
+    SELECT 1
+    FROM public.exercises AS exercise
+    JOIN private.exercise_answer_keys AS answer_key
+      ON answer_key.exercise_id = exercise.id
+    WHERE exercise.id = 'c3460000-0000-0000-0000-000000000001'
+      AND exercise.chapter_id = 'c32c0000-0000-0000-0000-000000000001'
+      AND exercise.status = 'draft'::public.content_status
+      AND exercise.row_version = 1
+      AND exercise.definition_version = 1
+      AND answer_key.answer_spec =
+        '{"correctOptionIds":["c3470000-0000-0000-0000-000000000001","c3470000-0000-0000-0000-000000000003"]}'::jsonb
+      AND answer_key.feedback_correct_markdown = 'Protected complete correct feedback.'
+      AND answer_key.feedback_incorrect_markdown = 'Protected complete incorrect feedback.'
+  )
+  AND (
+    SELECT pg_catalog.count(*) = 3
+      AND pg_catalog.bool_and(option_entry.id IN (
+        'c3470000-0000-0000-0000-000000000001'::uuid,
+        'c3470000-0000-0000-0000-000000000002'::uuid,
+        'c3470000-0000-0000-0000-000000000003'::uuid
+      ))
+    FROM public.exercise_options AS option_entry
+    WHERE option_entry.exercise_id = 'c3460000-0000-0000-0000-000000000001'
+  )
+  AND EXISTS (
+    SELECT 1
+    FROM public.exercises AS exercise
+    WHERE exercise.id = 'c3480000-0000-0000-0000-000000000001'
+      AND exercise.status = 'draft'::public.content_status
+      AND exercise.row_version = 1
+      AND exercise.definition_version = 1
+  )
+  AND NOT EXISTS (
+    SELECT 1
+    FROM private.exercise_answer_keys AS answer_key
+    WHERE answer_key.exercise_id = 'c3480000-0000-0000-0000-000000000001'
+  )
+  AND EXISTS (
+    SELECT 1
+    FROM public.exercise_attempts AS attempt
+    WHERE attempt.id = 'c3750000-0000-0000-0000-000000000001'
+      AND attempt.exercise_id = 'c3460000-0000-0000-0000-000000000001'
+      AND attempt.exercise_definition_version = 1
+  )
+  AND EXISTS (
+    SELECT 1
+    FROM public.chapters AS chapter
+    WHERE chapter.id = 'c32c0000-0000-0000-0000-000000000001'
+      AND chapter.status = 'archived'::public.content_status
+  )
+  AND (
+    SELECT pg_catalog.count(*) = 2
+      AND pg_catalog.bool_and(
+        audit_entry.actor_kind = 'user'
+        AND audit_entry.action = 'exercise_authoring_accessed'
+        AND audit_entry.entity_type = 'exercise'
+        AND audit_entry.changed_fields = ARRAY[]::text[]
+        AND audit_entry.change_summary = '{}'::jsonb
+        AND audit_entry.reason IS NULL
+        AND (
+          (
+            audit_entry.actor_user_id = 'c3000000-0000-0000-0000-000000000004'
+            AND audit_entry.entity_id = 'c3460000-0000-0000-0000-000000000001'
+            AND audit_entry.request_id = 'c3f80000-0000-0000-0000-000000000010'
+          )
+          OR (
+            audit_entry.actor_user_id = 'c3000000-0000-0000-0000-000000000005'
+            AND audit_entry.entity_id = 'c3480000-0000-0000-0000-000000000001'
+            AND audit_entry.request_id = 'c3f80000-0000-0000-0000-000000000011'
+          )
+        )
+      )
+    FROM private.audit_events AS audit_entry
+    WHERE audit_entry.action = 'exercise_authoring_accessed'
+      AND audit_entry.entity_type = 'exercise'
+      AND audit_entry.entity_id IN (
+        'c3460000-0000-0000-0000-000000000001'::uuid,
+        'c3480000-0000-0000-0000-000000000001'::uuid
+      )
+  )
+  AND NOT EXISTS (
+    SELECT 1
+    FROM private.audit_events AS audit_entry
+    WHERE audit_entry.request_id IN (
+      'c3f80000-0000-0000-0000-000000000001'::uuid,
+      'c3f80000-0000-0000-0000-000000000002'::uuid,
+      'c3f80000-0000-0000-0000-000000000003'::uuid,
+      'c3f80000-0000-0000-0000-000000000004'::uuid,
+      'c3f80000-0000-0000-0000-000000000005'::uuid,
+      'c3f80000-0000-0000-0000-000000000006'::uuid,
+      'c3f80000-0000-0000-0000-000000000007'::uuid,
+      'c3f80000-0000-0000-0000-000000000008'::uuid,
+      'c3f80000-0000-0000-0000-000000000012'::uuid,
+      'c3f80000-0000-0000-0000-000000000013'::uuid
+    )
+  )
+  AND NOT EXISTS (
+    SELECT 1
+    FROM private.idempotency_records AS record_entry
+    WHERE record_entry.result_resource_id IN (
+      'c3460000-0000-0000-0000-000000000001'::uuid,
+      'c3480000-0000-0000-0000-000000000001'::uuid
+    )
+  )
+  AND COALESCE(
+    pg_catalog.current_setting('coditza.assessment_tree_root', true),
+    ''
+  ) = '',
+  'draft-exercise authoring reads return only ordered protected scalar definition keys, preserve drafts and history, audit access safely, and avoid idempotency'
 );
 RESET ROLE;
 

@@ -41,7 +41,8 @@ SQL helpers may live in `private`, but the runtime cannot execute them directly.
 | `update_draft_content(actor_id, type, id, expected_version, input)` | server secret + verified staff actor | static type/field allowlist; atomic root/tree change; one row-version increment and, for behavior changes, one definition-version increment; audit |
 | `correct_published_content(actor_id, type, id, expected_version, reason_code, input)` | server secret + verified staff actor | module/chapter/theory correction allowlist only; required approved reason code; preserve completion; audit |
 | `replace_draft_quiz_definition(actor_id, quiz_id, expected_version, definition)` | server secret + verified staff actor | validate/replace the entire submitted draft question-option-key tree, including the permitted empty/incomplete draft envelope; increment row/definition versions once, no partial state |
-| `get_draft_assessment_authoring(actor_id, type, id)` | server secret + verified staff actor | reload staff role, require draft, return protected ID-based definition/key projection, audit access |
+| `assessment_get_draft_exercise_authoring(actor_id, exercise_id, request_id)` | server secret + verified staff actor | reload staff role, lock active draft hierarchy, return only protected stored-ID scalar definition/key data, and audit access |
+| `assessment_get_draft_quiz_authoring(actor_id, quiz_id, request_id)` | server secret + verified staff actor | reload staff role, lock active draft hierarchy, return only protected stored-ID nested definition/key data, and audit access |
 | `start_quiz_attempt(actor_id, quiz_id, idempotency_key, canonical_version, request_hash)` | server secret + verified authenticated owner actor | idempotency step zero; for new key lock ancestors/quiz, recheck publication, finalize stale attempt, enforce limit, create deadline/result |
 | `save_quiz_answer(actor_id, attempt_id, question_id, answer)` | server secret + verified owner actor | lock attempt; recheck owner/in-progress and `(expires_at is null or now() < expires_at)`; validate; identical retry preserves timestamp |
 | `remove_quiz_answer(actor_id, attempt_id, question_id)` | server secret + verified owner actor | same attempt lock/rechecks as save; idempotent delete while untimed or before a non-null deadline |
@@ -205,7 +206,7 @@ saved/graded answers so omitted questions cannot disappear.
 - [ ] Grant execution only to the server path and prove direct user denial.
 - [ ] Add concurrency tests before any HTTP mutation task uses a function.
 
-Implementation note (2026-07-29): twelve forward-only slices are present:
+Implementation note (2026-07-29): thirteen forward-only slices are present:
 structured idempotency replay, exact safe exercise/quiz-start response schemas,
 assessment learner mutations, matching SQL/TypeScript normalization vectors,
 service-role-only theory completion/current-curriculum progress reads with
@@ -227,8 +228,11 @@ version advance, retained-attempt denial, no tree mutation, and no invented
 PATCH idempotency, plus a named draft-quiz definition replacement facade with
 canonical ancestor locking, validated full-tree replacement, intentional
 incomplete-draft preservation, one root/definition version advance, retained
-attempt denial, safe client-reference mappings, and no invented replay. They
-are documented in
+attempt denial, safe client-reference mappings, and no invented replay, plus
+a named protected draft-exercise authoring-read facade with canonical shared
+ancestor/root locks, a minimal stored-ID scalar definition/key projection,
+incomplete-draft null-key preservation, retained-attempt access, empty-delta
+safe audit, and no version/tree/idempotency mutation. They are documented in
 [slice 01](../../docs/implementation/SUP-FUNCTIONS-001-slice-01.md) and
 [slice 02](../../docs/implementation/SUP-FUNCTIONS-001-slice-02.md) and
 [slice 03](../../docs/implementation/SUP-FUNCTIONS-001-slice-03.md) and
@@ -240,7 +244,8 @@ are documented in
 [slice 09](../../docs/implementation/SUP-FUNCTIONS-001-slice-09.md), and
 [slice 10](../../docs/implementation/SUP-FUNCTIONS-001-slice-10.md), and
 [slice 11](../../docs/implementation/SUP-FUNCTIONS-001-slice-11.md), and
-[slice 12](../../docs/implementation/SUP-FUNCTIONS-001-slice-12.md).
+[slice 12](../../docs/implementation/SUP-FUNCTIONS-001-slice-12.md), and
+[slice 13](../../docs/implementation/SUP-FUNCTIONS-001-slice-13.md).
 Remaining authoring/lifecycle/operations facades and real two-session race
 proof remain open; each authoring facade must use the locked active-staff
 assertion rather than a bare role boolean.
