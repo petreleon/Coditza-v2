@@ -13,11 +13,11 @@
   draft-exercise PATCH, draft-quiz root PATCH, and complete draft-quiz
   definition-replacement and protected draft-exercise and draft-quiz
   authoring-read and draft-module/draft-chapter/draft-theory-section PATCH and
-  published-module/published-chapter/published-theory-section correction slices
-  are implemented and verified; remaining owner families and real concurrency
-  proof are still required.
-- Last verified implementation slice: SUP-FUNCTIONS-001 published-theory-
-  section correction facade with protected local and Docker verification
+  published-module/published-chapter/published-theory-section correction and
+  theory-section publication slices are implemented and verified; remaining
+  owner families and real concurrency proof are still required.
+- Last verified implementation slice: SUP-FUNCTIONS-001 theory-section
+  publication facade with protected local and Docker verification
 - Last updated: 2026-07-29
 
 ## Phase status
@@ -260,6 +260,12 @@ to the deadlines in that file.
   non-archived ancestors, preserves the root, siblings, assessment state, and
   learning state, returns safe no-op/version results, writes a redacted
   required-reason audit only for real changes, and passes protected
+  local/Docker proof.
+- [SUP-FUNCTIONS-001 theory-section publication slice report](../docs/implementation/SUP-FUNCTIONS-001-slice-21.md);
+  a service-role-only facade now publishes one complete theory draft with
+  canonical hierarchy and UUID-ordered progress locks, accepts all
+  non-archived ancestor combinations, recalculates only effective published
+  progress, retries safely by lifecycle state, and passes protected
   local/Docker proof.
 - [G1 completion record](08-execution/00-roadmap.md#g1-completion-record);
   Foundation reproducibility is recorded from the accepted architecture/product

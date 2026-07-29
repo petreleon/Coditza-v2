@@ -4,7 +4,7 @@ BEGIN;
 -- and the only runtime role used for successful calls is service_role.
 GRANT USAGE ON SCHEMA extensions TO coditza_owner;
 
-SELECT extensions.plan(52);
+SELECT extensions.plan(54);
 
 SET LOCAL ROLE coditza_owner;
 DO $normalization_golden_vectors$
@@ -780,6 +780,42 @@ SELECT extensions.ok(
   'published-theory-section correction facade is owner-controlled, fixed-path, exact-name, and server-only'
 );
 
+SELECT extensions.ok(
+  (
+    SELECT procedure_entry.proowner = 'coditza_owner'::pg_catalog.regrole
+      AND procedure_entry.prosecdef
+      AND procedure_entry.proconfig = ARRAY['search_path=""']::text[]
+    FROM pg_catalog.pg_proc AS procedure_entry
+    WHERE procedure_entry.oid =
+      'public.curriculum_publish_theory_section(uuid,uuid,integer,uuid)'::pg_catalog.regprocedure
+  )
+  AND (
+    SELECT pg_catalog.count(*) = 1
+    FROM pg_catalog.pg_proc AS procedure_entry
+    JOIN pg_catalog.pg_namespace AS procedure_namespace
+      ON procedure_namespace.oid = procedure_entry.pronamespace
+    WHERE procedure_namespace.nspname = 'public'
+      AND procedure_entry.proname = 'curriculum_publish_theory_section'
+  )
+  AND NOT EXISTS (
+    SELECT 1
+    FROM (
+      VALUES ('anon'), ('authenticated'), ('authenticator')
+    ) AS runtime_role(rolname)
+    WHERE pg_catalog.has_function_privilege(
+      runtime_role.rolname,
+      'public.curriculum_publish_theory_section(uuid,uuid,integer,uuid)'::pg_catalog.regprocedure,
+      'EXECUTE'
+    )
+  )
+  AND pg_catalog.has_function_privilege(
+    'service_role',
+    'public.curriculum_publish_theory_section(uuid,uuid,integer,uuid)'::pg_catalog.regprocedure,
+    'EXECUTE'
+  ),
+  'published-theory-section publication facade is owner-controlled, fixed-path, exact-name, and server-only'
+);
+
 SET LOCAL ROLE authenticated;
 DO $authenticated_facade_denial$
 DECLARE
@@ -1110,6 +1146,22 @@ BEGIN
   END;
   IF NOT v_rejected THEN
     RAISE EXCEPTION 'authenticated role unexpectedly executed a published theory-section correction facade';
+  END IF;
+
+  v_rejected := false;
+  BEGIN
+    PERFORM *
+    FROM public.curriculum_publish_theory_section(
+      'c3000000-0000-0000-0000-000000000005',
+      'c3c30000-0000-0000-0000-000000000001',
+      2,
+      'c4000000-0000-0000-0000-000000000001'
+    );
+  EXCEPTION WHEN insufficient_privilege THEN
+    v_rejected := true;
+  END;
+  IF NOT v_rejected THEN
+    RAISE EXCEPTION 'authenticated role unexpectedly executed a theory-section publication facade';
   END IF;
 END;
 $authenticated_facade_denial$;
@@ -14309,6 +14361,1262 @@ SELECT extensions.ok(
     ''
   ) = '',
   'published-theory correction locks module then chapter then theory section, permits draft nonarchived ancestors, preserves root/completion/progress and sibling state, audits redacted content safely, and has no replay'
+);
+RESET ROLE;
+
+-- The publication facade reuses the completed correction fixture for the
+-- visible parent path and adds isolated valid draft targets for every other
+-- permitted parent-state combination. The direct owner setup is intentional:
+-- only the named service-role facade below performs lifecycle work under test.
+SET LOCAL ROLE coditza_owner;
+INSERT INTO public.modules (
+  id,
+  slug,
+  title,
+  description_markdown,
+  position,
+  created_by,
+  updated_by
+)
+VALUES (
+  'c4100000-0000-0000-0000-000000000001',
+  'draft-module-published-chapter-publication',
+  'Draft module with published chapter',
+  'Isolated hierarchy for draft-module theory publication verification.',
+  9900,
+  'c3000000-0000-0000-0000-000000000004',
+  'c3000000-0000-0000-0000-000000000004'
+);
+
+INSERT INTO public.chapters (
+  id,
+  module_id,
+  slug,
+  title,
+  summary_markdown,
+  position,
+  estimated_minutes,
+  created_by,
+  updated_by
+)
+VALUES (
+  'c4200000-0000-0000-0000-000000000001',
+  'c4100000-0000-0000-0000-000000000001',
+  'published-child-under-draft-module',
+  'Published chapter under draft module',
+  'This fixture isolates the draft-module/published-chapter path.',
+  0,
+  20,
+  'c3000000-0000-0000-0000-000000000004',
+  'c3000000-0000-0000-0000-000000000004'
+);
+
+UPDATE public.chapters
+SET status = 'published'::public.content_status,
+    published_at = pg_catalog.clock_timestamp()
+WHERE id = 'c4200000-0000-0000-0000-000000000001';
+
+INSERT INTO public.theory_sections (
+  id,
+  chapter_id,
+  title,
+  body_markdown,
+  position,
+  estimated_minutes,
+  created_by,
+  updated_by
+)
+VALUES
+  (
+    'c4300000-0000-0000-0000-000000000001',
+    'c4200000-0000-0000-0000-000000000001',
+    'Draft theory under draft module',
+    'This valid theory proves publication under a draft module and published chapter.',
+    0,
+    14,
+    'c3000000-0000-0000-0000-000000000004',
+    'c3000000-0000-0000-0000-000000000004'
+  ),
+  (
+    'c4310000-0000-0000-0000-000000000001',
+    'c32f0000-0000-0000-0000-000000000001',
+    'Draft theory under draft chapter',
+    'This valid theory proves publication under a published module and draft chapter.',
+    0,
+    13,
+    'c3000000-0000-0000-0000-000000000004',
+    'c3000000-0000-0000-0000-000000000004'
+  ),
+  (
+    'c4330000-0000-0000-0000-000000000001',
+    'c32c0000-0000-0000-0000-000000000001',
+    'Draft theory under archived chapter',
+    'This valid draft must be rejected because its chapter is archived.',
+    1,
+    11,
+    'c3000000-0000-0000-0000-000000000004',
+    'c3000000-0000-0000-0000-000000000004'
+  ),
+  (
+    'c4340000-0000-0000-0000-000000000001',
+    'c3310000-0000-0000-0000-000000000001',
+    'Draft theory under archived module',
+    'This valid draft must be rejected because its module is archived.',
+    1,
+    12,
+    'c3000000-0000-0000-0000-000000000004',
+    'c3000000-0000-0000-0000-000000000004'
+  );
+
+-- Sentinel snapshots ensure that publication beneath an ineffective ancestor
+-- proves the stronger no-write rule instead of merely observing absent rows.
+DO $published_theory_section_publication_seed_progress$
+DECLARE
+  v_seed record;
+BEGIN
+  FOR v_seed IN
+    SELECT *
+    FROM (
+      VALUES
+        (
+          'c3000000-0000-0000-0000-000000000004'::uuid,
+          'c3200000-0000-0000-0000-000000000001'::uuid
+        ),
+        (
+          'c3000000-0000-0000-0000-000000000002'::uuid,
+          'c32e0000-0000-0000-0000-000000000001'::uuid
+        ),
+        (
+          'c3000000-0000-0000-0000-000000000003'::uuid,
+          'c32f0000-0000-0000-0000-000000000001'::uuid
+        ),
+        (
+          'c3000000-0000-0000-0000-000000000005'::uuid,
+          'c4200000-0000-0000-0000-000000000001'::uuid
+        )
+    ) AS seed(user_id, chapter_id)
+  LOOP
+    PERFORM pg_catalog.set_config(
+      'coditza.learning_write',
+      'progress:' || v_seed.user_id::text || ':' || v_seed.chapter_id::text,
+      true
+    );
+    INSERT INTO public.chapter_progress (
+      user_id,
+      chapter_id,
+      theory_percent,
+      exercise_percent,
+      quiz_percent,
+      overall_percent
+    )
+    VALUES (
+      v_seed.user_id,
+      v_seed.chapter_id,
+      41,
+      42,
+      43,
+      42
+    );
+  END LOOP;
+  PERFORM pg_catalog.set_config('coditza.learning_write', '', true);
+END;
+$published_theory_section_publication_seed_progress$;
+RESET ROLE;
+
+SET LOCAL ROLE coditza_owner;
+DO $published_theory_section_publication_initial_snapshot$
+DECLARE
+  v_target_snapshots jsonb;
+  v_parent_snapshots jsonb;
+  v_unrelated_fingerprint text;
+  v_invisible_progress_snapshot jsonb;
+  v_affected_user_ids jsonb;
+  v_user_one_first_completed_at text;
+  v_user_one_completed_at text;
+BEGIN
+  SELECT pg_catalog.jsonb_object_agg(
+    theory_entry.id::text,
+    pg_catalog.jsonb_build_object(
+      'chapterId', theory_entry.chapter_id::text,
+      'title', theory_entry.title,
+      'bodyMarkdown', theory_entry.body_markdown,
+      'position', theory_entry.position,
+      'estimatedMinutes', theory_entry.estimated_minutes,
+      'createdAt', theory_entry.created_at::text,
+      'createdBy', theory_entry.created_by::text
+    )
+  )
+  INTO v_target_snapshots
+  FROM public.theory_sections AS theory_entry
+  WHERE theory_entry.id IN (
+    'c3c30000-0000-0000-0000-000000000001'::uuid,
+    'c4300000-0000-0000-0000-000000000001'::uuid,
+    'c4310000-0000-0000-0000-000000000001'::uuid,
+    'c33f0000-0000-0000-0000-000000000001'::uuid
+  );
+
+  SELECT pg_catalog.jsonb_build_object(
+    'modules',
+    (
+      SELECT pg_catalog.jsonb_agg(
+        pg_catalog.to_jsonb(module_entry)
+        ORDER BY module_entry.id
+      )
+      FROM public.modules AS module_entry
+      WHERE module_entry.id IN (
+        'c3100000-0000-0000-0000-000000000001'::uuid,
+        'c31e0000-0000-0000-0000-000000000001'::uuid,
+        'c4100000-0000-0000-0000-000000000001'::uuid
+      )
+    ),
+    'chapters',
+    (
+      SELECT pg_catalog.jsonb_agg(
+        pg_catalog.to_jsonb(chapter_entry)
+        ORDER BY chapter_entry.id
+      )
+      FROM public.chapters AS chapter_entry
+      WHERE chapter_entry.id IN (
+        'c3200000-0000-0000-0000-000000000001'::uuid,
+        'c32e0000-0000-0000-0000-000000000001'::uuid,
+        'c32f0000-0000-0000-0000-000000000001'::uuid,
+        'c4200000-0000-0000-0000-000000000001'::uuid
+      )
+    )
+  )
+  INTO v_parent_snapshots;
+
+  SELECT COALESCE(
+    pg_catalog.jsonb_agg(
+      pg_catalog.to_jsonb(progress_entry)
+      ORDER BY progress_entry.user_id, progress_entry.chapter_id
+    ),
+    '[]'::jsonb
+  )
+  INTO v_invisible_progress_snapshot
+  FROM public.chapter_progress AS progress_entry
+  WHERE (progress_entry.user_id, progress_entry.chapter_id) IN (
+    (
+      'c3000000-0000-0000-0000-000000000002'::uuid,
+      'c32e0000-0000-0000-0000-000000000001'::uuid
+    ),
+    (
+      'c3000000-0000-0000-0000-000000000003'::uuid,
+      'c32f0000-0000-0000-0000-000000000001'::uuid
+    ),
+    (
+      'c3000000-0000-0000-0000-000000000005'::uuid,
+      'c4200000-0000-0000-0000-000000000001'::uuid
+    )
+  );
+
+  SELECT COALESCE(
+    pg_catalog.jsonb_agg(affected_user.user_id::text ORDER BY affected_user.user_id),
+    '[]'::jsonb
+  )
+  INTO v_affected_user_ids
+  FROM (
+    SELECT progress_entry.user_id
+    FROM public.chapter_progress AS progress_entry
+    WHERE progress_entry.chapter_id =
+      'c3200000-0000-0000-0000-000000000001'::uuid
+
+    UNION
+
+    SELECT completion_entry.user_id
+    FROM public.theory_section_completions AS completion_entry
+    JOIN public.theory_sections AS theory_entry
+      ON theory_entry.id = completion_entry.theory_section_id
+    WHERE theory_entry.chapter_id =
+      'c3200000-0000-0000-0000-000000000001'::uuid
+
+    UNION
+
+    SELECT attempt_entry.user_id
+    FROM public.exercise_attempts AS attempt_entry
+    JOIN public.exercises AS exercise_entry
+      ON exercise_entry.id = attempt_entry.exercise_id
+    WHERE exercise_entry.chapter_id =
+      'c3200000-0000-0000-0000-000000000001'::uuid
+
+    UNION
+
+    SELECT attempt_entry.user_id
+    FROM public.quiz_attempts AS attempt_entry
+    JOIN public.quizzes AS quiz_entry
+      ON quiz_entry.id = attempt_entry.quiz_id
+    WHERE quiz_entry.chapter_id =
+      'c3200000-0000-0000-0000-000000000001'::uuid
+  ) AS affected_user;
+
+  SELECT
+    progress_entry.first_completed_at::text,
+    progress_entry.completed_at::text
+  INTO v_user_one_first_completed_at, v_user_one_completed_at
+  FROM public.chapter_progress AS progress_entry
+  WHERE progress_entry.user_id =
+      'c3000000-0000-0000-0000-000000000001'::uuid
+    AND progress_entry.chapter_id =
+      'c3200000-0000-0000-0000-000000000001'::uuid;
+
+  IF v_target_snapshots IS NULL
+    OR v_parent_snapshots IS NULL
+    OR v_user_one_first_completed_at IS NULL
+    OR v_user_one_completed_at IS NULL
+    OR v_affected_user_ids IS DISTINCT FROM pg_catalog.jsonb_build_array(
+      'c3000000-0000-0000-0000-000000000001',
+      'c3000000-0000-0000-0000-000000000002',
+      'c3000000-0000-0000-0000-000000000003',
+      'c3000000-0000-0000-0000-000000000004'
+    )
+    OR EXISTS (
+      SELECT 1
+      FROM public.chapter_progress AS progress_entry
+      WHERE progress_entry.chapter_id =
+          'c3200000-0000-0000-0000-000000000001'::uuid
+        AND progress_entry.user_id IN (
+          'c3000000-0000-0000-0000-000000000002'::uuid,
+          'c3000000-0000-0000-0000-000000000003'::uuid
+        )
+    )
+    OR NOT EXISTS (
+      SELECT 1
+      FROM public.chapter_progress AS progress_entry
+      WHERE progress_entry.user_id =
+          'c3000000-0000-0000-0000-000000000004'::uuid
+        AND progress_entry.chapter_id =
+          'c3200000-0000-0000-0000-000000000001'::uuid
+        AND progress_entry.theory_percent = 41
+        AND progress_entry.exercise_percent = 42
+        AND progress_entry.quiz_percent = 43
+        AND progress_entry.overall_percent = 42
+    ) THEN
+    RAISE EXCEPTION 'published theory publication fixture is incomplete';
+  END IF;
+
+  SELECT pg_catalog.md5(
+    COALESCE(
+      pg_catalog.jsonb_agg(
+        pg_catalog.jsonb_build_object(
+          'kind',
+          unchanged_entry.kind,
+          'stateDigest',
+          pg_catalog.md5(unchanged_entry.state::text)
+        )
+        ORDER BY unchanged_entry.kind, pg_catalog.md5(unchanged_entry.state::text)
+      )::text,
+      '[]'
+    )
+  )
+  INTO v_unrelated_fingerprint
+  FROM (
+    SELECT 'module'::text AS kind, pg_catalog.to_jsonb(module_entry) AS state
+    FROM public.modules AS module_entry
+
+    UNION ALL
+
+    SELECT 'chapter'::text, pg_catalog.to_jsonb(chapter_entry)
+    FROM public.chapters AS chapter_entry
+
+    UNION ALL
+
+    SELECT 'theory_section'::text, pg_catalog.to_jsonb(theory_entry)
+    FROM public.theory_sections AS theory_entry
+    WHERE theory_entry.id NOT IN (
+      'c3c30000-0000-0000-0000-000000000001'::uuid,
+      'c4300000-0000-0000-0000-000000000001'::uuid,
+      'c4310000-0000-0000-0000-000000000001'::uuid,
+      'c33f0000-0000-0000-0000-000000000001'::uuid
+    )
+
+    UNION ALL
+
+    SELECT 'exercise'::text, pg_catalog.to_jsonb(exercise_entry)
+    FROM public.exercises AS exercise_entry
+
+    UNION ALL
+
+    SELECT 'exercise_option'::text, pg_catalog.to_jsonb(option_entry)
+    FROM public.exercise_options AS option_entry
+
+    UNION ALL
+
+    SELECT 'exercise_key'::text, pg_catalog.to_jsonb(answer_key)
+    FROM private.exercise_answer_keys AS answer_key
+
+    UNION ALL
+
+    SELECT 'quiz'::text, pg_catalog.to_jsonb(quiz_entry)
+    FROM public.quizzes AS quiz_entry
+
+    UNION ALL
+
+    SELECT 'quiz_question'::text, pg_catalog.to_jsonb(question_entry)
+    FROM public.quiz_questions AS question_entry
+
+    UNION ALL
+
+    SELECT 'quiz_option'::text, pg_catalog.to_jsonb(option_entry)
+    FROM public.quiz_question_options AS option_entry
+
+    UNION ALL
+
+    SELECT 'quiz_key'::text, pg_catalog.to_jsonb(answer_key)
+    FROM private.quiz_question_answer_keys AS answer_key
+
+    UNION ALL
+
+    SELECT 'theory_completion'::text, pg_catalog.to_jsonb(completion_entry)
+    FROM public.theory_section_completions AS completion_entry
+
+    UNION ALL
+
+    SELECT 'exercise_attempt'::text, pg_catalog.to_jsonb(attempt_entry)
+    FROM public.exercise_attempts AS attempt_entry
+
+    UNION ALL
+
+    SELECT 'quiz_attempt'::text, pg_catalog.to_jsonb(attempt_entry)
+    FROM public.quiz_attempts AS attempt_entry
+
+    UNION ALL
+
+    SELECT 'quiz_attempt_answer'::text, pg_catalog.to_jsonb(answer_entry)
+    FROM public.quiz_attempt_answers AS answer_entry
+
+    UNION ALL
+
+    SELECT 'chapter_progress'::text, pg_catalog.to_jsonb(progress_entry)
+    FROM public.chapter_progress AS progress_entry
+    WHERE progress_entry.chapter_id <>
+      'c3200000-0000-0000-0000-000000000001'::uuid
+
+    UNION ALL
+
+    SELECT 'idempotency_record'::text, pg_catalog.to_jsonb(record_entry)
+    FROM private.idempotency_records AS record_entry
+  ) AS unchanged_entry;
+
+  PERFORM pg_catalog.set_config(
+    'coditza.slice21_target_snapshots',
+    v_target_snapshots::text,
+    true
+  );
+  PERFORM pg_catalog.set_config(
+    'coditza.slice21_parent_snapshots',
+    v_parent_snapshots::text,
+    true
+  );
+  PERFORM pg_catalog.set_config(
+    'coditza.slice21_invisible_progress',
+    v_invisible_progress_snapshot::text,
+    true
+  );
+  PERFORM pg_catalog.set_config(
+    'coditza.slice21_pp_candidates',
+    v_affected_user_ids::text,
+    true
+  );
+  PERFORM pg_catalog.set_config(
+    'coditza.slice21_user_one_first_completed_at',
+    v_user_one_first_completed_at,
+    true
+  );
+  PERFORM pg_catalog.set_config(
+    'coditza.slice21_unrelated_fingerprint',
+    v_unrelated_fingerprint,
+    true
+  );
+END;
+$published_theory_section_publication_initial_snapshot$;
+RESET ROLE;
+
+-- The unique-position check is explicitly made by the lifecycle facade. A
+-- deferred duplicate in a nested rollback proves malformed draft readiness is
+-- refused before the one lifecycle update can run.
+SET LOCAL ROLE coditza_owner;
+DO $published_theory_section_publication_position_readiness_denial$
+DECLARE
+  v_rejected boolean := false;
+BEGIN
+  BEGIN
+    SET CONSTRAINTS theory_sections_chapter_position_key DEFERRED;
+    UPDATE public.theory_sections
+    SET position = 0
+    WHERE id = 'c3c30000-0000-0000-0000-000000000001';
+
+    PERFORM *
+    FROM public.curriculum_publish_theory_section(
+      'c3000000-0000-0000-0000-000000000005',
+      'c3c30000-0000-0000-0000-000000000001',
+      3,
+      'c4010000-0000-0000-0000-000000000018'
+    );
+  EXCEPTION WHEN raise_exception THEN
+    v_rejected := true;
+  END;
+
+  IF NOT v_rejected THEN
+    RAISE EXCEPTION 'theory publication accepted a duplicate draft sibling position';
+  END IF;
+END;
+$published_theory_section_publication_position_readiness_denial$;
+RESET ROLE;
+
+SET LOCAL ROLE service_role;
+DO $curriculum_publish_theory_section_validation$
+DECLARE
+  v_invalid_case record;
+  v_rejected boolean;
+BEGIN
+  FOR v_invalid_case IN
+    SELECT *
+    FROM (
+      VALUES
+        (
+          'learner actor',
+          'c3000000-0000-0000-0000-000000000001'::uuid,
+          'c3c30000-0000-0000-0000-000000000001'::uuid,
+          2::integer,
+          'c4010000-0000-0000-0000-000000000002'::uuid
+        ),
+        (
+          'held actor',
+          'c3000000-0000-0000-0000-000000000006'::uuid,
+          'c3c30000-0000-0000-0000-000000000001'::uuid,
+          2::integer,
+          'c4010000-0000-0000-0000-000000000003'::uuid
+        ),
+        (
+          'null actor',
+          NULL::uuid,
+          'c3c30000-0000-0000-0000-000000000001'::uuid,
+          2::integer,
+          'c4010000-0000-0000-0000-000000000004'::uuid
+        ),
+        (
+          'missing actor',
+          'c3000000-0000-0000-0000-000000000999'::uuid,
+          'c3c30000-0000-0000-0000-000000000001'::uuid,
+          2::integer,
+          'c4010000-0000-0000-0000-000000000005'::uuid
+        ),
+        (
+          'null theory section',
+          'c3000000-0000-0000-0000-000000000005'::uuid,
+          NULL::uuid,
+          2::integer,
+          'c4010000-0000-0000-0000-000000000006'::uuid
+        ),
+        (
+          'missing theory section',
+          'c3000000-0000-0000-0000-000000000005'::uuid,
+          'c4390000-0000-0000-0000-000000000001'::uuid,
+          2::integer,
+          'c4010000-0000-0000-0000-000000000007'::uuid
+        ),
+        (
+          'null expected version',
+          'c3000000-0000-0000-0000-000000000005'::uuid,
+          'c3c30000-0000-0000-0000-000000000001'::uuid,
+          NULL::integer,
+          'c4010000-0000-0000-0000-000000000008'::uuid
+        ),
+        (
+          'zero expected version',
+          'c3000000-0000-0000-0000-000000000005'::uuid,
+          'c3c30000-0000-0000-0000-000000000001'::uuid,
+          0::integer,
+          'c4010000-0000-0000-0000-000000000009'::uuid
+        ),
+        (
+          'negative expected version',
+          'c3000000-0000-0000-0000-000000000005'::uuid,
+          'c3c30000-0000-0000-0000-000000000001'::uuid,
+          (-1)::integer,
+          'c4010000-0000-0000-0000-000000000010'::uuid
+        ),
+        (
+          'null request identifier',
+          'c3000000-0000-0000-0000-000000000005'::uuid,
+          'c3c30000-0000-0000-0000-000000000001'::uuid,
+          2::integer,
+          NULL::uuid
+        ),
+        (
+          'stale draft',
+          'c3000000-0000-0000-0000-000000000005'::uuid,
+          'c33e0000-0000-0000-0000-000000000001'::uuid,
+          1::integer,
+          'c4010000-0000-0000-0000-000000000012'::uuid
+        ),
+        (
+          'archived target',
+          'c3000000-0000-0000-0000-000000000005'::uuid,
+          'c33b0000-0000-0000-0000-000000000001'::uuid,
+          2::integer,
+          'c4010000-0000-0000-0000-000000000013'::uuid
+        ),
+        (
+          'draft target under archived chapter',
+          'c3000000-0000-0000-0000-000000000005'::uuid,
+          'c4330000-0000-0000-0000-000000000001'::uuid,
+          1::integer,
+          'c4010000-0000-0000-0000-000000000014'::uuid
+        ),
+        (
+          'draft target under archived module',
+          'c3000000-0000-0000-0000-000000000005'::uuid,
+          'c4340000-0000-0000-0000-000000000001'::uuid,
+          1::integer,
+          'c4010000-0000-0000-0000-000000000015'::uuid
+        ),
+        (
+          'published target under archived chapter',
+          'c3000000-0000-0000-0000-000000000005'::uuid,
+          'c33c0000-0000-0000-0000-000000000001'::uuid,
+          2::integer,
+          'c4010000-0000-0000-0000-000000000016'::uuid
+        ),
+        (
+          'published target under archived module',
+          'c3000000-0000-0000-0000-000000000005'::uuid,
+          'c33d0000-0000-0000-0000-000000000001'::uuid,
+          2::integer,
+          'c4010000-0000-0000-0000-000000000017'::uuid
+        )
+    ) AS invalid_case(
+      label,
+      actor_user_id,
+      theory_section_id,
+      expected_row_version,
+      request_id
+    )
+  LOOP
+    v_rejected := false;
+    BEGIN
+      PERFORM *
+      FROM public.curriculum_publish_theory_section(
+        v_invalid_case.actor_user_id,
+        v_invalid_case.theory_section_id,
+        v_invalid_case.expected_row_version,
+        v_invalid_case.request_id
+      );
+    EXCEPTION WHEN raise_exception THEN
+      v_rejected := true;
+    END;
+
+    IF NOT v_rejected THEN
+      RAISE EXCEPTION 'theory publication unexpectedly accepted invalid case: %',
+        v_invalid_case.label;
+    END IF;
+  END LOOP;
+END;
+$curriculum_publish_theory_section_validation$;
+RESET ROLE;
+
+SET LOCAL ROLE service_role;
+DO $curriculum_publish_theory_section_effective_parent_success$
+DECLARE
+  v_published record;
+BEGIN
+  SELECT * INTO v_published
+  FROM public.curriculum_publish_theory_section(
+    'c3000000-0000-0000-0000-000000000004',
+    'c3c30000-0000-0000-0000-000000000001',
+    2,
+    'c4010000-0000-0000-0000-000000000040'
+  );
+
+  IF v_published.response_status <> 200
+    OR v_published.response_body IS DISTINCT FROM pg_catalog.jsonb_build_object(
+      'id', 'c3c30000-0000-0000-0000-000000000001',
+      'rowVersion', 3
+    ) THEN
+    RAISE EXCEPTION 'theory publication did not return its safe effective-parent result';
+  END IF;
+END;
+$curriculum_publish_theory_section_effective_parent_success$;
+RESET ROLE;
+
+SET LOCAL ROLE coditza_owner;
+DO $published_theory_section_publication_effective_snapshot$
+DECLARE
+  v_target_updated_at text;
+  v_target_updated_by text;
+  v_target_published_at text;
+  v_progress_fingerprint text;
+BEGIN
+  SELECT
+    theory_entry.updated_at::text,
+    theory_entry.updated_by::text,
+    theory_entry.published_at::text
+  INTO v_target_updated_at, v_target_updated_by, v_target_published_at
+  FROM public.theory_sections AS theory_entry
+  WHERE theory_entry.id = 'c3c30000-0000-0000-0000-000000000001';
+
+  SELECT pg_catalog.md5(
+    COALESCE(
+      pg_catalog.jsonb_agg(
+        pg_catalog.to_jsonb(progress_entry)
+        ORDER BY progress_entry.user_id
+      )::text,
+      '[]'
+    )
+  )
+  INTO v_progress_fingerprint
+  FROM public.chapter_progress AS progress_entry
+  WHERE progress_entry.chapter_id =
+    'c3200000-0000-0000-0000-000000000001'::uuid;
+
+  IF v_target_updated_at IS NULL
+    OR v_target_updated_by IS NULL
+    OR v_target_published_at IS NULL THEN
+    RAISE EXCEPTION 'effective theory publication did not create target metadata';
+  END IF;
+
+  PERFORM pg_catalog.set_config(
+    'coditza.slice21_pp_target_updated_at',
+    v_target_updated_at,
+    true
+  );
+  PERFORM pg_catalog.set_config(
+    'coditza.slice21_pp_target_updated_by',
+    v_target_updated_by,
+    true
+  );
+  PERFORM pg_catalog.set_config(
+    'coditza.slice21_pp_target_published_at',
+    v_target_published_at,
+    true
+  );
+  PERFORM pg_catalog.set_config(
+    'coditza.slice21_pp_progress_fingerprint',
+    v_progress_fingerprint,
+    true
+  );
+END;
+$published_theory_section_publication_effective_snapshot$;
+RESET ROLE;
+
+SET LOCAL ROLE service_role;
+DO $curriculum_publish_theory_section_retry_and_ineffective_parent_successes$
+DECLARE
+  v_retry record;
+  v_published_under_published_draft record;
+  v_published_under_draft_published record;
+  v_published_under_draft_draft record;
+BEGIN
+  SELECT * INTO v_retry
+  FROM public.curriculum_publish_theory_section(
+    'c3000000-0000-0000-0000-000000000005',
+    'c3c30000-0000-0000-0000-000000000001',
+    2,
+    'c4010000-0000-0000-0000-000000000041'
+  );
+  SELECT * INTO v_published_under_published_draft
+  FROM public.curriculum_publish_theory_section(
+    'c3000000-0000-0000-0000-000000000005',
+    'c4310000-0000-0000-0000-000000000001',
+    1,
+    'c4010000-0000-0000-0000-000000000042'
+  );
+  SELECT * INTO v_published_under_draft_published
+  FROM public.curriculum_publish_theory_section(
+    'c3000000-0000-0000-0000-000000000004',
+    'c4300000-0000-0000-0000-000000000001',
+    1,
+    'c4010000-0000-0000-0000-000000000043'
+  );
+  SELECT * INTO v_published_under_draft_draft
+  FROM public.curriculum_publish_theory_section(
+    'c3000000-0000-0000-0000-000000000005',
+    'c33f0000-0000-0000-0000-000000000001',
+    1,
+    'c4010000-0000-0000-0000-000000000044'
+  );
+
+  IF v_retry.response_status <> 200
+    OR v_retry.response_body IS DISTINCT FROM pg_catalog.jsonb_build_object(
+      'id', 'c3c30000-0000-0000-0000-000000000001',
+      'rowVersion', 3
+    )
+    OR v_published_under_published_draft.response_status <> 200
+    OR v_published_under_published_draft.response_body IS DISTINCT FROM
+      pg_catalog.jsonb_build_object(
+        'id', 'c4310000-0000-0000-0000-000000000001',
+        'rowVersion', 2
+      )
+    OR v_published_under_draft_published.response_status <> 200
+    OR v_published_under_draft_published.response_body IS DISTINCT FROM
+      pg_catalog.jsonb_build_object(
+        'id', 'c4300000-0000-0000-0000-000000000001',
+        'rowVersion', 2
+      )
+    OR v_published_under_draft_draft.response_status <> 200
+    OR v_published_under_draft_draft.response_body IS DISTINCT FROM
+      pg_catalog.jsonb_build_object(
+        'id', 'c33f0000-0000-0000-0000-000000000001',
+        'rowVersion', 2
+      ) THEN
+    RAISE EXCEPTION 'theory publication did not preserve retry or non-effective-parent success semantics';
+  END IF;
+END;
+$curriculum_publish_theory_section_retry_and_ineffective_parent_successes$;
+RESET ROLE;
+
+SET LOCAL ROLE coditza_owner;
+DO $published_theory_section_publication_state_preservation$
+DECLARE
+  v_target_snapshots jsonb;
+  v_parent_snapshots jsonb;
+  v_invisible_progress_snapshot jsonb;
+  v_unrelated_fingerprint text;
+  v_pp_progress_fingerprint text;
+  v_pp_user_ids jsonb;
+BEGIN
+  SELECT pg_catalog.jsonb_object_agg(
+    theory_entry.id::text,
+    pg_catalog.jsonb_build_object(
+      'chapterId', theory_entry.chapter_id::text,
+      'title', theory_entry.title,
+      'bodyMarkdown', theory_entry.body_markdown,
+      'position', theory_entry.position,
+      'estimatedMinutes', theory_entry.estimated_minutes,
+      'createdAt', theory_entry.created_at::text,
+      'createdBy', theory_entry.created_by::text
+    )
+  )
+  INTO v_target_snapshots
+  FROM public.theory_sections AS theory_entry
+  WHERE theory_entry.id IN (
+    'c3c30000-0000-0000-0000-000000000001'::uuid,
+    'c4300000-0000-0000-0000-000000000001'::uuid,
+    'c4310000-0000-0000-0000-000000000001'::uuid,
+    'c33f0000-0000-0000-0000-000000000001'::uuid
+  );
+
+  SELECT pg_catalog.jsonb_build_object(
+    'modules',
+    (
+      SELECT pg_catalog.jsonb_agg(
+        pg_catalog.to_jsonb(module_entry)
+        ORDER BY module_entry.id
+      )
+      FROM public.modules AS module_entry
+      WHERE module_entry.id IN (
+        'c3100000-0000-0000-0000-000000000001'::uuid,
+        'c31e0000-0000-0000-0000-000000000001'::uuid,
+        'c4100000-0000-0000-0000-000000000001'::uuid
+      )
+    ),
+    'chapters',
+    (
+      SELECT pg_catalog.jsonb_agg(
+        pg_catalog.to_jsonb(chapter_entry)
+        ORDER BY chapter_entry.id
+      )
+      FROM public.chapters AS chapter_entry
+      WHERE chapter_entry.id IN (
+        'c3200000-0000-0000-0000-000000000001'::uuid,
+        'c32e0000-0000-0000-0000-000000000001'::uuid,
+        'c32f0000-0000-0000-0000-000000000001'::uuid,
+        'c4200000-0000-0000-0000-000000000001'::uuid
+      )
+    )
+  )
+  INTO v_parent_snapshots;
+
+  SELECT COALESCE(
+    pg_catalog.jsonb_agg(
+      pg_catalog.to_jsonb(progress_entry)
+      ORDER BY progress_entry.user_id, progress_entry.chapter_id
+    ),
+    '[]'::jsonb
+  )
+  INTO v_invisible_progress_snapshot
+  FROM public.chapter_progress AS progress_entry
+  WHERE (progress_entry.user_id, progress_entry.chapter_id) IN (
+    (
+      'c3000000-0000-0000-0000-000000000002'::uuid,
+      'c32e0000-0000-0000-0000-000000000001'::uuid
+    ),
+    (
+      'c3000000-0000-0000-0000-000000000003'::uuid,
+      'c32f0000-0000-0000-0000-000000000001'::uuid
+    ),
+    (
+      'c3000000-0000-0000-0000-000000000005'::uuid,
+      'c4200000-0000-0000-0000-000000000001'::uuid
+    )
+  );
+
+  SELECT pg_catalog.md5(
+    COALESCE(
+      pg_catalog.jsonb_agg(
+        pg_catalog.jsonb_build_object(
+          'kind',
+          unchanged_entry.kind,
+          'stateDigest',
+          pg_catalog.md5(unchanged_entry.state::text)
+        )
+        ORDER BY unchanged_entry.kind, pg_catalog.md5(unchanged_entry.state::text)
+      )::text,
+      '[]'
+    )
+  )
+  INTO v_unrelated_fingerprint
+  FROM (
+    SELECT 'module'::text AS kind, pg_catalog.to_jsonb(module_entry) AS state
+    FROM public.modules AS module_entry
+
+    UNION ALL
+
+    SELECT 'chapter'::text, pg_catalog.to_jsonb(chapter_entry)
+    FROM public.chapters AS chapter_entry
+
+    UNION ALL
+
+    SELECT 'theory_section'::text, pg_catalog.to_jsonb(theory_entry)
+    FROM public.theory_sections AS theory_entry
+    WHERE theory_entry.id NOT IN (
+      'c3c30000-0000-0000-0000-000000000001'::uuid,
+      'c4300000-0000-0000-0000-000000000001'::uuid,
+      'c4310000-0000-0000-0000-000000000001'::uuid,
+      'c33f0000-0000-0000-0000-000000000001'::uuid
+    )
+
+    UNION ALL
+
+    SELECT 'exercise'::text, pg_catalog.to_jsonb(exercise_entry)
+    FROM public.exercises AS exercise_entry
+
+    UNION ALL
+
+    SELECT 'exercise_option'::text, pg_catalog.to_jsonb(option_entry)
+    FROM public.exercise_options AS option_entry
+
+    UNION ALL
+
+    SELECT 'exercise_key'::text, pg_catalog.to_jsonb(answer_key)
+    FROM private.exercise_answer_keys AS answer_key
+
+    UNION ALL
+
+    SELECT 'quiz'::text, pg_catalog.to_jsonb(quiz_entry)
+    FROM public.quizzes AS quiz_entry
+
+    UNION ALL
+
+    SELECT 'quiz_question'::text, pg_catalog.to_jsonb(question_entry)
+    FROM public.quiz_questions AS question_entry
+
+    UNION ALL
+
+    SELECT 'quiz_option'::text, pg_catalog.to_jsonb(option_entry)
+    FROM public.quiz_question_options AS option_entry
+
+    UNION ALL
+
+    SELECT 'quiz_key'::text, pg_catalog.to_jsonb(answer_key)
+    FROM private.quiz_question_answer_keys AS answer_key
+
+    UNION ALL
+
+    SELECT 'theory_completion'::text, pg_catalog.to_jsonb(completion_entry)
+    FROM public.theory_section_completions AS completion_entry
+
+    UNION ALL
+
+    SELECT 'exercise_attempt'::text, pg_catalog.to_jsonb(attempt_entry)
+    FROM public.exercise_attempts AS attempt_entry
+
+    UNION ALL
+
+    SELECT 'quiz_attempt'::text, pg_catalog.to_jsonb(attempt_entry)
+    FROM public.quiz_attempts AS attempt_entry
+
+    UNION ALL
+
+    SELECT 'quiz_attempt_answer'::text, pg_catalog.to_jsonb(answer_entry)
+    FROM public.quiz_attempt_answers AS answer_entry
+
+    UNION ALL
+
+    SELECT 'chapter_progress'::text, pg_catalog.to_jsonb(progress_entry)
+    FROM public.chapter_progress AS progress_entry
+    WHERE progress_entry.chapter_id <>
+      'c3200000-0000-0000-0000-000000000001'::uuid
+
+    UNION ALL
+
+    SELECT 'idempotency_record'::text, pg_catalog.to_jsonb(record_entry)
+    FROM private.idempotency_records AS record_entry
+  ) AS unchanged_entry;
+
+  SELECT pg_catalog.md5(
+    COALESCE(
+      pg_catalog.jsonb_agg(
+        pg_catalog.to_jsonb(progress_entry)
+        ORDER BY progress_entry.user_id
+      )::text,
+      '[]'
+    )
+  )
+  INTO v_pp_progress_fingerprint
+  FROM public.chapter_progress AS progress_entry
+  WHERE progress_entry.chapter_id =
+    'c3200000-0000-0000-0000-000000000001'::uuid;
+
+  SELECT COALESCE(
+    pg_catalog.jsonb_agg(progress_entry.user_id::text ORDER BY progress_entry.user_id),
+    '[]'::jsonb
+  )
+  INTO v_pp_user_ids
+  FROM public.chapter_progress AS progress_entry
+  WHERE progress_entry.chapter_id =
+    'c3200000-0000-0000-0000-000000000001'::uuid;
+
+  IF v_target_snapshots IS DISTINCT FROM pg_catalog.current_setting(
+      'coditza.slice21_target_snapshots',
+      true
+    )::jsonb
+    OR v_parent_snapshots IS DISTINCT FROM pg_catalog.current_setting(
+      'coditza.slice21_parent_snapshots',
+      true
+    )::jsonb
+    OR v_invisible_progress_snapshot IS DISTINCT FROM pg_catalog.current_setting(
+      'coditza.slice21_invisible_progress',
+      true
+    )::jsonb
+    OR v_unrelated_fingerprint IS DISTINCT FROM pg_catalog.current_setting(
+      'coditza.slice21_unrelated_fingerprint',
+      true
+    )
+    OR v_pp_progress_fingerprint IS DISTINCT FROM pg_catalog.current_setting(
+      'coditza.slice21_pp_progress_fingerprint',
+      true
+    )
+    OR v_pp_user_ids IS DISTINCT FROM pg_catalog.current_setting(
+      'coditza.slice21_pp_candidates',
+      true
+    )::jsonb THEN
+    RAISE EXCEPTION 'theory publication changed an unrelated root, source, history, or ineffective-parent progress row';
+  END IF;
+
+  IF NOT EXISTS (
+    SELECT 1
+    FROM public.theory_sections AS theory_entry
+    WHERE theory_entry.id = 'c3c30000-0000-0000-0000-000000000001'
+      AND theory_entry.status = 'published'::public.content_status
+      AND theory_entry.published_at::text = pg_catalog.current_setting(
+        'coditza.slice21_pp_target_published_at',
+        true
+      )
+      AND theory_entry.row_version = 3
+      AND theory_entry.updated_at::text = pg_catalog.current_setting(
+        'coditza.slice21_pp_target_updated_at',
+        true
+      )
+      AND theory_entry.updated_by::text = pg_catalog.current_setting(
+        'coditza.slice21_pp_target_updated_by',
+        true
+      )
+      AND theory_entry.updated_by =
+        'c3000000-0000-0000-0000-000000000004'::uuid
+  )
+    OR NOT EXISTS (
+      SELECT 1
+      FROM public.theory_sections AS theory_entry
+      WHERE theory_entry.id = 'c4310000-0000-0000-0000-000000000001'
+        AND theory_entry.status = 'published'::public.content_status
+        AND theory_entry.published_at IS NOT NULL
+        AND theory_entry.row_version = 2
+        AND theory_entry.updated_by =
+          'c3000000-0000-0000-0000-000000000005'::uuid
+    )
+    OR NOT EXISTS (
+      SELECT 1
+      FROM public.theory_sections AS theory_entry
+      WHERE theory_entry.id = 'c4300000-0000-0000-0000-000000000001'
+        AND theory_entry.status = 'published'::public.content_status
+        AND theory_entry.published_at IS NOT NULL
+        AND theory_entry.row_version = 2
+        AND theory_entry.updated_by =
+          'c3000000-0000-0000-0000-000000000004'::uuid
+    )
+    OR NOT EXISTS (
+      SELECT 1
+      FROM public.theory_sections AS theory_entry
+      WHERE theory_entry.id = 'c33f0000-0000-0000-0000-000000000001'
+        AND theory_entry.status = 'published'::public.content_status
+        AND theory_entry.published_at IS NOT NULL
+        AND theory_entry.row_version = 2
+        AND theory_entry.updated_by =
+          'c3000000-0000-0000-0000-000000000005'::uuid
+    ) THEN
+    RAISE EXCEPTION 'theory publication did not preserve exact target lifecycle fields';
+  END IF;
+
+  IF NOT EXISTS (
+    SELECT 1
+    FROM public.chapter_progress AS progress_entry
+    WHERE progress_entry.user_id =
+        'c3000000-0000-0000-0000-000000000001'::uuid
+      AND progress_entry.chapter_id =
+        'c3200000-0000-0000-0000-000000000001'::uuid
+      AND progress_entry.theory_percent = 50
+      AND progress_entry.exercise_percent = 100
+      AND progress_entry.quiz_percent = 100
+      AND progress_entry.overall_percent = 83
+      AND progress_entry.first_completed_at::text = pg_catalog.current_setting(
+        'coditza.slice21_user_one_first_completed_at',
+        true
+      )
+      AND progress_entry.completed_at IS NULL
+  )
+    OR NOT EXISTS (
+      SELECT 1
+      FROM public.chapter_progress AS progress_entry
+      WHERE progress_entry.user_id =
+          'c3000000-0000-0000-0000-000000000002'::uuid
+        AND progress_entry.chapter_id =
+          'c3200000-0000-0000-0000-000000000001'::uuid
+        AND progress_entry.theory_percent = 0
+        AND progress_entry.exercise_percent = 0
+        AND progress_entry.quiz_percent = 0
+        AND progress_entry.overall_percent = 0
+        AND progress_entry.first_completed_at IS NULL
+        AND progress_entry.completed_at IS NULL
+    )
+    OR NOT EXISTS (
+      SELECT 1
+      FROM public.chapter_progress AS progress_entry
+      WHERE progress_entry.user_id =
+          'c3000000-0000-0000-0000-000000000003'::uuid
+        AND progress_entry.chapter_id =
+          'c3200000-0000-0000-0000-000000000001'::uuid
+        AND progress_entry.theory_percent = 50
+        AND progress_entry.exercise_percent = 100
+        AND progress_entry.quiz_percent = 100
+        AND progress_entry.overall_percent = 83
+        AND progress_entry.first_completed_at IS NULL
+        AND progress_entry.completed_at IS NULL
+    )
+    OR NOT EXISTS (
+      SELECT 1
+      FROM public.chapter_progress AS progress_entry
+      WHERE progress_entry.user_id =
+          'c3000000-0000-0000-0000-000000000004'::uuid
+        AND progress_entry.chapter_id =
+          'c3200000-0000-0000-0000-000000000001'::uuid
+        AND progress_entry.theory_percent = 0
+        AND progress_entry.exercise_percent = 0
+        AND progress_entry.quiz_percent = 0
+        AND progress_entry.overall_percent = 0
+        AND progress_entry.first_completed_at IS NULL
+        AND progress_entry.completed_at IS NULL
+    ) THEN
+    RAISE EXCEPTION 'effective theory publication did not recalculate every affected progress source correctly';
+  END IF;
+END;
+$published_theory_section_publication_state_preservation$;
+
+SELECT extensions.ok(
+  (
+    SELECT pg_catalog.count(*) = 4
+      AND pg_catalog.bool_and(
+        audit_entry.actor_kind = 'user'
+        AND audit_entry.action = 'theory_section_published'
+        AND audit_entry.entity_type = 'theory_section'
+        AND audit_entry.changed_fields = ARRAY['status']::text[]
+        AND audit_entry.change_summary =
+          '{"status":{"before":"draft","after":"published"}}'::jsonb
+        AND audit_entry.reason IS NULL
+        AND (
+          (
+            audit_entry.actor_user_id =
+              'c3000000-0000-0000-0000-000000000004'::uuid
+            AND audit_entry.entity_id =
+              'c3c30000-0000-0000-0000-000000000001'::uuid
+            AND audit_entry.request_id =
+              'c4010000-0000-0000-0000-000000000040'::uuid
+          )
+          OR (
+            audit_entry.actor_user_id =
+              'c3000000-0000-0000-0000-000000000005'::uuid
+            AND audit_entry.entity_id =
+              'c4310000-0000-0000-0000-000000000001'::uuid
+            AND audit_entry.request_id =
+              'c4010000-0000-0000-0000-000000000042'::uuid
+          )
+          OR (
+            audit_entry.actor_user_id =
+              'c3000000-0000-0000-0000-000000000004'::uuid
+            AND audit_entry.entity_id =
+              'c4300000-0000-0000-0000-000000000001'::uuid
+            AND audit_entry.request_id =
+              'c4010000-0000-0000-0000-000000000043'::uuid
+          )
+          OR (
+            audit_entry.actor_user_id =
+              'c3000000-0000-0000-0000-000000000005'::uuid
+            AND audit_entry.entity_id =
+              'c33f0000-0000-0000-0000-000000000001'::uuid
+            AND audit_entry.request_id =
+              'c4010000-0000-0000-0000-000000000044'::uuid
+          )
+        )
+      )
+    FROM private.audit_events AS audit_entry
+    WHERE audit_entry.action = 'theory_section_published'
+      AND audit_entry.entity_type = 'theory_section'
+      AND audit_entry.entity_id IN (
+        'c3c30000-0000-0000-0000-000000000001'::uuid,
+        'c4300000-0000-0000-0000-000000000001'::uuid,
+        'c4310000-0000-0000-0000-000000000001'::uuid,
+        'c33f0000-0000-0000-0000-000000000001'::uuid
+      )
+  )
+  AND NOT EXISTS (
+    SELECT 1
+    FROM private.audit_events AS audit_entry
+    WHERE audit_entry.request_id IN (
+      'c4000000-0000-0000-0000-000000000001'::uuid,
+      'c4010000-0000-0000-0000-000000000002'::uuid,
+      'c4010000-0000-0000-0000-000000000003'::uuid,
+      'c4010000-0000-0000-0000-000000000004'::uuid,
+      'c4010000-0000-0000-0000-000000000005'::uuid,
+      'c4010000-0000-0000-0000-000000000006'::uuid,
+      'c4010000-0000-0000-0000-000000000007'::uuid,
+      'c4010000-0000-0000-0000-000000000008'::uuid,
+      'c4010000-0000-0000-0000-000000000009'::uuid,
+      'c4010000-0000-0000-0000-000000000010'::uuid,
+      'c4010000-0000-0000-0000-000000000012'::uuid,
+      'c4010000-0000-0000-0000-000000000013'::uuid,
+      'c4010000-0000-0000-0000-000000000014'::uuid,
+      'c4010000-0000-0000-0000-000000000015'::uuid,
+      'c4010000-0000-0000-0000-000000000016'::uuid,
+      'c4010000-0000-0000-0000-000000000017'::uuid,
+      'c4010000-0000-0000-0000-000000000018'::uuid,
+      'c4010000-0000-0000-0000-000000000041'::uuid
+    )
+  )
+  AND NOT EXISTS (
+    SELECT 1
+    FROM private.idempotency_records AS record_entry
+    WHERE record_entry.result_resource_id IN (
+      'c3c30000-0000-0000-0000-000000000001'::uuid,
+      'c4300000-0000-0000-0000-000000000001'::uuid,
+      'c4310000-0000-0000-0000-000000000001'::uuid,
+      'c33f0000-0000-0000-0000-000000000001'::uuid
+    )
+  )
+  AND COALESCE(
+    pg_catalog.current_setting('coditza.learning_write', true),
+    ''
+  ) = '',
+  'theory publication locks the full path, validates readiness, recalculates every effective-progress source once, preserves ineffective-parent progress, audits only real transitions, and uses state-based retry without replay records'
 );
 RESET ROLE;
 

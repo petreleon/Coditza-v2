@@ -17,8 +17,9 @@ staff-authorization primitive cluster, root draft-module creation cluster,
 draft-chapter creation cluster, draft-theory-section creation cluster, scalar
 draft-exercise and complete draft-quiz creation clusters, scalar
 draft-exercise and draft-quiz PATCH clusters, protected assessment authoring
-reads, draft-module/chapter/theory-section PATCH clusters, and
-published-module/chapter/theory-section correction clusters, documented in
+reads, draft-module/chapter/theory-section PATCH clusters,
+published-module/chapter/theory-section correction clusters, and
+theory-section publication, documented in
 [slice 01](../docs/implementation/SUP-FUNCTIONS-001-slice-01.md),
 [slice 02](../docs/implementation/SUP-FUNCTIONS-001-slice-02.md), and
 [slice 03](../docs/implementation/SUP-FUNCTIONS-001-slice-03.md), and
@@ -38,41 +39,42 @@ published-module/chapter/theory-section correction clusters, documented in
 [slice 17](../docs/implementation/SUP-FUNCTIONS-001-slice-17.md), and
 [slice 18](../docs/implementation/SUP-FUNCTIONS-001-slice-18.md), and
 [slice 19](../docs/implementation/SUP-FUNCTIONS-001-slice-19.md), and
-[slice 20](../docs/implementation/SUP-FUNCTIONS-001-slice-20.md). Continue
-from those bounded baselines with the curriculum-owned
-curriculum_publish_theory_section facade. It must require a server-generated
-request UUID, non-null actor and theory-section identifiers, and a positive
-expected row version. It must recheck the live active editor/admin actor before
-any hierarchy or theory-content access, discover the current
-section-to-chapter-to-module path, lock module then chapter then theory section
-in canonical order, and recheck both hierarchy edges under those locks. The
-module and chapter may be draft or published but must not be archived.
+[slice 20](../docs/implementation/SUP-FUNCTIONS-001-slice-20.md), and
+[slice 21](../docs/implementation/SUP-FUNCTIONS-001-slice-21.md). Continue
+from those bounded baselines with the assessment-owned
+assessment_publish_exercise facade. It must require a server-generated request
+UUID, non-null actor and exercise identifiers, and a positive expected row
+version. It must recheck the live active editor/admin actor before hierarchy,
+exercise-root, definition, or progress-source access; discover the current
+exercise-to-chapter-to-module path; lock module then chapter then exercise in
+canonical order; and recheck both hierarchy edges. Module and chapter may be
+draft or published but must not be archived.
 
-The target must be handled as a closed lifecycle transition: a valid current
-draft can publish; an archived target is rejected; and an already published
-target returns only its current id and rowVersion without an UPDATE, audit, or
-progress recalculation. That idempotent already-published path must precede the
-expected-version comparison, so a retry using the original version receives the
-current safe result. A draft target must have trimmed 1..160 title, nonblank
-Markdown of at most 100,000 characters, estimated_minutes from 1 through
-1,440, and a valid sibling position. A real transition updates only status,
-the first published_at value, and updated_by, advances row_version exactly
-once through the lifecycle trigger, and appends exactly one
-theory_section_published audit event with changed_fields ['status'], the closed
-draft-to-published status delta, and no reason code. Execution must be granted
-only to service_role.
+The target is a closed lifecycle transition: an archived target is rejected;
+an already published target returns only its current id and rowVersion before
+expected-version comparison, with no UPDATE, audit, or progress recalculation;
+and only a current draft with the expected version may publish. Validate the
+locked root title (trimmed 1..160), prompt Markdown (nonblank, at most 50,000
+characters), points (1..1,000), non-null is_required, non-negative unique
+sibling position, and null published_at. It must invoke the existing
+private.validate_exercise_definition(exercise_id) as the authoritative option
+and answer-key completeness check, not duplicate that logic. Python-code
+exercises must fail closed until SUP-WASM-001 provides their digest-pinned
+private definition.
 
-When both ancestors are published, the transaction must synchronously
-recalculate every affected learner's chapter progress from the distinct union
-of chapter_progress, theory completions, exercise attempts, and quiz attempts
-for that chapter. It must acquire the documented progress locks last in UUID
-order and preserve source/history rows. Under a draft module or chapter, it
-must not create progress writes because the published denominator remains
-invisible. The facade must preserve authored content, hierarchy, position,
-created fields, definition/assessment state, and learner history. It must not
-add a reason/input envelope, replay/idempotency records, hierarchy/reorder,
-generic lifecycle, Fastify/HTTP/direct-client/Python/SMTP/MFA/Vercel behavior,
-or a broader publish operation.
+The sole real write changes only status, first published_at, and updated_by;
+the lifecycle triggers advance row_version/updated_at once. It then appends
+exactly one exercise_published audit event with changed_fields ['status'], the
+closed draft-to-published status delta, and no reason code. When both ancestors
+are published, it must recalculate every affected learner from the distinct
+UUID-sorted union of chapter_progress, theory completions, exercise attempts,
+and quiz attempts for that chapter, acquiring all progress locks last before
+calling the existing recalculator. Under a draft ancestor it must perform no
+progress source/snapshot reads or writes. It must preserve definition version,
+option/key tree, hierarchy, created fields, attempts/history, and optional
+exercise denominator semantics. It must not add input/reason envelopes,
+idempotency records, hierarchy/reorder/replacement, generic lifecycle,
+Fastify/HTTP/direct-client/Python/SMTP/MFA/Vercel behavior, or WASM work.
 
 ## Read first
 
