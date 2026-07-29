@@ -30,23 +30,32 @@ draft-exercise and draft-quiz PATCH clusters, documented in
 [slice 11](../docs/implementation/SUP-FUNCTIONS-001-slice-11.md), and
 [slice 12](../docs/implementation/SUP-FUNCTIONS-001-slice-12.md), and
 [slice 13](../docs/implementation/SUP-FUNCTIONS-001-slice-13.md), and
-[slice 14](../docs/implementation/SUP-FUNCTIONS-001-slice-14.md). Continue
+[slice 14](../docs/implementation/SUP-FUNCTIONS-001-slice-14.md), and
+[slice 15](../docs/implementation/SUP-FUNCTIONS-001-slice-15.md). Continue
 from those bounded baselines with the curriculum-owned
-curriculum_update_draft_module facade. It must require a server-generated
-request UUID, recheck the live active staff actor, lock exactly one current
-module, and reject missing, stale, published, or archived roots. It must
-require a positive expected row version and a nonempty partial JSON object
-whose only accepted fields are slug, title, and descriptionMarkdown; each
-supplied field must meet the existing module-create validation and unknown
-fields must be rejected. It must update only that root atomically, advance the
-row version once for a real change, return only a safe ID/version result, and
-append one closed-contract sanitized module-update audit without authored raw
-values. Execution must be granted only to service_role.
+curriculum_update_draft_chapter facade. It must require a server-generated
+request UUID, recheck the live active staff actor before content access, lock
+the current parent module then the current chapter in canonical order, recheck
+that the chapter remains under that locked module, and reject missing,
+reparented, stale, non-draft chapters and archived parents. A parent module may
+be draft or published when it is not archived.
 
-This PATCH must not lock siblings because it may not change position. It must
-not create replay/idempotency behavior, reparent a module, touch children,
-perform chapter/theory updates, alter a published root, correct published
-content, reorder, publish, archive, add a generic curriculum facade, or add
+The facade must require a positive expected row version and a nonempty partial
+JSON object whose only accepted fields are slug, title, summaryMarkdown, and
+estimatedMinutes. Every supplied field must pass the same validation as
+draft-chapter creation: valid slug; trimmed 1..160 title; nonblank Markdown of
+at most 5,000 characters; and a JSON integer from 1 through 1,440. JSON null,
+unknown or server-owned fields must be rejected. Resolve omitted fields from
+the locked row. A no-op must return only id and rowVersion without an UPDATE or
+audit; a real change must update only those four scalar fields plus updated_by,
+advance row_version once through the existing trigger, and append exactly one
+closed-contract redacted chapter_updated audit event. Execution must be granted
+only to service_role.
+
+This PATCH must not lock a sibling scope because it may not change position. It
+must not create replay/idempotency behavior, reparent the chapter, touch theory
+or assessment descendants, alter a module lifecycle, correct published content,
+reorder, publish, archive, add a generic curriculum facade, or add
 Fastify/HTTP/direct-client/Python/SMTP/MFA/Vercel behavior.
 
 ## Read first
