@@ -205,12 +205,14 @@ saved/graded answers so omitted questions cannot disappear.
 Implementation note (2026-07-29): two forward-only slices are present:
 structured idempotency replay, exact safe exercise/quiz-start response schemas,
 assessment learner mutations, matching SQL/TypeScript normalization vectors,
-and service-role-only theory completion/current-curriculum progress reads with
-source fallback. They are documented in
+service-role-only theory completion/current-curriculum progress reads with
+source fallback, own archived assessment-history projections, and a repaired
+module progress next-cursor. They are documented in
 [slice 01](../../docs/implementation/SUP-FUNCTIONS-001-slice-01.md) and
-[slice 02](../../docs/implementation/SUP-FUNCTIONS-001-slice-02.md). Assessment
-history, authoring/lifecycle/operations facades, and real two-session race
-proof remain open.
+[slice 02](../../docs/implementation/SUP-FUNCTIONS-001-slice-02.md) and
+[slice 03](../../docs/implementation/SUP-FUNCTIONS-001-slice-03.md).
+Authoring/lifecycle/operations facades and real two-session race proof remain
+open.
 
 ## Constraint checklist
 

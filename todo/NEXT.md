@@ -12,12 +12,14 @@ ineligible; neither blocks this task.
 
 This task builds the named server-only transaction facades over those existing
 tables. Its completed slices are the structured idempotency/assessment learner
-mutation cluster and learner progress cluster documented in
-[slice 01](../docs/implementation/SUP-FUNCTIONS-001-slice-01.md) and
-[slice 02](../docs/implementation/SUP-FUNCTIONS-001-slice-02.md). Continue
-from those bounded baselines with safe own assessment-history facades; this is
-not permission to add HTTP routes, direct client policies, hosted
-configuration, Python/WASM jobs, or identity/bootstrap workflows.
+mutation cluster, learner progress cluster, and own assessment-history cluster
+documented in [slice 01](../docs/implementation/SUP-FUNCTIONS-001-slice-01.md),
+[slice 02](../docs/implementation/SUP-FUNCTIONS-001-slice-02.md), and
+[slice 03](../docs/implementation/SUP-FUNCTIONS-001-slice-03.md). Continue
+from those bounded baselines by inventorying the missing in-database
+staff/admin predicate before any curriculum or assessment authoring/lifecycle
+facade. This is not permission to add HTTP routes, direct client policies,
+hosted configuration, Python/WASM jobs, or identity/bootstrap workflows.
 
 ## Read first
 

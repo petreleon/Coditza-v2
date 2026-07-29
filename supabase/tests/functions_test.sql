@@ -4,7 +4,7 @@ BEGIN;
 -- and the only runtime role used for successful calls is service_role.
 GRANT USAGE ON SCHEMA extensions TO coditza_owner;
 
-SELECT extensions.plan(12);
+SELECT extensions.plan(18);
 
 SET LOCAL ROLE coditza_owner;
 DO $normalization_golden_vectors$
@@ -192,6 +192,22 @@ BEGIN
   END;
   IF NOT v_rejected THEN
     RAISE EXCEPTION 'authenticated role unexpectedly executed a progress facade';
+  END IF;
+
+  v_rejected := false;
+  BEGIN
+    PERFORM public.assessment_list_own_exercise_attempts(
+      'c3000000-0000-0000-0000-000000000001',
+      NULL,
+      NULL,
+      NULL,
+      1
+    );
+  EXCEPTION WHEN insufficient_privilege THEN
+    v_rejected := true;
+  END;
+  IF NOT v_rejected THEN
+    RAISE EXCEPTION 'authenticated role unexpectedly executed a history facade';
   END IF;
 END;
 $authenticated_facade_denial$;
@@ -468,7 +484,7 @@ BEGIN
     OR v_first.response_body ->> 'sectionId'
       <> 'c3300000-0000-0000-0000-000000000001'
     OR v_first.response_body ->> 'completedAt' IS NULL
-    OR v_first.response_body -> 'chapterProgress' ->> 'theoryPercent' <> '100'
+    OR (v_first.response_body -> 'chapterProgress' ->> 'theoryPercent')::numeric <> 100
     OR v_replay.response_body IS DISTINCT FROM v_first.response_body
     OR v_remove.response_status <> 204
     OR v_remove.response_body IS NOT NULL
@@ -956,23 +972,23 @@ BEGIN
       <> 'c3100000-0000-0000-0000-000000000001'
     OR v_owner_list -> 'items' -> 0 ->> 'completedPublishedChapters' <> '1'
     OR v_owner_list -> 'items' -> 0 ->> 'totalPublishedChapters' <> '1'
-    OR v_owner_list -> 'items' -> 0 ->> 'percent' <> '100'
+    OR (v_owner_list -> 'items' -> 0 ->> 'percent')::numeric <> 100
     OR v_owner_list -> 'items' -> 0 ->> 'completedAt' IS NULL
     OR v_owner_detail -> 'chapters' -> 0 -> 'theory' ->> 'completed' <> '1'
     OR v_owner_detail -> 'chapters' -> 0 -> 'exercises' ->> 'completed' <> '1'
     OR v_owner_detail -> 'chapters' -> 0 -> 'quizzes' ->> 'completed' <> '1'
-    OR v_owner_detail -> 'chapters' -> 0 ->> 'overallPercent' <> '100'
+    OR (v_owner_detail -> 'chapters' -> 0 ->> 'overallPercent')::numeric <> 100
     OR v_owner_detail::text ~ '(answer|accepted|correctoption|key|token|password|secret)'
     OR pg_catalog.jsonb_array_length(v_fresh_list -> 'items') <> 1
     OR v_fresh_list -> 'items' -> 0 ->> 'completedPublishedChapters' <> '0'
-    OR v_fresh_list -> 'items' -> 0 ->> 'percent' <> '0'
+    OR (v_fresh_list -> 'items' -> 0 ->> 'percent')::numeric <> 0
     OR v_fresh_detail -> 'chapters' -> 0 -> 'theory' ->> 'completed' <> '0'
-    OR v_fresh_detail -> 'chapters' -> 0 ->> 'overallPercent' <> '0'
+    OR (v_fresh_detail -> 'chapters' -> 0 ->> 'overallPercent')::numeric <> 0
     OR v_fresh_detail -> 'chapters' -> 0 ->> 'completedAt' IS NOT NULL
     OR v_fallback_list -> 'items' -> 0 ->> 'completedPublishedChapters' <> '1'
-    OR v_fallback_list -> 'items' -> 0 ->> 'percent' <> '100'
+    OR (v_fallback_list -> 'items' -> 0 ->> 'percent')::numeric <> 100
     OR v_fallback_list -> 'items' -> 0 ->> 'completedAt' IS NOT NULL
-    OR v_fallback_detail -> 'chapters' -> 0 ->> 'overallPercent' <> '100'
+    OR (v_fallback_detail -> 'chapters' -> 0 ->> 'overallPercent')::numeric <> 100
     OR v_fallback_detail -> 'chapters' -> 0 ->> 'completedAt' IS NOT NULL
     OR NOT v_rejected
     OR NOT v_invalid_cursor_rejected
@@ -999,6 +1015,827 @@ SELECT extensions.ok(
       AND audit_entry.entity_id = 'c3300000-0000-0000-0000-000000000001'
   ),
   'progress reads retain fresh-learner defaults and completed chapters retain their theory-completion history'
+);
+
+-- Dedicated immutable history fixtures use a separate assessment tree so the
+-- historical ordering, archive behavior, and selected-feedback projections do
+-- not depend on mutation-test state above.
+SET LOCAL ROLE coditza_owner;
+
+INSERT INTO public.exercises (
+  id,
+  chapter_id,
+  title,
+  prompt_markdown,
+  exercise_type,
+  position,
+  points,
+  is_required
+)
+VALUES (
+  'c3410000-0000-0000-0000-000000000001',
+  'c3200000-0000-0000-0000-000000000001',
+  'History exercise',
+  'Answer with yes or no for the history fixture.',
+  'short_text',
+  1,
+  7,
+  true
+);
+SELECT pg_catalog.set_config(
+  'coditza.assessment_tree_root',
+  'exercise:c3410000-0000-0000-0000-000000000001',
+  true
+);
+INSERT INTO private.exercise_answer_keys (
+  exercise_id,
+  answer_spec,
+  feedback_correct_markdown,
+  feedback_incorrect_markdown
+)
+VALUES (
+  'c3410000-0000-0000-0000-000000000001',
+  '{"acceptedAnswers":["yes"],"normalization":"nfkc_ascii_ws_ascii_lower_v1"}'::jsonb,
+  'CORECT_EXCLUSIV',
+  'INCORECT_EXCLUSIV'
+);
+SELECT pg_catalog.set_config('coditza.assessment_tree_root', '', true);
+
+INSERT INTO public.quizzes (
+  id,
+  chapter_id,
+  slug,
+  title,
+  instructions_markdown,
+  position,
+  passing_percent,
+  max_attempts,
+  time_limit_seconds,
+  is_required
+)
+VALUES (
+  'c3510000-0000-0000-0000-000000000001',
+  'c3200000-0000-0000-0000-000000000001',
+  'history-quiz',
+  'History quiz',
+  'Answer both retained questions.',
+  1,
+  50,
+  NULL,
+  NULL,
+  true
+);
+SELECT pg_catalog.set_config(
+  'coditza.assessment_tree_root',
+  'quiz:c3510000-0000-0000-0000-000000000001',
+  true
+);
+INSERT INTO public.quiz_questions (
+  id,
+  quiz_id,
+  prompt_markdown,
+  question_type,
+  position,
+  points
+)
+VALUES
+  (
+    'c3610000-0000-0000-0000-000000000001',
+    'c3510000-0000-0000-0000-000000000001',
+    'Choose the retained first answer.',
+    'single_choice',
+    0,
+    5
+  ),
+  (
+    'c3610000-0000-0000-0000-000000000002',
+    'c3510000-0000-0000-0000-000000000001',
+    'Type yes for the retained second answer.',
+    'short_text',
+    1,
+    3
+  );
+INSERT INTO public.quiz_question_options (
+  id,
+  question_id,
+  label_markdown,
+  position
+)
+VALUES
+  (
+    'c3620000-0000-0000-0000-000000000001',
+    'c3610000-0000-0000-0000-000000000001',
+    'Retained correct option',
+    0
+  ),
+  (
+    'c3620000-0000-0000-0000-000000000002',
+    'c3610000-0000-0000-0000-000000000001',
+    'Retained incorrect option',
+    1
+  );
+INSERT INTO private.quiz_question_answer_keys (
+  question_id,
+  answer_spec,
+  feedback_correct_markdown,
+  feedback_incorrect_markdown
+)
+VALUES
+  (
+    'c3610000-0000-0000-0000-000000000001',
+    '{"correctOptionId":"c3620000-0000-0000-0000-000000000001"}'::jsonb,
+    'HISTORY_Q1_CORECT',
+    'HISTORY_Q1_INCORECT'
+  ),
+  (
+    'c3610000-0000-0000-0000-000000000002',
+    '{"acceptedAnswers":["yes"],"normalization":"nfkc_ascii_ws_ascii_lower_v1"}'::jsonb,
+    'HISTORY_Q2_CORECT',
+    'HISTORY_Q2_INCORECT'
+  );
+SELECT pg_catalog.set_config('coditza.assessment_tree_root', '', true);
+
+UPDATE public.exercises
+SET status = 'published'::public.content_status,
+    published_at = pg_catalog.clock_timestamp()
+WHERE id = 'c3410000-0000-0000-0000-000000000001';
+UPDATE public.quizzes
+SET status = 'published'::public.content_status,
+    published_at = pg_catalog.clock_timestamp()
+WHERE id = 'c3510000-0000-0000-0000-000000000001';
+
+SELECT pg_catalog.set_config('coditza.learning_write', 'exercise', true);
+INSERT INTO public.exercise_attempts (
+  id,
+  user_id,
+  exercise_id,
+  exercise_definition_version,
+  answer,
+  is_correct,
+  points_earned,
+  points_possible,
+  submitted_at
+)
+VALUES
+  (
+    'c3d10000-0000-0000-0000-000000000001',
+    'c3000000-0000-0000-0000-000000000001',
+    'c3410000-0000-0000-0000-000000000001',
+    1,
+    '{"text":"yes"}'::jsonb,
+    true,
+    7,
+    7,
+    timestamptz '2026-07-29 10:00:00+00'
+  ),
+  (
+    'c3d10000-0000-0000-0000-000000000002',
+    'c3000000-0000-0000-0000-000000000001',
+    'c3410000-0000-0000-0000-000000000001',
+    1,
+    '{"text":"no"}'::jsonb,
+    false,
+    0,
+    7,
+    timestamptz '2026-07-29 10:00:00+00'
+  ),
+  (
+    'c3d10000-0000-0000-0000-000000000003',
+    'c3000000-0000-0000-0000-000000000002',
+    'c3410000-0000-0000-0000-000000000001',
+    1,
+    '{"text":"yes"}'::jsonb,
+    true,
+    7,
+    7,
+    timestamptz '2026-07-29 10:00:00+00'
+  );
+SELECT pg_catalog.set_config('coditza.learning_write', '', true);
+
+SELECT pg_catalog.set_config('coditza.learning_write', 'quiz-start', true);
+INSERT INTO public.quiz_attempts (
+  id,
+  user_id,
+  quiz_id,
+  quiz_definition_version,
+  attempt_number,
+  started_at
+)
+VALUES (
+  'c3d20000-0000-0000-0000-000000000002',
+  'c3000000-0000-0000-0000-000000000001',
+  'c3510000-0000-0000-0000-000000000001',
+  1,
+  1,
+  timestamptz '2026-07-29 11:00:00+00'
+);
+SELECT pg_catalog.set_config(
+  'coditza.learning_write',
+  'quiz-answer:c3d20000-0000-0000-0000-000000000002',
+  true
+);
+INSERT INTO public.quiz_attempt_answers (attempt_id, question_id, answer)
+VALUES (
+  'c3d20000-0000-0000-0000-000000000002',
+  'c3610000-0000-0000-0000-000000000001',
+  '{"optionId":"c3620000-0000-0000-0000-000000000001"}'::jsonb
+);
+SELECT pg_catalog.set_config(
+  'coditza.learning_write',
+  'quiz-finalize:c3d20000-0000-0000-0000-000000000002',
+  true
+);
+UPDATE public.quiz_attempt_answers
+SET is_correct = true,
+    points_earned = 5
+WHERE attempt_id = 'c3d20000-0000-0000-0000-000000000002'
+  AND question_id = 'c3610000-0000-0000-0000-000000000001';
+UPDATE public.quiz_attempts
+SET status = 'submitted'::public.quiz_attempt_status,
+    submitted_at = timestamptz '2026-07-29 12:00:00+00',
+    points_earned = 5,
+    points_possible = 8,
+    score_percent = 62.50,
+    passed = true
+WHERE id = 'c3d20000-0000-0000-0000-000000000002';
+SELECT pg_catalog.set_config('coditza.learning_write', '', true);
+
+SELECT pg_catalog.set_config('coditza.learning_write', 'quiz-start', true);
+INSERT INTO public.quiz_attempts (
+  id,
+  user_id,
+  quiz_id,
+  quiz_definition_version,
+  attempt_number,
+  started_at
+)
+VALUES (
+  'c3d20000-0000-0000-0000-000000000001',
+  'c3000000-0000-0000-0000-000000000001',
+  'c3510000-0000-0000-0000-000000000001',
+  1,
+  2,
+  timestamptz '2026-07-29 12:00:00+00'
+);
+SELECT pg_catalog.set_config(
+  'coditza.learning_write',
+  'quiz-answer:c3d20000-0000-0000-0000-000000000001',
+  true
+);
+INSERT INTO public.quiz_attempt_answers (attempt_id, question_id, answer)
+VALUES (
+  'c3d20000-0000-0000-0000-000000000001',
+  'c3610000-0000-0000-0000-000000000001',
+  '{"optionId":"c3620000-0000-0000-0000-000000000002"}'::jsonb
+);
+SELECT pg_catalog.set_config('coditza.learning_write', '', true);
+
+SELECT pg_catalog.set_config('coditza.learning_write', 'quiz-start', true);
+INSERT INTO public.quiz_attempts (
+  id,
+  user_id,
+  quiz_id,
+  quiz_definition_version,
+  attempt_number,
+  started_at
+)
+VALUES (
+  'c3d20000-0000-0000-0000-000000000003',
+  'c3000000-0000-0000-0000-000000000002',
+  'c3510000-0000-0000-0000-000000000001',
+  1,
+  1,
+  timestamptz '2026-07-29 12:00:00+00'
+);
+SELECT pg_catalog.set_config('coditza.learning_write', '', true);
+
+UPDATE public.exercises
+SET status = 'archived'::public.content_status
+WHERE id = 'c3410000-0000-0000-0000-000000000001';
+UPDATE public.quizzes
+SET status = 'archived'::public.content_status
+WHERE id = 'c3510000-0000-0000-0000-000000000001';
+RESET ROLE;
+
+SELECT extensions.ok(
+  (
+    SELECT pg_catalog.count(*) = 4
+      AND pg_catalog.bool_and(
+        procedure_entry.proowner = 'coditza_owner'::pg_catalog.regrole
+        AND procedure_entry.prosecdef
+        AND procedure_entry.proconfig = ARRAY['search_path=""']::text[]
+      )
+    FROM pg_catalog.pg_proc AS procedure_entry
+    WHERE procedure_entry.oid IN (
+      'public.assessment_list_own_exercise_attempts(uuid,uuid,timestamp with time zone,uuid,integer)'::pg_catalog.regprocedure,
+      'public.assessment_get_own_exercise_attempt(uuid,uuid)'::pg_catalog.regprocedure,
+      'public.assessment_list_own_quiz_attempts(uuid,uuid,text,timestamp with time zone,uuid,integer)'::pg_catalog.regprocedure,
+      'public.assessment_get_own_quiz_attempt(uuid,uuid)'::pg_catalog.regprocedure
+    )
+  )
+  AND NOT EXISTS (
+    SELECT 1
+    FROM (
+      VALUES (
+        'public.assessment_list_own_exercise_attempts(uuid,uuid,timestamp with time zone,uuid,integer)'::pg_catalog.regprocedure
+      ), (
+        'public.assessment_get_own_exercise_attempt(uuid,uuid)'::pg_catalog.regprocedure
+      ), (
+        'public.assessment_list_own_quiz_attempts(uuid,uuid,text,timestamp with time zone,uuid,integer)'::pg_catalog.regprocedure
+      ), (
+        'public.assessment_get_own_quiz_attempt(uuid,uuid)'::pg_catalog.regprocedure
+      )
+    ) AS facade(procedure_oid)
+    CROSS JOIN (
+      VALUES ('anon'), ('authenticated'), ('authenticator')
+    ) AS runtime_role(rolname)
+    WHERE pg_catalog.has_function_privilege(
+      runtime_role.rolname,
+      facade.procedure_oid,
+      'EXECUTE'
+    )
+  )
+  AND (
+    SELECT pg_catalog.count(*) = 4
+    FROM (
+      VALUES (
+        'public.assessment_list_own_exercise_attempts(uuid,uuid,timestamp with time zone,uuid,integer)'::pg_catalog.regprocedure
+      ), (
+        'public.assessment_get_own_exercise_attempt(uuid,uuid)'::pg_catalog.regprocedure
+      ), (
+        'public.assessment_list_own_quiz_attempts(uuid,uuid,text,timestamp with time zone,uuid,integer)'::pg_catalog.regprocedure
+      ), (
+        'public.assessment_get_own_quiz_attempt(uuid,uuid)'::pg_catalog.regprocedure
+      )
+    ) AS facade(procedure_oid)
+    WHERE pg_catalog.has_function_privilege(
+      'service_role',
+      facade.procedure_oid,
+      'EXECUTE'
+    )
+  ),
+  'assessment history facades are owner-controlled SECURITY DEFINER entrypoints granted only to service_role'
+);
+
+SET LOCAL ROLE service_role;
+DO $exercise_history_projection$
+DECLARE
+  v_page_one jsonb;
+  v_page_two jsonb;
+  v_correct jsonb;
+  v_incorrect jsonb;
+  v_foreign_rejected boolean := false;
+  v_cursor_rejected boolean := false;
+  v_limit_rejected boolean := false;
+BEGIN
+  v_page_one := public.assessment_list_own_exercise_attempts(
+    'c3000000-0000-0000-0000-000000000001',
+    'c3410000-0000-0000-0000-000000000001',
+    NULL,
+    NULL,
+    1
+  );
+  v_page_two := public.assessment_list_own_exercise_attempts(
+    'c3000000-0000-0000-0000-000000000001',
+    'c3410000-0000-0000-0000-000000000001',
+    (v_page_one -> 'nextCursor' ->> 'submittedAt')::timestamptz,
+    (v_page_one -> 'nextCursor' ->> 'attemptId')::uuid,
+    1
+  );
+  v_correct := public.assessment_get_own_exercise_attempt(
+    'c3000000-0000-0000-0000-000000000001',
+    'c3d10000-0000-0000-0000-000000000001'
+  );
+  v_incorrect := public.assessment_get_own_exercise_attempt(
+    'c3000000-0000-0000-0000-000000000001',
+    'c3d10000-0000-0000-0000-000000000002'
+  );
+
+  BEGIN
+    PERFORM public.assessment_get_own_exercise_attempt(
+      'c3000000-0000-0000-0000-000000000001',
+      'c3d10000-0000-0000-0000-000000000003'
+    );
+  EXCEPTION WHEN raise_exception THEN
+    v_foreign_rejected := true;
+  END;
+  BEGIN
+    PERFORM public.assessment_list_own_exercise_attempts(
+      'c3000000-0000-0000-0000-000000000001',
+      'c3410000-0000-0000-0000-000000000001',
+      timestamptz '2026-07-29 10:00:00+00',
+      NULL,
+      1
+    );
+  EXCEPTION WHEN raise_exception THEN
+    v_cursor_rejected := true;
+  END;
+  BEGIN
+    PERFORM public.assessment_list_own_exercise_attempts(
+      'c3000000-0000-0000-0000-000000000001',
+      'c3410000-0000-0000-0000-000000000001',
+      NULL,
+      NULL,
+      0
+    );
+  EXCEPTION WHEN raise_exception THEN
+    v_limit_rejected := true;
+  END;
+
+  IF pg_catalog.jsonb_array_length(v_page_one -> 'items') <> 1
+    OR v_page_one -> 'items' -> 0 ->> 'id'
+      <> 'c3d10000-0000-0000-0000-000000000002'
+    OR v_page_one -> 'nextCursor' ->> 'attemptId'
+      <> 'c3d10000-0000-0000-0000-000000000002'
+    OR pg_catalog.jsonb_array_length(v_page_two -> 'items') <> 1
+    OR v_page_two -> 'items' -> 0 ->> 'id'
+      <> 'c3d10000-0000-0000-0000-000000000001'
+    OR v_page_two -> 'nextCursor' IS DISTINCT FROM 'null'::jsonb
+    OR v_correct ->> 'feedbackMarkdown' <> 'CORECT_EXCLUSIV'
+    OR v_incorrect ->> 'feedbackMarkdown' <> 'INCORECT_EXCLUSIV'
+    OR v_correct -> 'answer' IS DISTINCT FROM '{"text":"yes"}'::jsonb
+    OR v_incorrect -> 'answer' IS DISTINCT FROM '{"text":"no"}'::jsonb
+    OR v_correct::text ~ '(INCORECT_EXCLUSIV|answerSpec|acceptedAnswers|correctOption|userId)'
+    OR v_incorrect::text ~ '("feedbackMarkdown": "CORECT_EXCLUSIV"|answerSpec|acceptedAnswers|correctOption|userId)'
+    OR NOT v_foreign_rejected
+    OR NOT v_cursor_rejected
+    OR NOT v_limit_rejected THEN
+    RAISE EXCEPTION 'exercise history did not retain owner-only archived keyset projections';
+  END IF;
+END;
+$exercise_history_projection$;
+RESET ROLE;
+SELECT extensions.ok(
+  TRUE,
+  'exercise history keeps archived owner attempts paginated and selects only the applicable feedback branch'
+);
+
+SET LOCAL ROLE service_role;
+DO $quiz_history_projection$
+DECLARE
+  v_page_one jsonb;
+  v_page_two jsonb;
+  v_submitted_only jsonb;
+  v_active_detail jsonb;
+  v_terminal_detail jsonb;
+  v_foreign_rejected boolean := false;
+  v_cursor_rejected boolean := false;
+  v_limit_rejected boolean := false;
+  v_status_rejected boolean := false;
+BEGIN
+  v_page_one := public.assessment_list_own_quiz_attempts(
+    'c3000000-0000-0000-0000-000000000001',
+    'c3510000-0000-0000-0000-000000000001',
+    NULL,
+    NULL,
+    NULL,
+    1
+  );
+  v_page_two := public.assessment_list_own_quiz_attempts(
+    'c3000000-0000-0000-0000-000000000001',
+    'c3510000-0000-0000-0000-000000000001',
+    NULL,
+    (v_page_one -> 'nextCursor' ->> 'occurredAt')::timestamptz,
+    (v_page_one -> 'nextCursor' ->> 'attemptId')::uuid,
+    1
+  );
+  v_submitted_only := public.assessment_list_own_quiz_attempts(
+    'c3000000-0000-0000-0000-000000000001',
+    'c3510000-0000-0000-0000-000000000001',
+    'submitted',
+    NULL,
+    NULL,
+    100
+  );
+  v_active_detail := public.assessment_get_own_quiz_attempt(
+    'c3000000-0000-0000-0000-000000000001',
+    'c3d20000-0000-0000-0000-000000000001'
+  );
+  v_terminal_detail := public.assessment_get_own_quiz_attempt(
+    'c3000000-0000-0000-0000-000000000001',
+    'c3d20000-0000-0000-0000-000000000002'
+  );
+
+  BEGIN
+    PERFORM public.assessment_get_own_quiz_attempt(
+      'c3000000-0000-0000-0000-000000000001',
+      'c3d20000-0000-0000-0000-000000000003'
+    );
+  EXCEPTION WHEN raise_exception THEN
+    v_foreign_rejected := true;
+  END;
+  BEGIN
+    PERFORM public.assessment_list_own_quiz_attempts(
+      'c3000000-0000-0000-0000-000000000001',
+      'c3510000-0000-0000-0000-000000000001',
+      NULL,
+      timestamptz '2026-07-29 12:00:00+00',
+      NULL,
+      1
+    );
+  EXCEPTION WHEN raise_exception THEN
+    v_cursor_rejected := true;
+  END;
+  BEGIN
+    PERFORM public.assessment_list_own_quiz_attempts(
+      'c3000000-0000-0000-0000-000000000001',
+      'c3510000-0000-0000-0000-000000000001',
+      NULL,
+      NULL,
+      NULL,
+      101
+    );
+  EXCEPTION WHEN raise_exception THEN
+    v_limit_rejected := true;
+  END;
+  BEGIN
+    PERFORM public.assessment_list_own_quiz_attempts(
+      'c3000000-0000-0000-0000-000000000001',
+      'c3510000-0000-0000-0000-000000000001',
+      'not-a-status',
+      NULL,
+      NULL,
+      1
+    );
+  EXCEPTION WHEN raise_exception THEN
+    v_status_rejected := true;
+  END;
+
+  IF pg_catalog.jsonb_array_length(v_page_one -> 'items') <> 1
+    OR v_page_one -> 'items' -> 0 ->> 'id'
+      <> 'c3d20000-0000-0000-0000-000000000002'
+    OR v_page_one -> 'items' -> 0 ->> 'status' <> 'submitted'
+    OR v_page_one -> 'nextCursor' ->> 'attemptId'
+      <> 'c3d20000-0000-0000-0000-000000000002'
+    OR pg_catalog.jsonb_array_length(v_page_two -> 'items') <> 1
+    OR v_page_two -> 'items' -> 0 ->> 'id'
+      <> 'c3d20000-0000-0000-0000-000000000001'
+    OR v_page_two -> 'items' -> 0 ->> 'status' <> 'in_progress'
+    OR v_page_two -> 'items' -> 0 -> 'pointsEarned' IS DISTINCT FROM 'null'::jsonb
+    OR v_page_two -> 'nextCursor' IS DISTINCT FROM 'null'::jsonb
+    OR pg_catalog.jsonb_array_length(v_submitted_only -> 'items') <> 1
+    OR v_submitted_only -> 'items' -> 0 ->> 'id'
+      <> 'c3d20000-0000-0000-0000-000000000002'
+    OR v_page_one::text ~ '(questions|options|answers|savedAnswers|answerSpec|acceptedAnswers|correctOption|feedbackMarkdown)'
+    OR v_active_detail ->> 'status' <> 'in_progress'
+    OR pg_catalog.jsonb_array_length(v_active_detail -> 'questions') <> 2
+    OR pg_catalog.jsonb_array_length(
+      v_active_detail -> 'questions' -> 0 -> 'options'
+    ) <> 2
+    OR v_active_detail -> 'savedAnswers' -> 0 -> 'answer'
+      IS DISTINCT FROM '{"optionId":"c3620000-0000-0000-0000-000000000002"}'::jsonb
+    OR v_active_detail -> 'answers' IS DISTINCT FROM '[]'::jsonb
+    OR v_active_detail ? 'pointsEarned'
+    OR v_active_detail::text ~ '(isCorrect|feedbackMarkdown|answerSpec|acceptedAnswers|correctOption)'
+    OR v_terminal_detail ->> 'status' <> 'submitted'
+    OR pg_catalog.jsonb_array_length(v_terminal_detail -> 'answers') <> 2
+    OR v_terminal_detail -> 'answers' -> 0 ->> 'questionId'
+      <> 'c3610000-0000-0000-0000-000000000001'
+    OR v_terminal_detail -> 'answers' -> 0 ->> 'isCorrect' <> 'true'
+    OR v_terminal_detail -> 'answers' -> 0 ->> 'pointsEarned' <> '5'
+    OR v_terminal_detail -> 'answers' -> 0 ->> 'feedbackMarkdown'
+      <> 'HISTORY_Q1_CORECT'
+    OR v_terminal_detail -> 'answers' -> 1 ->> 'questionId'
+      <> 'c3610000-0000-0000-0000-000000000002'
+    OR v_terminal_detail -> 'answers' -> 1 -> 'submittedAnswer'
+      IS DISTINCT FROM 'null'::jsonb
+    OR v_terminal_detail -> 'answers' -> 1 ->> 'isCorrect' <> 'false'
+    OR v_terminal_detail -> 'answers' -> 1 ->> 'pointsEarned' <> '0'
+    OR v_terminal_detail -> 'answers' -> 1 ->> 'feedbackMarkdown'
+      <> 'HISTORY_Q2_INCORECT'
+    OR v_terminal_detail::text ~ '("feedbackMarkdown": "HISTORY_Q1_INCORECT"|"feedbackMarkdown": "HISTORY_Q2_CORECT"|answerSpec|acceptedAnswers|correctOption)'
+    OR NOT v_foreign_rejected
+    OR NOT v_cursor_rejected
+    OR NOT v_limit_rejected
+    OR NOT v_status_rejected THEN
+    RAISE EXCEPTION 'quiz history did not preserve archived owner-safe list and detail projections';
+  END IF;
+END;
+$quiz_history_projection$;
+RESET ROLE;
+SELECT extensions.ok(
+  TRUE,
+  'quiz history retains archived definitions, keeps active attempts start-safe, and projects terminal omissions safely'
+);
+
+SET LOCAL ROLE coditza_owner;
+UPDATE public.profiles
+SET security_hold_at = pg_catalog.clock_timestamp()
+WHERE id = 'c3000000-0000-0000-0000-000000000001';
+RESET ROLE;
+SET LOCAL ROLE service_role;
+DO $history_held_actor_denial$
+DECLARE
+  v_list_rejected boolean := false;
+  v_detail_rejected boolean := false;
+BEGIN
+  BEGIN
+    PERFORM public.assessment_list_own_exercise_attempts(
+      'c3000000-0000-0000-0000-000000000001',
+      'c3410000-0000-0000-0000-000000000001',
+      NULL,
+      NULL,
+      1
+    );
+  EXCEPTION WHEN raise_exception THEN
+    v_list_rejected := true;
+  END;
+  BEGIN
+    PERFORM public.assessment_get_own_quiz_attempt(
+      'c3000000-0000-0000-0000-000000000001',
+      'c3d20000-0000-0000-0000-000000000002'
+    );
+  EXCEPTION WHEN raise_exception THEN
+    v_detail_rejected := true;
+  END;
+  IF NOT v_list_rejected OR NOT v_detail_rejected THEN
+    RAISE EXCEPTION 'held actor unexpectedly read assessment history';
+  END IF;
+END;
+$history_held_actor_denial$;
+RESET ROLE;
+SET LOCAL ROLE coditza_owner;
+UPDATE public.profiles
+SET security_hold_at = NULL
+WHERE id = 'c3000000-0000-0000-0000-000000000001';
+RESET ROLE;
+SELECT extensions.ok(
+  TRUE,
+  'assessment history reloads the actor and denies both list and detail while held'
+);
+
+SET LOCAL ROLE coditza_owner;
+SELECT pg_catalog.set_config('coditza.learning_write', 'exercise', true);
+INSERT INTO public.exercise_attempts (
+  id,
+  user_id,
+  exercise_id,
+  exercise_definition_version,
+  answer,
+  is_correct,
+  points_earned,
+  points_possible,
+  submitted_at
+)
+VALUES (
+  'c3d10000-0000-0000-0000-000000000004',
+  'c3000000-0000-0000-0000-000000000001',
+  'c3410000-0000-0000-0000-000000000001',
+  2,
+  '{"text":"corrupt"}'::jsonb,
+  false,
+  0,
+  7,
+  timestamptz '2026-07-29 09:00:00+00'
+);
+SELECT pg_catalog.set_config('coditza.learning_write', 'quiz-start', true);
+INSERT INTO public.quiz_attempts (
+  id,
+  user_id,
+  quiz_id,
+  quiz_definition_version,
+  attempt_number,
+  status,
+  started_at,
+  submitted_at,
+  points_earned,
+  points_possible,
+  score_percent,
+  passed
+)
+VALUES (
+  'c3d20000-0000-0000-0000-000000000004',
+  'c3000000-0000-0000-0000-000000000001',
+  'c3510000-0000-0000-0000-000000000001',
+  2,
+  3,
+  'submitted'::public.quiz_attempt_status,
+  timestamptz '2026-07-29 09:00:00+00',
+  timestamptz '2026-07-29 09:01:00+00',
+  0,
+  8,
+  0,
+  false
+);
+SELECT pg_catalog.set_config('coditza.learning_write', '', true);
+RESET ROLE;
+
+SET LOCAL ROLE service_role;
+DO $history_definition_version_consistency$
+DECLARE
+  v_exercise_list_rejected boolean := false;
+  v_exercise_detail_rejected boolean := false;
+  v_quiz_list_rejected boolean := false;
+  v_quiz_detail_rejected boolean := false;
+BEGIN
+  BEGIN
+    PERFORM public.assessment_list_own_exercise_attempts(
+      'c3000000-0000-0000-0000-000000000001',
+      'c3410000-0000-0000-0000-000000000001',
+      NULL,
+      NULL,
+      100
+    );
+  EXCEPTION WHEN raise_exception THEN
+    v_exercise_list_rejected := true;
+  END;
+  BEGIN
+    PERFORM public.assessment_get_own_exercise_attempt(
+      'c3000000-0000-0000-0000-000000000001',
+      'c3d10000-0000-0000-0000-000000000004'
+    );
+  EXCEPTION WHEN raise_exception THEN
+    v_exercise_detail_rejected := true;
+  END;
+  BEGIN
+    PERFORM public.assessment_list_own_quiz_attempts(
+      'c3000000-0000-0000-0000-000000000001',
+      'c3510000-0000-0000-0000-000000000001',
+      NULL,
+      NULL,
+      NULL,
+      100
+    );
+  EXCEPTION WHEN raise_exception THEN
+    v_quiz_list_rejected := true;
+  END;
+  BEGIN
+    PERFORM public.assessment_get_own_quiz_attempt(
+      'c3000000-0000-0000-0000-000000000001',
+      'c3d20000-0000-0000-0000-000000000004'
+    );
+  EXCEPTION WHEN raise_exception THEN
+    v_quiz_detail_rejected := true;
+  END;
+  IF NOT v_exercise_list_rejected
+    OR NOT v_exercise_detail_rejected
+    OR NOT v_quiz_list_rejected
+    OR NOT v_quiz_detail_rejected THEN
+    RAISE EXCEPTION
+      'history facade projected a definition that did not match its frozen version';
+  END IF;
+END;
+$history_definition_version_consistency$;
+RESET ROLE;
+SELECT extensions.ok(
+  TRUE,
+  'assessment history fails closed when an attempt version differs from its retained definition'
+);
+
+SET LOCAL ROLE coditza_owner;
+INSERT INTO public.modules (
+  id,
+  slug,
+  title,
+  description_markdown,
+  position
+)
+VALUES (
+  'c3110000-0000-0000-0000-000000000001',
+  'functions-module-page-two',
+  'Functions module page two',
+  'Synthetic second page module for progress cursor verification.',
+  811
+);
+UPDATE public.modules
+SET status = 'published'::public.content_status,
+    published_at = pg_catalog.clock_timestamp()
+WHERE id = 'c3110000-0000-0000-0000-000000000001';
+RESET ROLE;
+
+SET LOCAL ROLE service_role;
+DO $progress_cursor_second_page$
+DECLARE
+  v_page_one jsonb;
+  v_page_two jsonb;
+BEGIN
+  v_page_one := public.progress_list_own_modules(
+    'c3000000-0000-0000-0000-000000000001',
+    NULL,
+    NULL,
+    1
+  );
+  v_page_two := public.progress_list_own_modules(
+    'c3000000-0000-0000-0000-000000000001',
+    (v_page_one -> 'nextCursor' ->> 'position')::integer,
+    (v_page_one -> 'nextCursor' ->> 'moduleId')::uuid,
+    1
+  );
+  IF v_page_one -> 'items' -> 0 ->> 'moduleId'
+      <> 'c3100000-0000-0000-0000-000000000001'
+    OR v_page_one -> 'nextCursor' ->> 'moduleId'
+      <> 'c3100000-0000-0000-0000-000000000001'
+    OR v_page_two -> 'items' -> 0 ->> 'moduleId'
+      <> 'c3110000-0000-0000-0000-000000000001'
+    OR v_page_two -> 'nextCursor' IS DISTINCT FROM 'null'::jsonb THEN
+    RAISE EXCEPTION 'progress list did not return a stable second page cursor';
+  END IF;
+END;
+$progress_cursor_second_page$;
+RESET ROLE;
+SELECT extensions.ok(
+  TRUE,
+  'progress module pagination produces a usable next cursor and a stable second page'
 );
 
 SET LOCAL ROLE coditza_owner;
