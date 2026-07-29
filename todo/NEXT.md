@@ -15,7 +15,7 @@ tables. Its completed slices are the structured idempotency/assessment learner
 mutation cluster, learner progress cluster, own assessment-history cluster,
 staff-authorization primitive cluster, root draft-module creation cluster,
 draft-chapter creation cluster, draft-theory-section creation cluster, and
-scalar draft-exercise creation cluster documented in
+scalar draft-exercise and complete draft-quiz creation clusters documented in
 [slice 01](../docs/implementation/SUP-FUNCTIONS-001-slice-01.md),
 [slice 02](../docs/implementation/SUP-FUNCTIONS-001-slice-02.md), and
 [slice 03](../docs/implementation/SUP-FUNCTIONS-001-slice-03.md), and
@@ -23,16 +23,18 @@ scalar draft-exercise creation cluster documented in
 [slice 05](../docs/implementation/SUP-FUNCTIONS-001-slice-05.md),
 [slice 06](../docs/implementation/SUP-FUNCTIONS-001-slice-06.md),
 [slice 07](../docs/implementation/SUP-FUNCTIONS-001-slice-07.md), and
-[slice 08](../docs/implementation/SUP-FUNCTIONS-001-slice-08.md). Continue
+[slice 08](../docs/implementation/SUP-FUNCTIONS-001-slice-08.md), and
+[slice 09](../docs/implementation/SUP-FUNCTIONS-001-slice-09.md). Continue
 from those bounded baselines with the assessment-owned
-`assessment_create_draft_quiz` facade. First record its exact flat,
-server-owned input and complete draft-tree contract; do not reuse a generic
-type-switched create RPC. It must assert active staff before replay or hierarchy
-access, preserve idempotency/safe replay/sanitized audit, use canonical
-`module -> chapter` locking before selecting the quiz sibling position across
-every status, and keep any initial root/version semantics explicit. It may not
-expose question keys, add HTTP routes/direct client policies, start Python/WASM
-work, or change identity/hosted configuration.
+`assessment_update_draft_exercise` facade. It must establish an exact
+server-owned update body and expected root-row-version contract, assert active
+staff before replay/content access, lock canonical ancestors then the draft
+exercise, and use the reviewed complete-tree replacement helper only under its
+marker. It must validate scalar-only definitions, advance root and definition
+versions exactly once for a definition change, store/replay only a safe result,
+and append a sanitized audit transition. It may not expose keys or mappings,
+add HTTP/direct-client behavior, introduce Python/WASM work, or change
+identity/hosted configuration.
 
 ## Read first
 
