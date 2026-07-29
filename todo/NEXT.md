@@ -11,12 +11,13 @@ closed audit contract. SUP-SMTP-LOCAL-001 and SUP-MFA-001 remain independently
 ineligible; neither blocks this task.
 
 This task builds the named server-only transaction facades over those existing
-tables. Its first completed slice is the structured idempotency/replay contract
-and assessment learner-mutation facade cluster documented in
-[SUP-FUNCTIONS-001 slice 01](../docs/implementation/SUP-FUNCTIONS-001-slice-01.md).
-Continue from that bounded baseline; it is not permission to add HTTP routes,
-direct client policies, hosted configuration, Python/WASM jobs, or
-identity/bootstrap workflows.
+tables. Its completed slices are the structured idempotency/assessment learner
+mutation cluster and learner progress cluster documented in
+[slice 01](../docs/implementation/SUP-FUNCTIONS-001-slice-01.md) and
+[slice 02](../docs/implementation/SUP-FUNCTIONS-001-slice-02.md). Continue
+from those bounded baselines with safe own assessment-history facades; this is
+not permission to add HTTP routes, direct client policies, hosted
+configuration, Python/WASM jobs, or identity/bootstrap workflows.
 
 ## Read first
 

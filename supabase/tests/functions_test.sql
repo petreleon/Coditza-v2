@@ -4,7 +4,7 @@ BEGIN;
 -- and the only runtime role used for successful calls is service_role.
 GRANT USAGE ON SCHEMA extensions TO coditza_owner;
 
-SELECT extensions.plan(9);
+SELECT extensions.plan(12);
 
 SET LOCAL ROLE coditza_owner;
 DO $normalization_golden_vectors$
@@ -101,6 +101,61 @@ SELECT extensions.ok(
   'assessment learner facades are owner-controlled SECURITY DEFINER entrypoints granted only to service_role'
 );
 
+SELECT extensions.ok(
+  (
+    SELECT pg_catalog.count(*) = 3
+      AND pg_catalog.bool_and(
+        procedure_entry.proowner = 'coditza_owner'::pg_catalog.regrole
+        AND procedure_entry.prosecdef
+        AND procedure_entry.proconfig = ARRAY['search_path=""']::text[]
+      )
+    FROM pg_catalog.pg_proc AS procedure_entry
+    WHERE procedure_entry.oid IN (
+      'public.progress_set_theory_completion(uuid,uuid,boolean,uuid)'::pg_catalog.regprocedure,
+      'public.progress_list_own_modules(uuid,integer,uuid,integer)'::pg_catalog.regprocedure,
+      'public.progress_get_own_module(uuid,uuid)'::pg_catalog.regprocedure
+    )
+  )
+  AND NOT EXISTS (
+    SELECT 1
+    FROM (
+      VALUES (
+        'public.progress_set_theory_completion(uuid,uuid,boolean,uuid)'::pg_catalog.regprocedure
+      ), (
+        'public.progress_list_own_modules(uuid,integer,uuid,integer)'::pg_catalog.regprocedure
+      ), (
+        'public.progress_get_own_module(uuid,uuid)'::pg_catalog.regprocedure
+      )
+    ) AS facade(procedure_oid)
+    CROSS JOIN (
+      VALUES ('anon'), ('authenticated'), ('authenticator')
+    ) AS runtime_role(rolname)
+    WHERE pg_catalog.has_function_privilege(
+      runtime_role.rolname,
+      facade.procedure_oid,
+      'EXECUTE'
+    )
+  )
+  AND (
+    SELECT pg_catalog.count(*) = 3
+    FROM (
+      VALUES (
+        'public.progress_set_theory_completion(uuid,uuid,boolean,uuid)'::pg_catalog.regprocedure
+      ), (
+        'public.progress_list_own_modules(uuid,integer,uuid,integer)'::pg_catalog.regprocedure
+      ), (
+        'public.progress_get_own_module(uuid,uuid)'::pg_catalog.regprocedure
+      )
+    ) AS facade(procedure_oid)
+    WHERE pg_catalog.has_function_privilege(
+      'service_role',
+      facade.procedure_oid,
+      'EXECUTE'
+    )
+  ),
+  'progress learner facades are owner-controlled SECURITY DEFINER entrypoints granted only to service_role'
+);
+
 SET LOCAL ROLE authenticated;
 DO $authenticated_facade_denial$
 DECLARE
@@ -122,6 +177,21 @@ BEGIN
   END;
   IF NOT v_rejected THEN
     RAISE EXCEPTION 'authenticated role unexpectedly executed a server-only facade';
+  END IF;
+
+  v_rejected := false;
+  BEGIN
+    PERFORM public.progress_list_own_modules(
+      'c3000000-0000-0000-0000-000000000001',
+      NULL,
+      NULL,
+      1
+    );
+  EXCEPTION WHEN insufficient_privilege THEN
+    v_rejected := true;
+  END;
+  IF NOT v_rejected THEN
+    RAISE EXCEPTION 'authenticated role unexpectedly executed a progress facade';
   END IF;
 END;
 $authenticated_facade_denial$;
@@ -146,6 +216,19 @@ BEGIN
   END;
   IF NOT v_rejected THEN
     RAISE EXCEPTION 'service role unexpectedly executed a private helper';
+  END IF;
+
+  v_rejected := false;
+  BEGIN
+    PERFORM *
+    FROM private.list_learner_published_chapters(
+      'c3000000-0000-0000-0000-000000000001'
+    );
+  EXCEPTION WHEN insufficient_privilege THEN
+    v_rejected := true;
+  END;
+  IF NOT v_rejected THEN
+    RAISE EXCEPTION 'service role unexpectedly executed a private progress helper';
   END IF;
 END;
 $private_runtime_denial$;
@@ -182,6 +265,16 @@ VALUES
     '{"displayName":"Functions Other"}'::jsonb,
     pg_catalog.now(),
     pg_catalog.now()
+  ),
+  (
+    'c3000000-0000-0000-0000-000000000003',
+    'authenticated',
+    'authenticated',
+    'functions-fallback@coditza.invalid',
+    '{}'::jsonb,
+    '{"displayName":"Functions Fallback"}'::jsonb,
+    pg_catalog.now(),
+    pg_catalog.now()
   );
 
 SET LOCAL ROLE coditza_owner;
@@ -208,6 +301,18 @@ VALUES (
   'Synthetic chapter for public function verification.',
   0,
   25
+);
+
+INSERT INTO public.theory_sections (
+  id, chapter_id, title, body_markdown, position, estimated_minutes
+)
+VALUES (
+  'c3300000-0000-0000-0000-000000000001',
+  'c3200000-0000-0000-0000-000000000001',
+  'Functions theory',
+  'Theory fixture for progress-function verification.',
+  0,
+  10
 );
 
 INSERT INTO public.exercises (
@@ -295,6 +400,10 @@ UPDATE public.chapters
 SET status = 'published'::public.content_status,
     published_at = pg_catalog.clock_timestamp()
 WHERE id = 'c3200000-0000-0000-0000-000000000001';
+UPDATE public.theory_sections
+SET status = 'published'::public.content_status,
+    published_at = pg_catalog.clock_timestamp()
+WHERE id = 'c3300000-0000-0000-0000-000000000001';
 UPDATE public.exercises
 SET status = 'published'::public.content_status,
     published_at = pg_catalog.clock_timestamp()
@@ -303,6 +412,88 @@ UPDATE public.quizzes
 SET status = 'published'::public.content_status,
     published_at = pg_catalog.clock_timestamp()
 WHERE id = 'c3500000-0000-0000-0000-000000000001';
+
+RESET ROLE;
+SET LOCAL ROLE service_role;
+DO $theory_completion_replay_and_remove$
+DECLARE
+  v_first record;
+  v_replay record;
+  v_remove record;
+  v_final_set record;
+  v_rejected boolean := false;
+BEGIN
+  SELECT * INTO v_first
+  FROM public.progress_set_theory_completion(
+    'c3000000-0000-0000-0000-000000000001',
+    'c3300000-0000-0000-0000-000000000001',
+    true,
+    'c3a00000-0000-0000-0000-000000000014'
+  );
+  SELECT * INTO v_replay
+  FROM public.progress_set_theory_completion(
+    'c3000000-0000-0000-0000-000000000001',
+    'c3300000-0000-0000-0000-000000000001',
+    true,
+    'c3a00000-0000-0000-0000-000000000015'
+  );
+  SELECT * INTO v_remove
+  FROM public.progress_set_theory_completion(
+    'c3000000-0000-0000-0000-000000000001',
+    'c3300000-0000-0000-0000-000000000001',
+    false,
+    'c3a00000-0000-0000-0000-000000000016'
+  );
+  SELECT * INTO v_final_set
+  FROM public.progress_set_theory_completion(
+    'c3000000-0000-0000-0000-000000000001',
+    'c3300000-0000-0000-0000-000000000001',
+    true,
+    'c3a00000-0000-0000-0000-000000000017'
+  );
+
+  BEGIN
+    PERFORM *
+    FROM public.progress_set_theory_completion(
+      'c3000000-0000-0000-0000-000000000001',
+      'c3300000-0000-0000-0000-000000000001',
+      NULL,
+      'c3a00000-0000-0000-0000-000000000018'
+    );
+  EXCEPTION WHEN raise_exception THEN
+    v_rejected := true;
+  END;
+
+  IF v_first.response_status <> 200
+    OR v_first.response_body ->> 'sectionId'
+      <> 'c3300000-0000-0000-0000-000000000001'
+    OR v_first.response_body ->> 'completedAt' IS NULL
+    OR v_first.response_body -> 'chapterProgress' ->> 'theoryPercent' <> '100'
+    OR v_replay.response_body IS DISTINCT FROM v_first.response_body
+    OR v_remove.response_status <> 204
+    OR v_remove.response_body IS NOT NULL
+    OR v_final_set.response_status <> 200
+    OR NOT v_rejected THEN
+    RAISE EXCEPTION 'theory completion facade did not preserve its safe idempotent mutation contract';
+  END IF;
+END;
+$theory_completion_replay_and_remove$;
+RESET ROLE;
+SELECT extensions.ok(
+  (
+    SELECT pg_catalog.count(*) = 2
+    FROM private.audit_events AS audit_entry
+    WHERE audit_entry.action = 'theory_completion_set'
+      AND audit_entry.entity_id = 'c3300000-0000-0000-0000-000000000001'
+  )
+  AND (
+    SELECT pg_catalog.count(*) = 1
+    FROM private.audit_events AS audit_entry
+    WHERE audit_entry.action = 'theory_completion_removed'
+      AND audit_entry.entity_id = 'c3300000-0000-0000-0000-000000000001'
+  ),
+  'theory completion records only actual set/remove transitions and rejects a null mutation flag'
+);
 
 RESET ROLE;
 SET LOCAL ROLE service_role;
@@ -614,6 +805,200 @@ SELECT extensions.ok(
         = '{"status":{"before":"in_progress","after":"expired"}}'::jsonb
   ),
   'quiz start finalizes a stale attempt before returning the limit outcome and records its safe audit transition'
+);
+
+-- Build source activity without its derived snapshot. This is a controlled
+-- fixture for the GET-only fallback: reads must derive current completion
+-- without fabricating an irreversible completed timestamp.
+SET LOCAL ROLE coditza_owner;
+SELECT pg_catalog.set_config(
+  'coditza.learning_write',
+  'theory:c3000000-0000-0000-0000-000000000003:c3300000-0000-0000-0000-000000000001',
+  true
+);
+INSERT INTO public.theory_section_completions (user_id, theory_section_id)
+VALUES (
+  'c3000000-0000-0000-0000-000000000003',
+  'c3300000-0000-0000-0000-000000000001'
+);
+SELECT pg_catalog.set_config('coditza.learning_write', '', true);
+SELECT pg_catalog.set_config('coditza.learning_write', 'exercise', true);
+INSERT INTO public.exercise_attempts (
+  id,
+  user_id,
+  exercise_id,
+  exercise_definition_version,
+  answer,
+  is_correct,
+  points_earned,
+  points_possible
+)
+VALUES (
+  'c3b00000-0000-0000-0000-000000000001',
+  'c3000000-0000-0000-0000-000000000003',
+  'c3400000-0000-0000-0000-000000000001',
+  1,
+  '{"text":"yes"}'::jsonb,
+  true,
+  5,
+  5
+);
+SELECT pg_catalog.set_config('coditza.learning_write', '', true);
+SELECT pg_catalog.set_config('coditza.learning_write', 'quiz-start', true);
+INSERT INTO public.quiz_attempts (
+  id,
+  user_id,
+  quiz_id,
+  quiz_definition_version,
+  attempt_number,
+  status,
+  submitted_at,
+  points_earned,
+  points_possible,
+  score_percent,
+  passed
+)
+VALUES (
+  'c3c00000-0000-0000-0000-000000000001',
+  'c3000000-0000-0000-0000-000000000003',
+  'c3500000-0000-0000-0000-000000000001',
+  1,
+  1,
+  'submitted'::public.quiz_attempt_status,
+  pg_catalog.now(),
+  10,
+  10,
+  100,
+  true
+);
+SELECT pg_catalog.set_config('coditza.learning_write', '', true);
+RESET ROLE;
+
+SET LOCAL ROLE service_role;
+DO $progress_reads_and_completed_removal_guard$
+DECLARE
+  v_owner_list jsonb;
+  v_owner_detail jsonb;
+  v_fresh_list jsonb;
+  v_fresh_detail jsonb;
+  v_fallback_list jsonb;
+  v_fallback_detail jsonb;
+  v_rejected boolean := false;
+  v_invalid_cursor_rejected boolean := false;
+  v_invalid_limit_rejected boolean := false;
+BEGIN
+  v_owner_list := public.progress_list_own_modules(
+    'c3000000-0000-0000-0000-000000000001',
+    NULL,
+    NULL,
+    1
+  );
+  v_owner_detail := public.progress_get_own_module(
+    'c3000000-0000-0000-0000-000000000001',
+    'c3100000-0000-0000-0000-000000000001'
+  );
+  v_fresh_list := public.progress_list_own_modules(
+    'c3000000-0000-0000-0000-000000000002',
+    NULL,
+    NULL,
+    1
+  );
+  v_fresh_detail := public.progress_get_own_module(
+    'c3000000-0000-0000-0000-000000000002',
+    'c3100000-0000-0000-0000-000000000001'
+  );
+  v_fallback_list := public.progress_list_own_modules(
+    'c3000000-0000-0000-0000-000000000003',
+    NULL,
+    NULL,
+    100
+  );
+  v_fallback_detail := public.progress_get_own_module(
+    'c3000000-0000-0000-0000-000000000003',
+    'c3100000-0000-0000-0000-000000000001'
+  );
+
+  BEGIN
+    PERFORM *
+    FROM public.progress_set_theory_completion(
+      'c3000000-0000-0000-0000-000000000001',
+      'c3300000-0000-0000-0000-000000000001',
+      false,
+      'c3a00000-0000-0000-0000-000000000019'
+    );
+  EXCEPTION WHEN raise_exception THEN
+    v_rejected := true;
+  END;
+
+  BEGIN
+    PERFORM public.progress_list_own_modules(
+      'c3000000-0000-0000-0000-000000000001',
+      810,
+      NULL,
+      1
+    );
+  EXCEPTION WHEN raise_exception THEN
+    v_invalid_cursor_rejected := true;
+  END;
+  BEGIN
+    PERFORM public.progress_list_own_modules(
+      'c3000000-0000-0000-0000-000000000001',
+      NULL,
+      NULL,
+      0
+    );
+  EXCEPTION WHEN raise_exception THEN
+    v_invalid_limit_rejected := true;
+  END;
+
+  IF pg_catalog.jsonb_array_length(v_owner_list -> 'items') <> 1
+    OR v_owner_list -> 'items' -> 0 ->> 'moduleId'
+      <> 'c3100000-0000-0000-0000-000000000001'
+    OR v_owner_list -> 'items' -> 0 ->> 'completedPublishedChapters' <> '1'
+    OR v_owner_list -> 'items' -> 0 ->> 'totalPublishedChapters' <> '1'
+    OR v_owner_list -> 'items' -> 0 ->> 'percent' <> '100'
+    OR v_owner_list -> 'items' -> 0 ->> 'completedAt' IS NULL
+    OR v_owner_detail -> 'chapters' -> 0 -> 'theory' ->> 'completed' <> '1'
+    OR v_owner_detail -> 'chapters' -> 0 -> 'exercises' ->> 'completed' <> '1'
+    OR v_owner_detail -> 'chapters' -> 0 -> 'quizzes' ->> 'completed' <> '1'
+    OR v_owner_detail -> 'chapters' -> 0 ->> 'overallPercent' <> '100'
+    OR v_owner_detail::text ~ '(answer|accepted|correctoption|key|token|password|secret)'
+    OR pg_catalog.jsonb_array_length(v_fresh_list -> 'items') <> 1
+    OR v_fresh_list -> 'items' -> 0 ->> 'completedPublishedChapters' <> '0'
+    OR v_fresh_list -> 'items' -> 0 ->> 'percent' <> '0'
+    OR v_fresh_detail -> 'chapters' -> 0 -> 'theory' ->> 'completed' <> '0'
+    OR v_fresh_detail -> 'chapters' -> 0 ->> 'overallPercent' <> '0'
+    OR v_fresh_detail -> 'chapters' -> 0 ->> 'completedAt' IS NOT NULL
+    OR v_fallback_list -> 'items' -> 0 ->> 'completedPublishedChapters' <> '1'
+    OR v_fallback_list -> 'items' -> 0 ->> 'percent' <> '100'
+    OR v_fallback_list -> 'items' -> 0 ->> 'completedAt' IS NOT NULL
+    OR v_fallback_detail -> 'chapters' -> 0 ->> 'overallPercent' <> '100'
+    OR v_fallback_detail -> 'chapters' -> 0 ->> 'completedAt' IS NOT NULL
+    OR NOT v_rejected
+    OR NOT v_invalid_cursor_rejected
+    OR NOT v_invalid_limit_rejected THEN
+    RAISE EXCEPTION 'progress read facades did not preserve current-curriculum aggregates and completion guards';
+  END IF;
+END;
+$progress_reads_and_completed_removal_guard$;
+RESET ROLE;
+SELECT extensions.ok(
+  EXISTS (
+    SELECT 1
+    FROM public.theory_section_completions AS completion_entry
+    WHERE completion_entry.user_id = 'c3000000-0000-0000-0000-000000000001'
+      AND completion_entry.theory_section_id = 'c3300000-0000-0000-0000-000000000001'
+  )
+  AND (
+    SELECT pg_catalog.count(*) = 3
+    FROM private.audit_events AS audit_entry
+    WHERE audit_entry.action IN (
+      'theory_completion_set',
+      'theory_completion_removed'
+    )
+      AND audit_entry.entity_id = 'c3300000-0000-0000-0000-000000000001'
+  ),
+  'progress reads retain fresh-learner defaults and completed chapters retain their theory-completion history'
 );
 
 SET LOCAL ROLE coditza_owner;

@@ -7,9 +7,10 @@
 - Current phase: 2 — Local Supabase and database security
 - Active implementation task: SUP-FUNCTIONS-001 (in progress) — named
   server-only transactional workflow facades, grants, normalization, and proof.
-  Its first assessment learner-mutation slice is implemented and verified; the
-  remaining owner families and real concurrency proof are still required.
-- Last verified implementation slice: SUP-FUNCTIONS-001 assessment learner
+  Its assessment learner-mutation and learner-progress slices are implemented
+  and verified; remaining owner families and real concurrency proof are still
+  required.
+- Last verified implementation slice: SUP-FUNCTIONS-001 learner-progress
   facades with protected local verification
 - Last updated: 2026-07-29
 
@@ -161,6 +162,10 @@ to the deadlines in that file.
   idempotency replay, exact safe response schemas, service-role-only grants,
   audit-safe mutations, and matching SQL/TypeScript normalization vectors.
   It does not claim completion of the remaining function families.
+- [SUP-FUNCTIONS-001 learner-progress slice report](../docs/implementation/SUP-FUNCTIONS-001-slice-02.md);
+  service-role-only theory completion and current-curriculum progress reads
+  now have active-profile guards, audited transitions, fresh-learner defaults,
+  source fallback for a missing snapshot, and protected local verification.
 - [G1 completion record](08-execution/00-roadmap.md#g1-completion-record);
   Foundation reproducibility is recorded from the accepted architecture/product
   contracts, current checks, Docker evidence, and scope review.
