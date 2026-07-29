@@ -8,11 +8,11 @@
 - Active implementation task: SUP-FUNCTIONS-001 (in progress) — named
   server-only transactional workflow facades, grants, normalization, and proof.
   Its assessment learner-mutation, learner-progress, learner-history,
-  staff-authorization primitive, curriculum draft-module, and draft-chapter
-  slices are implemented and verified; remaining owner families and real
-  concurrency proof are still required.
-- Last verified implementation slice: SUP-FUNCTIONS-001 curriculum draft-chapter
-  creation facade with protected local verification
+  staff-authorization primitive, curriculum draft-module, draft-chapter, and
+  draft-theory-section slices are implemented and verified; remaining owner
+  families and real concurrency proof are still required.
+- Last verified implementation slice: SUP-FUNCTIONS-001 curriculum
+  draft-theory-section creation facade with protected local verification
 - Last updated: 2026-07-29
 
 ## Phase status
@@ -184,6 +184,11 @@ to the deadlines in that file.
   chapter across all sibling states, validates exact input, preserves a safe
   replay after later archive, denies held replay, and appends a sanitized audit
   transition.
+- [SUP-FUNCTIONS-001 curriculum draft-theory-section slice report](../docs/implementation/SUP-FUNCTIONS-001-slice-07.md);
+  a service-role-only facade now locks module then chapter before it appends a
+  draft theory section across all sibling states, validates exact input,
+  preserves a safe replay after later ancestor archive, denies held replay, and
+  appends a sanitized audit transition.
 - [G1 completion record](08-execution/00-roadmap.md#g1-completion-record);
   Foundation reproducibility is recorded from the accepted architecture/product
   contracts, current checks, Docker evidence, and scope review.

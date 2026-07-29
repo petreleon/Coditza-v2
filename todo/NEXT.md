@@ -13,24 +13,27 @@ ineligible; neither blocks this task.
 This task builds the named server-only transaction facades over those existing
 tables. Its completed slices are the structured idempotency/assessment learner
 mutation cluster, learner progress cluster, own assessment-history cluster,
-staff-authorization primitive cluster, root draft-module creation cluster, and
-draft-chapter creation cluster
+staff-authorization primitive cluster, root draft-module creation cluster,
+draft-chapter creation cluster, and draft-theory-section creation cluster
 documented in [slice 01](../docs/implementation/SUP-FUNCTIONS-001-slice-01.md),
 [slice 02](../docs/implementation/SUP-FUNCTIONS-001-slice-02.md), and
 [slice 03](../docs/implementation/SUP-FUNCTIONS-001-slice-03.md), and
 [slice 04](../docs/implementation/SUP-FUNCTIONS-001-slice-04.md),
-[slice 05](../docs/implementation/SUP-FUNCTIONS-001-slice-05.md), and
-[slice 06](../docs/implementation/SUP-FUNCTIONS-001-slice-06.md). Continue
-from those bounded baselines with `curriculum_create_draft_theory_section`: it
-must call the active-staff assertion before replay or hierarchy access, validate
-the exact `{ title, bodyMarkdown, estimatedMinutes }` input, and preserve
-idempotency/safe replay/sanitized audit. For a new key, it must use canonical
-`module -> chapter` locking, re-read the chapter after its module lock, reject a
-missing or archived ancestor, and use the locked chapter row as the sibling-scope
-mutex before calculating the next position across all theory statuses. It must
-not widen into a generic type-switched authoring RPC. This is not permission to
-add HTTP routes, direct client policies, hosted configuration, Python/WASM jobs,
-or identity/bootstrap workflows.
+[slice 05](../docs/implementation/SUP-FUNCTIONS-001-slice-05.md),
+[slice 06](../docs/implementation/SUP-FUNCTIONS-001-slice-06.md), and
+[slice 07](../docs/implementation/SUP-FUNCTIONS-001-slice-07.md). Continue
+from those bounded baselines with the assessment-owned
+`assessment_create_draft_exercise` facade, limited to scalar exercise types.
+It must assert active staff before replay or hierarchy access, validate an exact
+server-owned create body, preserve idempotency/safe replay/sanitized audit, and
+use canonical `module -> chapter` locking before selecting the exercise sibling
+position across every status. It must create the exercise plus its complete
+scalar options/answer-key definition atomically while leaving initial
+`row_version` and `definition_version` at one; do not blindly call a draft
+replacement helper that increments versions. `python_code` is exclusively owned
+by SUP-WASM-001 and must be rejected without creating partial state. This is not
+permission to add HTTP routes, direct client policies, hosted configuration,
+Python/WASM jobs, or identity/bootstrap workflows.
 
 ## Read first
 
