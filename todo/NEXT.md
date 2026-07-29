@@ -15,7 +15,8 @@ tables. Its completed slices are the structured idempotency/assessment learner
 mutation cluster, learner progress cluster, own assessment-history cluster,
 staff-authorization primitive cluster, root draft-module creation cluster,
 draft-chapter creation cluster, draft-theory-section creation cluster, and
-scalar draft-exercise and complete draft-quiz creation clusters documented in
+scalar draft-exercise and complete draft-quiz creation clusters, then scalar
+draft-exercise and draft-quiz PATCH clusters, documented in
 [slice 01](../docs/implementation/SUP-FUNCTIONS-001-slice-01.md),
 [slice 02](../docs/implementation/SUP-FUNCTIONS-001-slice-02.md), and
 [slice 03](../docs/implementation/SUP-FUNCTIONS-001-slice-03.md), and
@@ -24,21 +25,21 @@ scalar draft-exercise and complete draft-quiz creation clusters documented in
 [slice 06](../docs/implementation/SUP-FUNCTIONS-001-slice-06.md),
 [slice 07](../docs/implementation/SUP-FUNCTIONS-001-slice-07.md), and
 [slice 08](../docs/implementation/SUP-FUNCTIONS-001-slice-08.md),
-[slice 09](../docs/implementation/SUP-FUNCTIONS-001-slice-09.md), and
-[slice 10](../docs/implementation/SUP-FUNCTIONS-001-slice-10.md). Continue
+[slice 09](../docs/implementation/SUP-FUNCTIONS-001-slice-09.md),
+[slice 10](../docs/implementation/SUP-FUNCTIONS-001-slice-10.md), and
+[slice 11](../docs/implementation/SUP-FUNCTIONS-001-slice-11.md). Continue
 from those bounded baselines with the assessment-owned
-`assessment_update_draft_quiz` facade. It must establish an exact nonempty
-partial root-field PATCH body and expected root-row-version contract, assert
-active staff before content access, lock canonical module, chapter, and draft
-quiz rows, and reject missing/archived ancestors, stale versions, and
-non-draft roots. PATCH is not a retry-sensitive operation: it must not accept,
-store, hash, or replay an idempotency key. For a real root change, it must
-advance the root and definition versions exactly once, append a sanitized audit
-transition, and return only a safe result; an exact no-op returns current safe
-versions without a write or audit. Complete question-tree replacement is a
-separate later facade. This slice may not expose keys or mappings, add
-HTTP/direct-client behavior, introduce Python/WASM work, or change
-identity/hosted configuration.
+`assessment_replace_draft_quiz_definition` facade. It must establish one exact
+complete question/option/key definition body and expected root-row-version
+contract, assert active staff before content access, lock canonical module,
+chapter, and draft quiz rows, and reject missing/archived ancestors, stale
+versions, non-draft roots, and retained attempt history. It must use the
+reviewed tree marker only while it atomically deletes children in child-first
+order and materializes the complete validated scalar tree. It must advance root
+and definition versions exactly once, return only the safe question/option
+client-reference mappings, append a sanitized audit transition, and not invent
+a retry/replay scheme. This slice may not add HTTP/direct-client behavior,
+introduce Python/WASM work, or change identity/hosted configuration.
 
 ## Read first
 

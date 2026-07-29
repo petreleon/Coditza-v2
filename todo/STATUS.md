@@ -9,11 +9,12 @@
   server-only transactional workflow facades, grants, normalization, and proof.
   Its assessment learner-mutation, learner-progress, learner-history,
   staff-authorization primitive, curriculum draft-module, draft-chapter, and
-  draft-theory-section, scalar draft-exercise, complete draft-quiz, and scalar
-  draft-exercise PATCH slices are implemented and verified; remaining owner
-  families and real concurrency proof are still required.
-- Last verified implementation slice: SUP-FUNCTIONS-001 scalar draft-exercise
-  PATCH facade with protected local verification
+  draft-theory-section, scalar draft-exercise, complete draft-quiz, scalar
+  draft-exercise PATCH, and draft-quiz root PATCH slices are implemented and
+  verified; remaining owner families and real concurrency proof are still
+  required.
+- Last verified implementation slice: SUP-FUNCTIONS-001 draft-quiz root PATCH
+  facade with protected local verification
 - Last updated: 2026-07-29
 
 ## Phase status
@@ -203,6 +204,11 @@ to the deadlines in that file.
   a service-role-only PATCH facade now applies atomic scalar root/tree edits
   with expected-version locking, safe audit/result behavior, learner-history
   denial, no invented idempotency scheme, and protected local/Docker proof.
+- [SUP-FUNCTIONS-001 draft-quiz root PATCH slice report](../docs/implementation/SUP-FUNCTIONS-001-slice-11.md);
+  a service-role-only PATCH facade now applies one atomic root update with
+  expected-version locking, safe audit/result behavior, preserved question/key
+  trees, retained-attempt denial, no invented idempotency scheme, and protected
+  local/Docker proof.
 - [G1 completion record](08-execution/00-roadmap.md#g1-completion-record);
   Foundation reproducibility is recorded from the accepted architecture/product
   contracts, current checks, Docker evidence, and scope review.

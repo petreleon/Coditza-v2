@@ -4,7 +4,7 @@ BEGIN;
 -- and the only runtime role used for successful calls is service_role.
 GRANT USAGE ON SCHEMA extensions TO coditza_owner;
 
-SELECT extensions.plan(32);
+SELECT extensions.plan(34);
 
 SET LOCAL ROLE coditza_owner;
 DO $normalization_golden_vectors$
@@ -400,6 +400,42 @@ SELECT extensions.ok(
   'draft-exercise PATCH facade is server-only while its root-and-tree helper remains private'
 );
 
+SELECT extensions.ok(
+  (
+    SELECT procedure_entry.proowner = 'coditza_owner'::pg_catalog.regrole
+      AND procedure_entry.prosecdef
+      AND procedure_entry.proconfig = ARRAY['search_path=""']::text[]
+    FROM pg_catalog.pg_proc AS procedure_entry
+    WHERE procedure_entry.oid =
+      'public.assessment_update_draft_quiz(uuid,uuid,integer,jsonb,uuid)'::pg_catalog.regprocedure
+  )
+  AND (
+    SELECT pg_catalog.count(*) = 1
+    FROM pg_catalog.pg_proc AS procedure_entry
+    JOIN pg_catalog.pg_namespace AS procedure_namespace
+      ON procedure_namespace.oid = procedure_entry.pronamespace
+    WHERE procedure_namespace.nspname = 'public'
+      AND procedure_entry.proname = 'assessment_update_draft_quiz'
+  )
+  AND NOT EXISTS (
+    SELECT 1
+    FROM (
+      VALUES ('anon'), ('authenticated'), ('authenticator')
+    ) AS runtime_role(rolname)
+    WHERE pg_catalog.has_function_privilege(
+      runtime_role.rolname,
+      'public.assessment_update_draft_quiz(uuid,uuid,integer,jsonb,uuid)'::pg_catalog.regprocedure,
+      'EXECUTE'
+    )
+  )
+  AND pg_catalog.has_function_privilege(
+    'service_role',
+    'public.assessment_update_draft_quiz(uuid,uuid,integer,jsonb,uuid)'::pg_catalog.regprocedure,
+    'EXECUTE'
+  ),
+  'draft-quiz PATCH facade is owner-controlled, fixed-path, server-only, and has no replay overload'
+);
+
 SET LOCAL ROLE authenticated;
 DO $authenticated_facade_denial$
 DECLARE
@@ -563,6 +599,23 @@ BEGIN
   END;
   IF NOT v_rejected THEN
     RAISE EXCEPTION 'authenticated role unexpectedly executed a draft exercise PATCH facade';
+  END IF;
+
+  v_rejected := false;
+  BEGIN
+    PERFORM *
+    FROM public.assessment_update_draft_quiz(
+      'c3000000-0000-0000-0000-000000000005',
+      'c3530000-0000-0000-0000-000000000001',
+      1,
+      '{"title":"Denied draft quiz update"}'::jsonb,
+      'c3f60000-0000-0000-0000-000000000001'
+    );
+  EXCEPTION WHEN insufficient_privilege THEN
+    v_rejected := true;
+  END;
+  IF NOT v_rejected THEN
+    RAISE EXCEPTION 'authenticated role unexpectedly executed a draft quiz PATCH facade';
   END IF;
 END;
 $authenticated_facade_denial$;
@@ -5497,6 +5550,528 @@ SELECT extensions.ok(
     ''
   ) = '',
   'draft-exercise PATCH keeps partial/root and complete-tree changes atomic, scalar-only, versioned once, audited safely, and outside idempotency'
+);
+RESET ROLE;
+
+-- An isolated draft quiz retains a complete child tree so this root-only PATCH
+-- proof can demonstrate that questions, options, and private keys stay intact.
+SET LOCAL ROLE coditza_owner;
+INSERT INTO public.modules (
+  id,
+  slug,
+  title,
+  description_markdown,
+  position,
+  created_by,
+  updated_by
+)
+VALUES (
+  'c31a0000-0000-0000-0000-000000000001',
+  'draft-quiz-patch-module',
+  'Draft quiz PATCH module',
+  'Parent module for the isolated draft quiz PATCH proof.',
+  902,
+  'c3000000-0000-0000-0000-000000000004',
+  'c3000000-0000-0000-0000-000000000004'
+);
+INSERT INTO public.chapters (
+  id,
+  module_id,
+  slug,
+  title,
+  summary_markdown,
+  position,
+  estimated_minutes,
+  created_by,
+  updated_by
+)
+VALUES (
+  'c32a0000-0000-0000-0000-000000000001',
+  'c31a0000-0000-0000-0000-000000000001',
+  'draft-quiz-patch-chapter',
+  'Draft quiz PATCH chapter',
+  'Parent chapter for the isolated draft quiz PATCH proof.',
+  0,
+  20,
+  'c3000000-0000-0000-0000-000000000004',
+  'c3000000-0000-0000-0000-000000000004'
+);
+INSERT INTO public.quizzes (
+  id,
+  chapter_id,
+  slug,
+  title,
+  instructions_markdown,
+  position,
+  passing_percent,
+  max_attempts,
+  time_limit_seconds,
+  is_required,
+  created_by,
+  updated_by
+)
+VALUES (
+  'c3530000-0000-0000-0000-000000000001',
+  'c32a0000-0000-0000-0000-000000000001',
+  'draft-quiz-patch',
+  'Original draft quiz',
+  'Original draft quiz instructions.',
+  0,
+  70,
+  3,
+  600,
+  true,
+  'c3000000-0000-0000-0000-000000000004',
+  'c3000000-0000-0000-0000-000000000004'
+);
+SELECT pg_catalog.set_config(
+  'coditza.assessment_tree_root',
+  'quiz:c3530000-0000-0000-0000-000000000001',
+  true
+);
+INSERT INTO public.quiz_questions (
+  id,
+  quiz_id,
+  prompt_markdown,
+  question_type,
+  position,
+  points
+)
+VALUES (
+  'c3630000-0000-0000-0000-000000000001',
+  'c3530000-0000-0000-0000-000000000001',
+  'Type yes to prove the original question remains.',
+  'short_text',
+  0,
+  4
+);
+INSERT INTO private.quiz_question_answer_keys (
+  question_id,
+  answer_spec,
+  feedback_correct_markdown,
+  feedback_incorrect_markdown,
+  created_by,
+  updated_by
+)
+VALUES (
+  'c3630000-0000-0000-0000-000000000001',
+  '{"acceptedAnswers":["yes"],"normalization":"nfkc_ascii_ws_ascii_lower_v1"}'::jsonb,
+  'Original quiz correct feedback.',
+  'Original quiz incorrect feedback.',
+  'c3000000-0000-0000-0000-000000000004',
+  'c3000000-0000-0000-0000-000000000004'
+);
+SELECT pg_catalog.set_config('coditza.assessment_tree_root', '', true);
+RESET ROLE;
+
+SET LOCAL ROLE service_role;
+DO $assessment_update_draft_quiz$
+DECLARE
+  v_full_update record;
+  v_partial_update record;
+  v_noop record;
+  v_empty_rejected boolean := false;
+  v_tree_rejected boolean := false;
+  v_invalid_boolean_rejected boolean := false;
+  v_learner_rejected boolean := false;
+  v_null_actor_rejected boolean := false;
+  v_missing_rejected boolean := false;
+  v_null_version_rejected boolean := false;
+  v_nonpositive_version_rejected boolean := false;
+  v_null_request_rejected boolean := false;
+  v_stale_rejected boolean := false;
+BEGIN
+  BEGIN
+    PERFORM *
+    FROM public.assessment_update_draft_quiz(
+      'c3000000-0000-0000-0000-000000000005',
+      'c3530000-0000-0000-0000-000000000001',
+      1,
+      '{}'::jsonb,
+      'c3f60000-0000-0000-0000-000000000001'
+    );
+  EXCEPTION WHEN raise_exception THEN
+    v_empty_rejected := true;
+  END;
+
+  BEGIN
+    PERFORM *
+    FROM public.assessment_update_draft_quiz(
+      'c3000000-0000-0000-0000-000000000005',
+      'c3530000-0000-0000-0000-000000000001',
+      1,
+      '{"questions":[]}'::jsonb,
+      'c3f60000-0000-0000-0000-000000000002'
+    );
+  EXCEPTION WHEN raise_exception THEN
+    v_tree_rejected := true;
+  END;
+
+  BEGIN
+    PERFORM *
+    FROM public.assessment_update_draft_quiz(
+      'c3000000-0000-0000-0000-000000000005',
+      'c3530000-0000-0000-0000-000000000001',
+      1,
+      '{"isRequired":"false"}'::jsonb,
+      'c3f60000-0000-0000-0000-000000000003'
+    );
+  EXCEPTION WHEN raise_exception THEN
+    v_invalid_boolean_rejected := true;
+  END;
+
+  BEGIN
+    PERFORM *
+    FROM public.assessment_update_draft_quiz(
+      'c3000000-0000-0000-0000-000000000001',
+      'c3530000-0000-0000-0000-000000000001',
+      1,
+      '{"title":"Learners cannot patch draft quizzes"}'::jsonb,
+      'c3f60000-0000-0000-0000-000000000004'
+    );
+  EXCEPTION WHEN raise_exception THEN
+    v_learner_rejected := true;
+  END;
+
+  BEGIN
+    PERFORM *
+    FROM public.assessment_update_draft_quiz(
+      NULL::uuid,
+      'c3530000-0000-0000-0000-000000000001',
+      1,
+      '{"title":"A staff actor is required"}'::jsonb,
+      'c3f60000-0000-0000-0000-000000000005'
+    );
+  EXCEPTION WHEN raise_exception THEN
+    v_null_actor_rejected := true;
+  END;
+
+  BEGIN
+    PERFORM *
+    FROM public.assessment_update_draft_quiz(
+      'c3000000-0000-0000-0000-000000000005',
+      'c3530000-0000-0000-0000-000000000999',
+      1,
+      '{"title":"Missing draft quiz"}'::jsonb,
+      'c3f60000-0000-0000-0000-000000000006'
+    );
+  EXCEPTION WHEN raise_exception THEN
+    v_missing_rejected := true;
+  END;
+
+  BEGIN
+    PERFORM *
+    FROM public.assessment_update_draft_quiz(
+      'c3000000-0000-0000-0000-000000000005',
+      'c3530000-0000-0000-0000-000000000001',
+      NULL::integer,
+      '{"title":"A version is required"}'::jsonb,
+      'c3f60000-0000-0000-0000-000000000007'
+    );
+  EXCEPTION WHEN raise_exception THEN
+    v_null_version_rejected := true;
+  END;
+
+  BEGIN
+    PERFORM *
+    FROM public.assessment_update_draft_quiz(
+      'c3000000-0000-0000-0000-000000000005',
+      'c3530000-0000-0000-0000-000000000001',
+      0,
+      '{"title":"A positive version is required"}'::jsonb,
+      'c3f60000-0000-0000-0000-000000000008'
+    );
+  EXCEPTION WHEN raise_exception THEN
+    v_nonpositive_version_rejected := true;
+  END;
+
+  BEGIN
+    PERFORM *
+    FROM public.assessment_update_draft_quiz(
+      'c3000000-0000-0000-0000-000000000005',
+      'c3530000-0000-0000-0000-000000000001',
+      1,
+      '{"title":"A request identifier is required"}'::jsonb,
+      NULL::uuid
+    );
+  EXCEPTION WHEN raise_exception THEN
+    v_null_request_rejected := true;
+  END;
+
+  SELECT * INTO v_full_update
+  FROM public.assessment_update_draft_quiz(
+    'c3000000-0000-0000-0000-000000000005',
+    'c3530000-0000-0000-0000-000000000001',
+    1,
+    '{"slug":"updated-draft-quiz-patch","title":"Updated draft quiz","instructionsMarkdown":"Updated draft quiz instructions.","passingPercent":80,"maxAttempts":null,"timeLimitSeconds":null,"isRequired":false}'::jsonb,
+    'c3f60000-0000-0000-0000-000000000010'
+  );
+
+  SELECT * INTO v_partial_update
+  FROM public.assessment_update_draft_quiz(
+    'c3000000-0000-0000-0000-000000000005',
+    'c3530000-0000-0000-0000-000000000001',
+    2,
+    '{"title":"Updated draft quiz root only"}'::jsonb,
+    'c3f60000-0000-0000-0000-000000000011'
+  );
+
+  BEGIN
+    PERFORM *
+    FROM public.assessment_update_draft_quiz(
+      'c3000000-0000-0000-0000-000000000005',
+      'c3530000-0000-0000-0000-000000000001',
+      2,
+      '{"title":"Updated draft quiz root only"}'::jsonb,
+      'c3f60000-0000-0000-0000-000000000012'
+    );
+  EXCEPTION WHEN raise_exception THEN
+    v_stale_rejected := true;
+  END;
+
+  SELECT * INTO v_noop
+  FROM public.assessment_update_draft_quiz(
+    'c3000000-0000-0000-0000-000000000005',
+    'c3530000-0000-0000-0000-000000000001',
+    3,
+    '{"title":"Updated draft quiz root only"}'::jsonb,
+    'c3f60000-0000-0000-0000-000000000013'
+  );
+
+  IF v_full_update.response_status <> 200
+    OR v_full_update.response_body IS DISTINCT FROM pg_catalog.jsonb_build_object(
+      'id', 'c3530000-0000-0000-0000-000000000001',
+      'rowVersion', 2,
+      'definitionVersion', 2
+    )
+    OR v_partial_update.response_status <> 200
+    OR v_partial_update.response_body IS DISTINCT FROM pg_catalog.jsonb_build_object(
+      'id', 'c3530000-0000-0000-0000-000000000001',
+      'rowVersion', 3,
+      'definitionVersion', 3
+    )
+    OR v_noop.response_status <> 200
+    OR v_noop.response_body IS DISTINCT FROM pg_catalog.jsonb_build_object(
+      'id', 'c3530000-0000-0000-0000-000000000001',
+      'rowVersion', 3,
+      'definitionVersion', 3
+    )
+    OR NOT v_empty_rejected
+    OR NOT v_tree_rejected
+    OR NOT v_invalid_boolean_rejected
+    OR NOT v_learner_rejected
+    OR NOT v_null_actor_rejected
+    OR NOT v_missing_rejected
+    OR NOT v_null_version_rejected
+    OR NOT v_nonpositive_version_rejected
+    OR NOT v_null_request_rejected
+    OR NOT v_stale_rejected THEN
+    RAISE EXCEPTION 'draft-quiz PATCH facade did not preserve its exact root update contract';
+  END IF;
+END;
+$assessment_update_draft_quiz$;
+RESET ROLE;
+
+SET LOCAL ROLE coditza_owner;
+UPDATE public.profiles
+SET security_hold_at = pg_catalog.clock_timestamp()
+WHERE id = 'c3000000-0000-0000-0000-000000000005';
+RESET ROLE;
+
+SET LOCAL ROLE service_role;
+DO $held_staff_draft_quiz_update$
+DECLARE
+  v_rejected boolean := false;
+BEGIN
+  BEGIN
+    PERFORM *
+    FROM public.assessment_update_draft_quiz(
+      'c3000000-0000-0000-0000-000000000005',
+      'c3530000-0000-0000-0000-000000000001',
+      3,
+      '{"title":"Held staff must not patch"}'::jsonb,
+      'c3f60000-0000-0000-0000-000000000014'
+    );
+  EXCEPTION WHEN raise_exception THEN
+    v_rejected := true;
+  END;
+  IF NOT v_rejected THEN
+    RAISE EXCEPTION 'held staff actor unexpectedly patched a draft quiz';
+  END IF;
+END;
+$held_staff_draft_quiz_update$;
+RESET ROLE;
+
+SET LOCAL ROLE coditza_owner;
+UPDATE public.profiles
+SET security_hold_at = NULL
+WHERE id = 'c3000000-0000-0000-0000-000000000005';
+SELECT pg_catalog.set_config('coditza.learning_write', 'quiz-start', true);
+INSERT INTO public.quiz_attempts (
+  id,
+  user_id,
+  quiz_id,
+  quiz_definition_version,
+  attempt_number
+)
+VALUES (
+  'c3730000-0000-0000-0000-000000000001',
+  'c3000000-0000-0000-0000-000000000001',
+  'c3530000-0000-0000-0000-000000000001',
+  3,
+  1
+);
+SELECT pg_catalog.set_config('coditza.learning_write', '', true);
+RESET ROLE;
+
+SET LOCAL ROLE service_role;
+DO $draft_quiz_history_update_denial$
+DECLARE
+  v_rejected boolean := false;
+BEGIN
+  BEGIN
+    PERFORM *
+    FROM public.assessment_update_draft_quiz(
+      'c3000000-0000-0000-0000-000000000005',
+      'c3530000-0000-0000-0000-000000000001',
+      3,
+      '{"passingPercent":90}'::jsonb,
+      'c3f60000-0000-0000-0000-000000000015'
+    );
+  EXCEPTION WHEN raise_exception THEN
+    v_rejected := true;
+  END;
+  IF NOT v_rejected THEN
+    RAISE EXCEPTION 'draft quiz history unexpectedly allowed a root definition update';
+  END IF;
+END;
+$draft_quiz_history_update_denial$;
+RESET ROLE;
+
+SET LOCAL ROLE coditza_owner;
+UPDATE public.modules
+SET status = 'archived'::public.content_status
+WHERE id = 'c31a0000-0000-0000-0000-000000000001';
+RESET ROLE;
+
+SET LOCAL ROLE service_role;
+DO $archived_parent_draft_quiz_update_denial$
+DECLARE
+  v_parent_rejected boolean := false;
+  v_published_rejected boolean := false;
+BEGIN
+  BEGIN
+    PERFORM *
+    FROM public.assessment_update_draft_quiz(
+      'c3000000-0000-0000-0000-000000000005',
+      'c3530000-0000-0000-0000-000000000001',
+      3,
+      '{"title":"Archived parent must reject updates"}'::jsonb,
+      'c3f60000-0000-0000-0000-000000000016'
+    );
+  EXCEPTION WHEN raise_exception THEN
+    v_parent_rejected := true;
+  END;
+
+  BEGIN
+    PERFORM *
+    FROM public.assessment_update_draft_quiz(
+      'c3000000-0000-0000-0000-000000000005',
+      'c3500000-0000-0000-0000-000000000001',
+      1,
+      '{"title":"Published quizzes are immutable"}'::jsonb,
+      'c3f60000-0000-0000-0000-000000000017'
+    );
+  EXCEPTION WHEN raise_exception THEN
+    v_published_rejected := true;
+  END;
+
+  IF NOT v_parent_rejected OR NOT v_published_rejected THEN
+    RAISE EXCEPTION 'archived parents or published quiz roots unexpectedly allowed PATCH';
+  END IF;
+END;
+$archived_parent_draft_quiz_update_denial$;
+RESET ROLE;
+
+SET LOCAL ROLE coditza_owner;
+SELECT extensions.ok(
+  EXISTS (
+    SELECT 1
+    FROM public.quizzes AS quiz
+    JOIN public.quiz_questions AS question_entry
+      ON question_entry.quiz_id = quiz.id
+    JOIN private.quiz_question_answer_keys AS answer_key
+      ON answer_key.question_id = question_entry.id
+    WHERE quiz.id = 'c3530000-0000-0000-0000-000000000001'
+      AND quiz.chapter_id = 'c32a0000-0000-0000-0000-000000000001'
+      AND quiz.slug = 'updated-draft-quiz-patch'
+      AND quiz.title = 'Updated draft quiz root only'
+      AND quiz.instructions_markdown = 'Updated draft quiz instructions.'
+      AND quiz.position = 0
+      AND quiz.passing_percent = 80
+      AND quiz.max_attempts IS NULL
+      AND quiz.time_limit_seconds IS NULL
+      AND NOT quiz.is_required
+      AND quiz.status = 'draft'::public.content_status
+      AND quiz.row_version = 3
+      AND quiz.definition_version = 3
+      AND quiz.created_by = 'c3000000-0000-0000-0000-000000000004'
+      AND quiz.updated_by = 'c3000000-0000-0000-0000-000000000005'
+      AND question_entry.id = 'c3630000-0000-0000-0000-000000000001'
+      AND question_entry.prompt_markdown =
+        'Type yes to prove the original question remains.'
+      AND question_entry.question_type = 'short_text'::public.question_type
+      AND question_entry.position = 0
+      AND question_entry.points = 4
+      AND answer_key.answer_spec =
+        '{"acceptedAnswers":["yes"],"normalization":"nfkc_ascii_ws_ascii_lower_v1"}'::jsonb
+      AND answer_key.feedback_correct_markdown = 'Original quiz correct feedback.'
+      AND answer_key.feedback_incorrect_markdown = 'Original quiz incorrect feedback.'
+      AND answer_key.created_by = 'c3000000-0000-0000-0000-000000000004'
+      AND answer_key.updated_by = 'c3000000-0000-0000-0000-000000000004'
+  )
+  AND EXISTS (
+    SELECT 1
+    FROM public.quiz_attempts AS attempt
+    WHERE attempt.id = 'c3730000-0000-0000-0000-000000000001'
+      AND attempt.quiz_id = 'c3530000-0000-0000-0000-000000000001'
+      AND attempt.quiz_definition_version = 3
+  )
+  AND EXISTS (
+    SELECT 1
+    FROM public.modules AS module_entry
+    WHERE module_entry.id = 'c31a0000-0000-0000-0000-000000000001'
+      AND module_entry.status = 'archived'::public.content_status
+  )
+  AND (
+    SELECT pg_catalog.count(*) = 2
+      AND pg_catalog.bool_and(
+        audit_entry.actor_kind = 'user'
+        AND audit_entry.actor_user_id = 'c3000000-0000-0000-0000-000000000005'
+        AND audit_entry.changed_fields = ARRAY['definition']::text[]
+        AND audit_entry.change_summary =
+          '{"definition":{"before":"draft","after":"updated"}}'::jsonb
+        AND audit_entry.reason IS NULL
+        AND audit_entry.request_id IN (
+          'c3f60000-0000-0000-0000-000000000010',
+          'c3f60000-0000-0000-0000-000000000011'
+        )
+      )
+    FROM private.audit_events AS audit_entry
+    WHERE audit_entry.action = 'quiz_updated'
+      AND audit_entry.entity_type = 'quiz'
+      AND audit_entry.entity_id = 'c3530000-0000-0000-0000-000000000001'
+  )
+  AND NOT EXISTS (
+    SELECT 1
+    FROM private.idempotency_records AS record_entry
+    WHERE record_entry.result_resource_id = 'c3530000-0000-0000-0000-000000000001'
+  )
+  AND COALESCE(
+    pg_catalog.current_setting('coditza.assessment_tree_root', true),
+    ''
+  ) = '',
+  'draft-quiz PATCH keeps root fields atomic, versioned once, history-safe, audited safely, and outside idempotency'
 );
 RESET ROLE;
 
