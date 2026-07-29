@@ -34,34 +34,37 @@ reads, and draft-module/chapter/theory-section PATCH clusters, documented in
 [slice 14](../docs/implementation/SUP-FUNCTIONS-001-slice-14.md), and
 [slice 15](../docs/implementation/SUP-FUNCTIONS-001-slice-15.md), and
 [slice 16](../docs/implementation/SUP-FUNCTIONS-001-slice-16.md), and
-[slice 17](../docs/implementation/SUP-FUNCTIONS-001-slice-17.md). Continue
+[slice 17](../docs/implementation/SUP-FUNCTIONS-001-slice-17.md), and
+[slice 18](../docs/implementation/SUP-FUNCTIONS-001-slice-18.md). Continue
 from those bounded baselines with the curriculum-owned
-curriculum_correct_published_module facade. It must require a server-generated
-request UUID, non-null actor and module identifiers, a positive expected row
+curriculum_correct_published_chapter facade. It must require a server-generated
+request UUID, non-null actor and chapter identifiers, a positive expected row
 version, and the exact reason code content_correction. It must recheck the live
-active editor/admin actor before any module content access, then lock exactly
-the target module row. It must reject missing, draft, archived, and stale
-modules. It must not take a sibling or descendant lock because it cannot change
-position, hierarchy, lifecycle, descendants, or learner state.
+active editor/admin actor before any chapter content access, discover the
+current parent, lock module then chapter in canonical order, and recheck the
+chapter-to-module relationship under those locks. It must reject missing or
+reparented hierarchy, draft, archived, and stale chapters, and an archived
+module ancestor. A draft or published non-archived parent remains valid.
 
 The facade must accept a nonempty partial JSON object whose only accepted fields
-are title and descriptionMarkdown. Every supplied field must pass the exact
-draft-module scalar validation: trimmed 1..160 title and nonblank Markdown of
-at most 10,000 characters. SQL NULL input, non-object input, JSON nulls,
-unknown fields, and all server-owned fields including slug must be rejected.
-Resolve omitted fields from the locked row. A current-version semantic no-op
-must return only id and rowVersion without an UPDATE, row-version/timestamp or
-updated_by change, or audit; a stale no-op must be rejected. A real change must
-update only title, description_markdown, and updated_by, advance row_version
-once through the existing trigger, and append exactly one closed-contract
-module_corrected audit event with changed_fields ['content'], the redacted
+are title, summaryMarkdown, and estimatedMinutes. Every supplied field must
+pass the exact draft-chapter scalar validation: trimmed 1..160 title; nonblank
+Markdown of at most 5,000 characters; and a JSON integer from 1 through 1,440.
+SQL NULL input, non-object input, JSON nulls, unknown fields, and all
+server-owned fields including slug must be rejected. Resolve omitted fields from
+the locked row. A current-version semantic no-op must return only id and
+rowVersion without an UPDATE, row-version/timestamp or updated_by change, or
+audit; a stale no-op must be rejected. A real change must update only title,
+summary_markdown, estimated_minutes, and updated_by, advance row_version once
+through the existing trigger, and append exactly one closed-contract
+chapter_corrected audit event with changed_fields ['content'], the redacted
 content delta, and reason content_correction. Execution must be granted only to
 service_role.
 
 This correction must preserve slug, position, status, published_at, IDs,
-created_at, hierarchy, descendants, assessment definitions, theory
+created_at, module relationship, theory/assessment descendants, theory
 completions, and all learner progress. It must not create replay/idempotency
-behavior, correct chapter/theory content, reparent, reorder, publish, archive,
+behavior, correct module/theory content, reparent, reorder, publish, archive,
 add a generic curriculum facade, or add Fastify/HTTP/direct-client/Python/SMTP/
 MFA/Vercel behavior.
 
