@@ -4,7 +4,7 @@ BEGIN;
 -- and the only runtime role used for successful calls is service_role.
 GRANT USAGE ON SCHEMA extensions TO coditza_owner;
 
-SELECT extensions.plan(42);
+SELECT extensions.plan(44);
 
 SET LOCAL ROLE coditza_owner;
 DO $normalization_golden_vectors$
@@ -599,6 +599,42 @@ SELECT extensions.ok(
   'draft-module PATCH facade is owner-controlled, fixed-path, exact-name, and server-only'
 );
 
+SELECT extensions.ok(
+  (
+    SELECT procedure_entry.proowner = 'coditza_owner'::pg_catalog.regrole
+      AND procedure_entry.prosecdef
+      AND procedure_entry.proconfig = ARRAY['search_path=""']::text[]
+    FROM pg_catalog.pg_proc AS procedure_entry
+    WHERE procedure_entry.oid =
+      'public.curriculum_update_draft_chapter(uuid,uuid,integer,jsonb,uuid)'::pg_catalog.regprocedure
+  )
+  AND (
+    SELECT pg_catalog.count(*) = 1
+    FROM pg_catalog.pg_proc AS procedure_entry
+    JOIN pg_catalog.pg_namespace AS procedure_namespace
+      ON procedure_namespace.oid = procedure_entry.pronamespace
+    WHERE procedure_namespace.nspname = 'public'
+      AND procedure_entry.proname = 'curriculum_update_draft_chapter'
+  )
+  AND NOT EXISTS (
+    SELECT 1
+    FROM (
+      VALUES ('anon'), ('authenticated'), ('authenticator')
+    ) AS runtime_role(rolname)
+    WHERE pg_catalog.has_function_privilege(
+      runtime_role.rolname,
+      'public.curriculum_update_draft_chapter(uuid,uuid,integer,jsonb,uuid)'::pg_catalog.regprocedure,
+      'EXECUTE'
+    )
+  )
+  AND pg_catalog.has_function_privilege(
+    'service_role',
+    'public.curriculum_update_draft_chapter(uuid,uuid,integer,jsonb,uuid)'::pg_catalog.regprocedure,
+    'EXECUTE'
+  ),
+  'draft-chapter PATCH facade is owner-controlled, fixed-path, exact-name, and server-only'
+);
+
 SET LOCAL ROLE authenticated;
 DO $authenticated_facade_denial$
 DECLARE
@@ -841,6 +877,23 @@ BEGIN
   END;
   IF NOT v_rejected THEN
     RAISE EXCEPTION 'authenticated role unexpectedly executed a draft module PATCH facade';
+  END IF;
+
+  v_rejected := false;
+  BEGIN
+    PERFORM *
+    FROM public.curriculum_update_draft_chapter(
+      'c3000000-0000-0000-0000-000000000005',
+      'c32f0000-0000-0000-0000-000000000001',
+      1,
+      '{"title":"Denied draft chapter update"}'::jsonb,
+      'c3fb0000-0000-0000-0000-000000000001'
+    );
+  EXCEPTION WHEN insufficient_privilege THEN
+    v_rejected := true;
+  END;
+  IF NOT v_rejected THEN
+    RAISE EXCEPTION 'authenticated role unexpectedly executed a draft chapter PATCH facade';
   END IF;
 END;
 $authenticated_facade_denial$;
@@ -8789,6 +8842,827 @@ SELECT extensions.ok(
     ''
   ) = '',
   'draft-module PATCH updates only the root once per real change, preserves children and lifecycle, audits redacted content safely, and has no replay'
+);
+RESET ROLE;
+
+-- The draft-chapter PATCH fixture starts only after the module PATCH assertion,
+-- so its target can reuse that untouched draft child without weakening the
+-- root-only proof above. It also proves draft descendants remain unaffected.
+SET LOCAL ROLE coditza_owner;
+INSERT INTO public.chapters (
+  id,
+  module_id,
+  slug,
+  title,
+  summary_markdown,
+  position,
+  estimated_minutes,
+  created_by,
+  updated_by
+)
+VALUES
+  (
+    'c3320000-0000-0000-0000-000000000001',
+    'c31e0000-0000-0000-0000-000000000001',
+    'draft-chapter-patch-sibling',
+    'Draft chapter PATCH sibling',
+    'Sibling retained to prove scoped-slug rollback and position preservation.',
+    1,
+    11,
+    'c3000000-0000-0000-0000-000000000004',
+    'c3000000-0000-0000-0000-000000000004'
+  ),
+  (
+    'c32f0000-0000-0000-0000-000000000001',
+    'c3100000-0000-0000-0000-000000000001',
+    'published-parent-chapter-patch-target',
+    'Published-parent draft chapter',
+    'A draft child remains editable under a published module.',
+    1,
+    18,
+    'c3000000-0000-0000-0000-000000000004',
+    'c3000000-0000-0000-0000-000000000004'
+  ),
+  (
+    'c3310000-0000-0000-0000-000000000001',
+    'c31f0000-0000-0000-0000-000000000001',
+    'archived-parent-chapter-patch-target',
+    'Archived-parent draft chapter',
+    'This draft child must remain immutable because its parent is archived.',
+    0,
+    12,
+    'c3000000-0000-0000-0000-000000000004',
+    'c3000000-0000-0000-0000-000000000004'
+  );
+INSERT INTO public.theory_sections (
+  id,
+  chapter_id,
+  title,
+  body_markdown,
+  position,
+  estimated_minutes,
+  created_by,
+  updated_by
+)
+VALUES (
+  'c33e0000-0000-0000-0000-000000000001',
+  'c32e0000-0000-0000-0000-000000000001',
+  'Draft chapter PATCH theory child',
+  'This theory child must remain untouched by a chapter scalar PATCH.',
+  0,
+  5,
+  'c3000000-0000-0000-0000-000000000004',
+  'c3000000-0000-0000-0000-000000000004'
+);
+INSERT INTO public.exercises (
+  id,
+  chapter_id,
+  title,
+  prompt_markdown,
+  exercise_type,
+  position,
+  points,
+  is_required,
+  created_by,
+  updated_by
+)
+VALUES (
+  'c34e0000-0000-0000-0000-000000000001',
+  'c32e0000-0000-0000-0000-000000000001',
+  'Draft chapter PATCH exercise child',
+  'This incomplete scalar exercise must remain untouched.',
+  'short_text',
+  0,
+  1,
+  true,
+  'c3000000-0000-0000-0000-000000000004',
+  'c3000000-0000-0000-0000-000000000004'
+);
+RESET ROLE;
+
+SET LOCAL ROLE service_role;
+DO $curriculum_update_draft_chapter$
+DECLARE
+  v_full_update record;
+  v_noop record;
+  v_published_parent_update record;
+  v_empty_rejected boolean := false;
+  v_nonobject_rejected boolean := false;
+  v_unknown_field_rejected boolean := false;
+  v_invalid_slug_rejected boolean := false;
+  v_wrong_slug_type_rejected boolean := false;
+  v_untrimmed_title_rejected boolean := false;
+  v_wrong_title_type_rejected boolean := false;
+  v_blank_summary_rejected boolean := false;
+  v_zero_minutes_rejected boolean := false;
+  v_high_minutes_rejected boolean := false;
+  v_wrong_minutes_type_rejected boolean := false;
+  v_wrong_summary_type_rejected boolean := false;
+  v_duplicate_slug_rejected boolean := false;
+  v_null_field_rejected boolean := false;
+  v_learner_rejected boolean := false;
+  v_held_actor_rejected boolean := false;
+  v_null_actor_rejected boolean := false;
+  v_missing_actor_rejected boolean := false;
+  v_null_chapter_rejected boolean := false;
+  v_missing_chapter_rejected boolean := false;
+  v_null_version_rejected boolean := false;
+  v_zero_version_rejected boolean := false;
+  v_negative_version_rejected boolean := false;
+  v_null_input_rejected boolean := false;
+  v_null_request_rejected boolean := false;
+  v_stale_rejected boolean := false;
+  v_stale_noop_rejected boolean := false;
+BEGIN
+  BEGIN
+    PERFORM *
+    FROM public.curriculum_update_draft_chapter(
+      'c3000000-0000-0000-0000-000000000005',
+      'c32e0000-0000-0000-0000-000000000001',
+      1,
+      '{}'::jsonb,
+      'c3fb0000-0000-0000-0000-000000000002'
+    );
+  EXCEPTION WHEN raise_exception THEN
+    v_empty_rejected := true;
+  END;
+
+  BEGIN
+    PERFORM *
+    FROM public.curriculum_update_draft_chapter(
+      'c3000000-0000-0000-0000-000000000005',
+      'c32e0000-0000-0000-0000-000000000001',
+      1,
+      '[]'::jsonb,
+      'c3fb0000-0000-0000-0000-000000000003'
+    );
+  EXCEPTION WHEN raise_exception THEN
+    v_nonobject_rejected := true;
+  END;
+
+  BEGIN
+    PERFORM *
+    FROM public.curriculum_update_draft_chapter(
+      'c3000000-0000-0000-0000-000000000005',
+      'c32e0000-0000-0000-0000-000000000001',
+      1,
+      '{"moduleId":"c3100000-0000-0000-0000-000000000001"}'::jsonb,
+      'c3fb0000-0000-0000-0000-000000000004'
+    );
+  EXCEPTION WHEN raise_exception THEN
+    v_unknown_field_rejected := true;
+  END;
+
+  BEGIN
+    PERFORM *
+    FROM public.curriculum_update_draft_chapter(
+      'c3000000-0000-0000-0000-000000000005',
+      'c32e0000-0000-0000-0000-000000000001',
+      1,
+      '{"slug":"Invalid slug"}'::jsonb,
+      'c3fb0000-0000-0000-0000-000000000005'
+    );
+  EXCEPTION WHEN raise_exception THEN
+    v_invalid_slug_rejected := true;
+  END;
+
+  BEGIN
+    PERFORM *
+    FROM public.curriculum_update_draft_chapter(
+      'c3000000-0000-0000-0000-000000000005',
+      'c32e0000-0000-0000-0000-000000000001',
+      1,
+      '{"slug":1}'::jsonb,
+      'c3fb0000-0000-0000-0000-000000000023'
+    );
+  EXCEPTION WHEN raise_exception THEN
+    v_wrong_slug_type_rejected := true;
+  END;
+
+  BEGIN
+    PERFORM *
+    FROM public.curriculum_update_draft_chapter(
+      'c3000000-0000-0000-0000-000000000005',
+      'c32e0000-0000-0000-0000-000000000001',
+      1,
+      '{"title":" Untrimmed draft chapter title"}'::jsonb,
+      'c3fb0000-0000-0000-0000-000000000006'
+    );
+  EXCEPTION WHEN raise_exception THEN
+    v_untrimmed_title_rejected := true;
+  END;
+
+  BEGIN
+    PERFORM *
+    FROM public.curriculum_update_draft_chapter(
+      'c3000000-0000-0000-0000-000000000005',
+      'c32e0000-0000-0000-0000-000000000001',
+      1,
+      '{"title":1}'::jsonb,
+      'c3fb0000-0000-0000-0000-000000000024'
+    );
+  EXCEPTION WHEN raise_exception THEN
+    v_wrong_title_type_rejected := true;
+  END;
+
+  BEGIN
+    PERFORM *
+    FROM public.curriculum_update_draft_chapter(
+      'c3000000-0000-0000-0000-000000000005',
+      'c32e0000-0000-0000-0000-000000000001',
+      1,
+      '{"summaryMarkdown":"   "}'::jsonb,
+      'c3fb0000-0000-0000-0000-000000000007'
+    );
+  EXCEPTION WHEN raise_exception THEN
+    v_blank_summary_rejected := true;
+  END;
+
+  BEGIN
+    PERFORM *
+    FROM public.curriculum_update_draft_chapter(
+      'c3000000-0000-0000-0000-000000000005',
+      'c32e0000-0000-0000-0000-000000000001',
+      1,
+      '{"estimatedMinutes":0}'::jsonb,
+      'c3fb0000-0000-0000-0000-000000000008'
+    );
+  EXCEPTION WHEN raise_exception THEN
+    v_zero_minutes_rejected := true;
+  END;
+
+  BEGIN
+    PERFORM *
+    FROM public.curriculum_update_draft_chapter(
+      'c3000000-0000-0000-0000-000000000005',
+      'c32e0000-0000-0000-0000-000000000001',
+      1,
+      '{"estimatedMinutes":1441}'::jsonb,
+      'c3fb0000-0000-0000-0000-000000000025'
+    );
+  EXCEPTION WHEN raise_exception THEN
+    v_high_minutes_rejected := true;
+  END;
+
+  BEGIN
+    PERFORM *
+    FROM public.curriculum_update_draft_chapter(
+      'c3000000-0000-0000-0000-000000000005',
+      'c32e0000-0000-0000-0000-000000000001',
+      1,
+      '{"estimatedMinutes":"10"}'::jsonb,
+      'c3fb0000-0000-0000-0000-000000000009'
+    );
+  EXCEPTION WHEN raise_exception THEN
+    v_wrong_minutes_type_rejected := true;
+  END;
+
+  BEGIN
+    PERFORM *
+    FROM public.curriculum_update_draft_chapter(
+      'c3000000-0000-0000-0000-000000000005',
+      'c32e0000-0000-0000-0000-000000000001',
+      1,
+      '{"summaryMarkdown":1}'::jsonb,
+      'c3fb0000-0000-0000-0000-000000000010'
+    );
+  EXCEPTION WHEN raise_exception THEN
+    v_wrong_summary_type_rejected := true;
+  END;
+
+  BEGIN
+    PERFORM *
+    FROM public.curriculum_update_draft_chapter(
+      'c3000000-0000-0000-0000-000000000005',
+      'c32e0000-0000-0000-0000-000000000001',
+      1,
+      '{"slug":"draft-chapter-patch-sibling"}'::jsonb,
+      'c3fb0000-0000-0000-0000-000000000011'
+    );
+  EXCEPTION WHEN raise_exception OR unique_violation THEN
+    v_duplicate_slug_rejected := true;
+  END;
+
+  BEGIN
+    PERFORM *
+    FROM public.curriculum_update_draft_chapter(
+      'c3000000-0000-0000-0000-000000000005',
+      'c32e0000-0000-0000-0000-000000000001',
+      1,
+      '{"slug":null}'::jsonb,
+      'c3fb0000-0000-0000-0000-000000000012'
+    );
+  EXCEPTION WHEN raise_exception THEN
+    v_null_field_rejected := true;
+  END;
+
+  BEGIN
+    PERFORM *
+    FROM public.curriculum_update_draft_chapter(
+      'c3000000-0000-0000-0000-000000000001',
+      'c32e0000-0000-0000-0000-000000000001',
+      1,
+      '{"title":"Learners cannot update draft chapters"}'::jsonb,
+      'c3fb0000-0000-0000-0000-000000000013'
+    );
+  EXCEPTION WHEN raise_exception THEN
+    v_learner_rejected := true;
+  END;
+
+  BEGIN
+    PERFORM *
+    FROM public.curriculum_update_draft_chapter(
+      'c3000000-0000-0000-0000-000000000006',
+      'c32e0000-0000-0000-0000-000000000001',
+      1,
+      '{"title":"Held staff cannot update draft chapters"}'::jsonb,
+      'c3fb0000-0000-0000-0000-000000000014'
+    );
+  EXCEPTION WHEN raise_exception THEN
+    v_held_actor_rejected := true;
+  END;
+
+  BEGIN
+    PERFORM *
+    FROM public.curriculum_update_draft_chapter(
+      NULL::uuid,
+      'c32e0000-0000-0000-0000-000000000001',
+      1,
+      '{"title":"Null actor"}'::jsonb,
+      'c3fb0000-0000-0000-0000-000000000015'
+    );
+  EXCEPTION WHEN raise_exception THEN
+    v_null_actor_rejected := true;
+  END;
+
+  BEGIN
+    PERFORM *
+    FROM public.curriculum_update_draft_chapter(
+      'c3000000-0000-0000-0000-000000000999',
+      'c32e0000-0000-0000-0000-000000000001',
+      1,
+      '{"title":"Missing actor"}'::jsonb,
+      'c3fb0000-0000-0000-0000-000000000016'
+    );
+  EXCEPTION WHEN raise_exception THEN
+    v_missing_actor_rejected := true;
+  END;
+
+  BEGIN
+    PERFORM *
+    FROM public.curriculum_update_draft_chapter(
+      'c3000000-0000-0000-0000-000000000005',
+      NULL::uuid,
+      1,
+      '{"title":"Null chapter"}'::jsonb,
+      'c3fb0000-0000-0000-0000-000000000017'
+    );
+  EXCEPTION WHEN raise_exception THEN
+    v_null_chapter_rejected := true;
+  END;
+
+  BEGIN
+    PERFORM *
+    FROM public.curriculum_update_draft_chapter(
+      'c3000000-0000-0000-0000-000000000005',
+      'c32f0000-0000-0000-0000-000000000999',
+      1,
+      '{"title":"Missing chapter"}'::jsonb,
+      'c3fb0000-0000-0000-0000-000000000018'
+    );
+  EXCEPTION WHEN raise_exception THEN
+    v_missing_chapter_rejected := true;
+  END;
+
+  BEGIN
+    PERFORM *
+    FROM public.curriculum_update_draft_chapter(
+      'c3000000-0000-0000-0000-000000000005',
+      'c32e0000-0000-0000-0000-000000000001',
+      NULL::integer,
+      '{"title":"Null version"}'::jsonb,
+      'c3fb0000-0000-0000-0000-000000000019'
+    );
+  EXCEPTION WHEN raise_exception THEN
+    v_null_version_rejected := true;
+  END;
+
+  BEGIN
+    PERFORM *
+    FROM public.curriculum_update_draft_chapter(
+      'c3000000-0000-0000-0000-000000000005',
+      'c32e0000-0000-0000-0000-000000000001',
+      0,
+      '{"title":"Zero version"}'::jsonb,
+      'c3fb0000-0000-0000-0000-000000000020'
+    );
+  EXCEPTION WHEN raise_exception THEN
+    v_zero_version_rejected := true;
+  END;
+
+  BEGIN
+    PERFORM *
+    FROM public.curriculum_update_draft_chapter(
+      'c3000000-0000-0000-0000-000000000005',
+      'c32e0000-0000-0000-0000-000000000001',
+      -1,
+      '{"title":"Negative version"}'::jsonb,
+      'c3fb0000-0000-0000-0000-000000000021'
+    );
+  EXCEPTION WHEN raise_exception THEN
+    v_negative_version_rejected := true;
+  END;
+
+  BEGIN
+    PERFORM *
+    FROM public.curriculum_update_draft_chapter(
+      'c3000000-0000-0000-0000-000000000005',
+      'c32e0000-0000-0000-0000-000000000001',
+      1,
+      NULL::jsonb,
+      'c3fb0000-0000-0000-0000-000000000022'
+    );
+  EXCEPTION WHEN raise_exception THEN
+    v_null_input_rejected := true;
+  END;
+
+  BEGIN
+    PERFORM *
+    FROM public.curriculum_update_draft_chapter(
+      'c3000000-0000-0000-0000-000000000005',
+      'c32e0000-0000-0000-0000-000000000001',
+      1,
+      '{"title":"Null request"}'::jsonb,
+      NULL::uuid
+    );
+  EXCEPTION WHEN raise_exception THEN
+    v_null_request_rejected := true;
+  END;
+
+  SELECT * INTO v_full_update
+  FROM public.curriculum_update_draft_chapter(
+    'c3000000-0000-0000-0000-000000000004',
+    'c32e0000-0000-0000-0000-000000000001',
+    1,
+    '{"slug":"updated-draft-chapter","title":"Updated draft chapter title","summaryMarkdown":"Updated draft chapter summary.","estimatedMinutes":25}'::jsonb,
+    'c3fb0000-0000-0000-0000-000000000030'
+  );
+
+  SELECT * INTO v_noop
+  FROM public.curriculum_update_draft_chapter(
+    'c3000000-0000-0000-0000-000000000005',
+    'c32e0000-0000-0000-0000-000000000001',
+    2,
+    '{"title":"Updated draft chapter title"}'::jsonb,
+    'c3fb0000-0000-0000-0000-000000000031'
+  );
+
+  SELECT * INTO v_published_parent_update
+  FROM public.curriculum_update_draft_chapter(
+    'c3000000-0000-0000-0000-000000000005',
+    'c32f0000-0000-0000-0000-000000000001',
+    1,
+    '{"estimatedMinutes":24}'::jsonb,
+    'c3fb0000-0000-0000-0000-000000000032'
+  );
+
+  BEGIN
+    PERFORM *
+    FROM public.curriculum_update_draft_chapter(
+      'c3000000-0000-0000-0000-000000000004',
+      'c32e0000-0000-0000-0000-000000000001',
+      1,
+      '{"slug":"updated-draft-chapter","title":"Updated draft chapter title","summaryMarkdown":"Updated draft chapter summary.","estimatedMinutes":25}'::jsonb,
+      'c3fb0000-0000-0000-0000-000000000030'
+    );
+  EXCEPTION WHEN raise_exception THEN
+    v_stale_rejected := true;
+  END;
+
+  BEGIN
+    PERFORM *
+    FROM public.curriculum_update_draft_chapter(
+      'c3000000-0000-0000-0000-000000000005',
+      'c32e0000-0000-0000-0000-000000000001',
+      1,
+      '{"title":"Updated draft chapter title"}'::jsonb,
+      'c3fb0000-0000-0000-0000-000000000034'
+    );
+  EXCEPTION WHEN raise_exception THEN
+    v_stale_noop_rejected := true;
+  END;
+
+  IF v_full_update.response_status <> 200
+    OR v_full_update.response_body IS DISTINCT FROM pg_catalog.jsonb_build_object(
+      'id', 'c32e0000-0000-0000-0000-000000000001',
+      'rowVersion', 2
+    )
+    OR v_noop.response_status <> 200
+    OR v_noop.response_body IS DISTINCT FROM pg_catalog.jsonb_build_object(
+      'id', 'c32e0000-0000-0000-0000-000000000001',
+      'rowVersion', 2
+    )
+    OR v_published_parent_update.response_status <> 200
+    OR v_published_parent_update.response_body IS DISTINCT FROM pg_catalog.jsonb_build_object(
+      'id', 'c32f0000-0000-0000-0000-000000000001',
+      'rowVersion', 2
+    )
+    OR NOT v_empty_rejected
+    OR NOT v_nonobject_rejected
+    OR NOT v_unknown_field_rejected
+    OR NOT v_invalid_slug_rejected
+    OR NOT v_wrong_slug_type_rejected
+    OR NOT v_untrimmed_title_rejected
+    OR NOT v_wrong_title_type_rejected
+    OR NOT v_blank_summary_rejected
+    OR NOT v_zero_minutes_rejected
+    OR NOT v_high_minutes_rejected
+    OR NOT v_wrong_minutes_type_rejected
+    OR NOT v_wrong_summary_type_rejected
+    OR NOT v_duplicate_slug_rejected
+    OR NOT v_null_field_rejected
+    OR NOT v_learner_rejected
+    OR NOT v_held_actor_rejected
+    OR NOT v_null_actor_rejected
+    OR NOT v_missing_actor_rejected
+    OR NOT v_null_chapter_rejected
+    OR NOT v_missing_chapter_rejected
+    OR NOT v_null_version_rejected
+    OR NOT v_zero_version_rejected
+    OR NOT v_negative_version_rejected
+    OR NOT v_null_input_rejected
+    OR NOT v_null_request_rejected
+    OR NOT v_stale_rejected
+    OR NOT v_stale_noop_rejected THEN
+    RAISE EXCEPTION 'draft-chapter PATCH facade did not preserve its exact parent-scoped update contract';
+  END IF;
+END;
+$curriculum_update_draft_chapter$;
+RESET ROLE;
+
+SET LOCAL ROLE service_role;
+DO $draft_chapter_update_lifecycle_denial$
+DECLARE
+  v_published_chapter_rejected boolean := false;
+  v_archived_chapter_rejected boolean := false;
+  v_archived_parent_rejected boolean := false;
+BEGIN
+  BEGIN
+    PERFORM *
+    FROM public.curriculum_update_draft_chapter(
+      'c3000000-0000-0000-0000-000000000005',
+      'c3200000-0000-0000-0000-000000000001',
+      2,
+      '{"title":"Published chapters are immutable in draft PATCH"}'::jsonb,
+      'c3fb0000-0000-0000-0000-000000000035'
+    );
+  EXCEPTION WHEN raise_exception THEN
+    v_published_chapter_rejected := true;
+  END;
+
+  BEGIN
+    PERFORM *
+    FROM public.curriculum_update_draft_chapter(
+      'c3000000-0000-0000-0000-000000000005',
+      'c32c0000-0000-0000-0000-000000000001',
+      2,
+      '{"title":"Archived chapters are immutable in draft PATCH"}'::jsonb,
+      'c3fb0000-0000-0000-0000-000000000036'
+    );
+  EXCEPTION WHEN raise_exception THEN
+    v_archived_chapter_rejected := true;
+  END;
+
+  BEGIN
+    PERFORM *
+    FROM public.curriculum_update_draft_chapter(
+      'c3000000-0000-0000-0000-000000000005',
+      'c3310000-0000-0000-0000-000000000001',
+      1,
+      '{"title":"Archived parents block draft chapter PATCH"}'::jsonb,
+      'c3fb0000-0000-0000-0000-000000000037'
+    );
+  EXCEPTION WHEN raise_exception THEN
+    v_archived_parent_rejected := true;
+  END;
+
+  IF NOT v_published_chapter_rejected
+    OR NOT v_archived_chapter_rejected
+    OR NOT v_archived_parent_rejected THEN
+    RAISE EXCEPTION 'draft-chapter PATCH unexpectedly accepted a non-draft chapter or archived parent';
+  END IF;
+END;
+$draft_chapter_update_lifecycle_denial$;
+RESET ROLE;
+
+SET LOCAL ROLE coditza_owner;
+SELECT extensions.ok(
+  EXISTS (
+    SELECT 1
+    FROM public.chapters AS chapter_entry
+    WHERE chapter_entry.id = 'c32e0000-0000-0000-0000-000000000001'
+      AND chapter_entry.module_id = 'c31e0000-0000-0000-0000-000000000001'
+      AND chapter_entry.slug = 'updated-draft-chapter'
+      AND chapter_entry.title = 'Updated draft chapter title'
+      AND chapter_entry.summary_markdown = 'Updated draft chapter summary.'
+      AND chapter_entry.position = 0
+      AND chapter_entry.estimated_minutes = 25
+      AND chapter_entry.status = 'draft'::public.content_status
+      AND chapter_entry.published_at IS NULL
+      AND chapter_entry.row_version = 2
+      AND chapter_entry.created_by = 'c3000000-0000-0000-0000-000000000004'
+      AND chapter_entry.updated_by = 'c3000000-0000-0000-0000-000000000004'
+  )
+  AND EXISTS (
+    SELECT 1
+    FROM public.chapters AS chapter_entry
+    WHERE chapter_entry.id = 'c32f0000-0000-0000-0000-000000000001'
+      AND chapter_entry.module_id = 'c3100000-0000-0000-0000-000000000001'
+      AND chapter_entry.slug = 'published-parent-chapter-patch-target'
+      AND chapter_entry.title = 'Published-parent draft chapter'
+      AND chapter_entry.summary_markdown =
+        'A draft child remains editable under a published module.'
+      AND chapter_entry.position = 1
+      AND chapter_entry.estimated_minutes = 24
+      AND chapter_entry.status = 'draft'::public.content_status
+      AND chapter_entry.published_at IS NULL
+      AND chapter_entry.row_version = 2
+      AND chapter_entry.created_by = 'c3000000-0000-0000-0000-000000000004'
+      AND chapter_entry.updated_by = 'c3000000-0000-0000-0000-000000000005'
+  )
+  AND EXISTS (
+    SELECT 1
+    FROM public.chapters AS chapter_entry
+    WHERE chapter_entry.id = 'c3320000-0000-0000-0000-000000000001'
+      AND chapter_entry.module_id = 'c31e0000-0000-0000-0000-000000000001'
+      AND chapter_entry.slug = 'draft-chapter-patch-sibling'
+      AND chapter_entry.position = 1
+      AND chapter_entry.status = 'draft'::public.content_status
+      AND chapter_entry.row_version = 1
+      AND chapter_entry.created_by = 'c3000000-0000-0000-0000-000000000004'
+      AND chapter_entry.updated_by = 'c3000000-0000-0000-0000-000000000004'
+  )
+  AND EXISTS (
+    SELECT 1
+    FROM public.theory_sections AS theory_entry
+    WHERE theory_entry.id = 'c33e0000-0000-0000-0000-000000000001'
+      AND theory_entry.chapter_id = 'c32e0000-0000-0000-0000-000000000001'
+      AND theory_entry.title = 'Draft chapter PATCH theory child'
+      AND theory_entry.body_markdown =
+        'This theory child must remain untouched by a chapter scalar PATCH.'
+      AND theory_entry.position = 0
+      AND theory_entry.estimated_minutes = 5
+      AND theory_entry.status = 'draft'::public.content_status
+      AND theory_entry.row_version = 1
+      AND theory_entry.created_by = 'c3000000-0000-0000-0000-000000000004'
+      AND theory_entry.updated_by = 'c3000000-0000-0000-0000-000000000004'
+  )
+  AND EXISTS (
+    SELECT 1
+    FROM public.exercises AS exercise_entry
+    WHERE exercise_entry.id = 'c34e0000-0000-0000-0000-000000000001'
+      AND exercise_entry.chapter_id = 'c32e0000-0000-0000-0000-000000000001'
+      AND exercise_entry.title = 'Draft chapter PATCH exercise child'
+      AND exercise_entry.prompt_markdown =
+        'This incomplete scalar exercise must remain untouched.'
+      AND exercise_entry.exercise_type = 'short_text'::public.exercise_type
+      AND exercise_entry.position = 0
+      AND exercise_entry.points = 1
+      AND exercise_entry.is_required
+      AND exercise_entry.status = 'draft'::public.content_status
+      AND exercise_entry.row_version = 1
+      AND exercise_entry.definition_version = 1
+      AND exercise_entry.created_by = 'c3000000-0000-0000-0000-000000000004'
+      AND exercise_entry.updated_by = 'c3000000-0000-0000-0000-000000000004'
+  )
+  AND EXISTS (
+    SELECT 1
+    FROM public.modules AS module_entry
+    WHERE module_entry.id = 'c31e0000-0000-0000-0000-000000000001'
+      AND module_entry.status = 'draft'::public.content_status
+      AND module_entry.row_version = 3
+  )
+  AND EXISTS (
+    SELECT 1
+    FROM public.modules AS module_entry
+    WHERE module_entry.id = 'c3100000-0000-0000-0000-000000000001'
+      AND module_entry.status = 'published'::public.content_status
+      AND module_entry.row_version = 2
+  )
+  AND EXISTS (
+    SELECT 1
+    FROM public.modules AS module_entry
+    WHERE module_entry.id = 'c31f0000-0000-0000-0000-000000000001'
+      AND module_entry.status = 'archived'::public.content_status
+      AND module_entry.row_version = 2
+  )
+  AND EXISTS (
+    SELECT 1
+    FROM public.chapters AS chapter_entry
+    WHERE chapter_entry.id = 'c3310000-0000-0000-0000-000000000001'
+      AND chapter_entry.module_id = 'c31f0000-0000-0000-0000-000000000001'
+      AND chapter_entry.status = 'draft'::public.content_status
+      AND chapter_entry.row_version = 1
+  )
+  AND EXISTS (
+    SELECT 1
+    FROM public.chapters AS chapter_entry
+    WHERE chapter_entry.id = 'c3200000-0000-0000-0000-000000000001'
+      AND chapter_entry.status = 'published'::public.content_status
+      AND chapter_entry.row_version = 2
+  )
+  AND EXISTS (
+    SELECT 1
+    FROM public.chapters AS chapter_entry
+    WHERE chapter_entry.id = 'c32c0000-0000-0000-0000-000000000001'
+      AND chapter_entry.status = 'archived'::public.content_status
+      AND chapter_entry.row_version = 2
+  )
+  AND (
+    SELECT pg_catalog.count(*) = 2
+      AND pg_catalog.bool_and(
+        audit_entry.actor_kind = 'user'
+        AND audit_entry.action = 'chapter_updated'
+        AND audit_entry.entity_type = 'chapter'
+        AND audit_entry.changed_fields = ARRAY['content']::text[]
+        AND audit_entry.change_summary =
+          '{"content":{"before":"redacted","after":"redacted"}}'::jsonb
+        AND audit_entry.reason IS NULL
+        AND (
+          (
+            audit_entry.actor_user_id = 'c3000000-0000-0000-0000-000000000004'
+            AND audit_entry.entity_id = 'c32e0000-0000-0000-0000-000000000001'
+            AND audit_entry.request_id = 'c3fb0000-0000-0000-0000-000000000030'::uuid
+          )
+          OR (
+            audit_entry.actor_user_id = 'c3000000-0000-0000-0000-000000000005'
+            AND audit_entry.entity_id = 'c32f0000-0000-0000-0000-000000000001'
+            AND audit_entry.request_id = 'c3fb0000-0000-0000-0000-000000000032'::uuid
+          )
+        )
+      )
+    FROM private.audit_events AS audit_entry
+    WHERE audit_entry.entity_id IN (
+        'c32e0000-0000-0000-0000-000000000001'::uuid,
+        'c32f0000-0000-0000-0000-000000000001'::uuid
+      )
+  )
+  AND (
+    SELECT pg_catalog.count(*) = 2
+    FROM private.audit_events AS audit_entry
+    WHERE audit_entry.request_id IN (
+      'c3fb0000-0000-0000-0000-000000000030'::uuid,
+      'c3fb0000-0000-0000-0000-000000000032'::uuid
+    )
+  )
+  AND NOT EXISTS (
+    SELECT 1
+    FROM private.audit_events AS audit_entry
+    WHERE audit_entry.request_id IN (
+      'c3fb0000-0000-0000-0000-000000000002'::uuid,
+      'c3fb0000-0000-0000-0000-000000000003'::uuid,
+      'c3fb0000-0000-0000-0000-000000000004'::uuid,
+      'c3fb0000-0000-0000-0000-000000000005'::uuid,
+      'c3fb0000-0000-0000-0000-000000000006'::uuid,
+      'c3fb0000-0000-0000-0000-000000000007'::uuid,
+      'c3fb0000-0000-0000-0000-000000000008'::uuid,
+      'c3fb0000-0000-0000-0000-000000000009'::uuid,
+      'c3fb0000-0000-0000-0000-000000000010'::uuid,
+      'c3fb0000-0000-0000-0000-000000000011'::uuid,
+      'c3fb0000-0000-0000-0000-000000000012'::uuid,
+      'c3fb0000-0000-0000-0000-000000000013'::uuid,
+      'c3fb0000-0000-0000-0000-000000000014'::uuid,
+      'c3fb0000-0000-0000-0000-000000000015'::uuid,
+      'c3fb0000-0000-0000-0000-000000000016'::uuid,
+      'c3fb0000-0000-0000-0000-000000000017'::uuid,
+      'c3fb0000-0000-0000-0000-000000000018'::uuid,
+      'c3fb0000-0000-0000-0000-000000000019'::uuid,
+      'c3fb0000-0000-0000-0000-000000000020'::uuid,
+      'c3fb0000-0000-0000-0000-000000000021'::uuid,
+      'c3fb0000-0000-0000-0000-000000000022'::uuid,
+      'c3fb0000-0000-0000-0000-000000000023'::uuid,
+      'c3fb0000-0000-0000-0000-000000000024'::uuid,
+      'c3fb0000-0000-0000-0000-000000000025'::uuid,
+      'c3fb0000-0000-0000-0000-000000000031'::uuid,
+      'c3fb0000-0000-0000-0000-000000000034'::uuid,
+      'c3fb0000-0000-0000-0000-000000000035'::uuid,
+      'c3fb0000-0000-0000-0000-000000000036'::uuid,
+      'c3fb0000-0000-0000-0000-000000000037'::uuid
+    )
+  )
+  AND NOT EXISTS (
+    SELECT 1
+    FROM private.idempotency_records AS record_entry
+    WHERE record_entry.result_resource_id IN (
+      'c32e0000-0000-0000-0000-000000000001'::uuid,
+      'c32f0000-0000-0000-0000-000000000001'::uuid
+    )
+  )
+  AND COALESCE(
+    pg_catalog.current_setting('coditza.learning_write', true),
+    ''
+  ) = '',
+  'draft-chapter PATCH locks parent then chapter, preserves hierarchy and descendants, permits a published parent, audits redacted content safely, and has no replay'
 );
 RESET ROLE;
 

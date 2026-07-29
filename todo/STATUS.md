@@ -230,6 +230,11 @@ to the deadlines in that file.
   of a current draft module, preserves children and lifecycle, returns a safe
   version result, writes a redacted audit only for a real change, and passes
   protected local/Docker proof.
+- [SUP-FUNCTIONS-001 draft-chapter PATCH slice report](../docs/implementation/SUP-FUNCTIONS-001-slice-16.md);
+  a service-role-only facade now locks a module then chapter, preserves
+  hierarchy and descendants, permits a published non-archived parent, returns
+  a safe version result, writes a redacted audit only for a real change, and
+  passes protected local/Docker proof.
 - [G1 completion record](08-execution/00-roadmap.md#g1-completion-record);
   Foundation reproducibility is recorded from the accepted architecture/product
   contracts, current checks, Docker evidence, and scope review.

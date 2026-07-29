@@ -33,28 +33,29 @@ draft-exercise and draft-quiz PATCH clusters, documented in
 [slice 14](../docs/implementation/SUP-FUNCTIONS-001-slice-14.md), and
 [slice 15](../docs/implementation/SUP-FUNCTIONS-001-slice-15.md). Continue
 from those bounded baselines with the curriculum-owned
-curriculum_update_draft_chapter facade. It must require a server-generated
-request UUID, recheck the live active staff actor before content access, lock
-the current parent module then the current chapter in canonical order, recheck
-that the chapter remains under that locked module, and reject missing,
-reparented, stale, non-draft chapters and archived parents. A parent module may
-be draft or published when it is not archived.
+curriculum_update_draft_theory_section facade. It must require a
+server-generated request UUID, recheck the live active staff actor before
+content access, discover the current chapter, lock module then chapter then
+theory section in canonical order, and recheck both theory-to-chapter and
+chapter-to-module relationships under those locks. It must reject missing or
+reparented hierarchy, stale or non-draft theory sections, and archived module
+or chapter ancestors. Draft or published non-archived ancestors remain valid.
 
 The facade must require a positive expected row version and a nonempty partial
-JSON object whose only accepted fields are slug, title, summaryMarkdown, and
+JSON object whose only accepted fields are title, bodyMarkdown, and
 estimatedMinutes. Every supplied field must pass the same validation as
-draft-chapter creation: valid slug; trimmed 1..160 title; nonblank Markdown of
-at most 5,000 characters; and a JSON integer from 1 through 1,440. JSON null,
+draft-theory-section creation: trimmed 1..160 title; nonblank Markdown of at
+most 100,000 characters; and a JSON integer from 1 through 1,440. JSON null,
 unknown or server-owned fields must be rejected. Resolve omitted fields from
 the locked row. A no-op must return only id and rowVersion without an UPDATE or
-audit; a real change must update only those four scalar fields plus updated_by,
+audit; a real change must update only those three scalar fields plus updated_by,
 advance row_version once through the existing trigger, and append exactly one
-closed-contract redacted chapter_updated audit event. Execution must be granted
-only to service_role.
+closed-contract redacted theory_section_updated audit event. Execution must be
+granted only to service_role.
 
 This PATCH must not lock a sibling scope because it may not change position. It
-must not create replay/idempotency behavior, reparent the chapter, touch theory
-or assessment descendants, alter a module lifecycle, correct published content,
+must not create replay/idempotency behavior, reparent the theory section, touch
+assessment descendants, alter an ancestor lifecycle, correct published content,
 reorder, publish, archive, add a generic curriculum facade, or add
 Fastify/HTTP/direct-client/Python/SMTP/MFA/Vercel behavior.
 
