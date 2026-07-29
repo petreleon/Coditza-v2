@@ -13,19 +13,24 @@ ineligible; neither blocks this task.
 This task builds the named server-only transaction facades over those existing
 tables. Its completed slices are the structured idempotency/assessment learner
 mutation cluster, learner progress cluster, own assessment-history cluster,
-staff-authorization primitive cluster, and root draft-module creation cluster
+staff-authorization primitive cluster, root draft-module creation cluster, and
+draft-chapter creation cluster
 documented in [slice 01](../docs/implementation/SUP-FUNCTIONS-001-slice-01.md),
 [slice 02](../docs/implementation/SUP-FUNCTIONS-001-slice-02.md), and
 [slice 03](../docs/implementation/SUP-FUNCTIONS-001-slice-03.md), and
-[slice 04](../docs/implementation/SUP-FUNCTIONS-001-slice-04.md), and
-[slice 05](../docs/implementation/SUP-FUNCTIONS-001-slice-05.md). Continue
-from those bounded baselines with `curriculum_create_draft_chapter`: it must
-call the active-staff assertion before parent/content access, lock and recheck a
-non-archived parent module before calculating the child sibling position,
-validate an exact chapter input, and preserve idempotency/safe replay/audit. It
-must not widen into a generic type-switched authoring RPC. This is not
-permission to add HTTP routes, direct client policies, hosted configuration,
-Python/WASM jobs, or identity/bootstrap workflows.
+[slice 04](../docs/implementation/SUP-FUNCTIONS-001-slice-04.md),
+[slice 05](../docs/implementation/SUP-FUNCTIONS-001-slice-05.md), and
+[slice 06](../docs/implementation/SUP-FUNCTIONS-001-slice-06.md). Continue
+from those bounded baselines with `curriculum_create_draft_theory_section`: it
+must call the active-staff assertion before replay or hierarchy access, validate
+the exact `{ title, bodyMarkdown, estimatedMinutes }` input, and preserve
+idempotency/safe replay/sanitized audit. For a new key, it must use canonical
+`module -> chapter` locking, re-read the chapter after its module lock, reject a
+missing or archived ancestor, and use the locked chapter row as the sibling-scope
+mutex before calculating the next position across all theory statuses. It must
+not widen into a generic type-switched authoring RPC. This is not permission to
+add HTTP routes, direct client policies, hosted configuration, Python/WASM jobs,
+or identity/bootstrap workflows.
 
 ## Read first
 

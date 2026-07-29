@@ -4,7 +4,7 @@ BEGIN;
 -- and the only runtime role used for successful calls is service_role.
 GRANT USAGE ON SCHEMA extensions TO coditza_owner;
 
-SELECT extensions.plan(22);
+SELECT extensions.plan(24);
 
 SET LOCAL ROLE coditza_owner;
 DO $normalization_golden_vectors$
@@ -241,6 +241,34 @@ SELECT extensions.ok(
   'draft-module facade is owner-controlled and server-only while its root lock remains private'
 );
 
+SELECT extensions.ok(
+  (
+    SELECT procedure_entry.proowner = 'coditza_owner'::pg_catalog.regrole
+      AND procedure_entry.prosecdef
+      AND procedure_entry.proconfig = ARRAY['search_path=""']::text[]
+    FROM pg_catalog.pg_proc AS procedure_entry
+    WHERE procedure_entry.oid =
+      'public.curriculum_create_draft_chapter(uuid,uuid,jsonb,uuid,integer,bytea,uuid)'::pg_catalog.regprocedure
+  )
+  AND NOT EXISTS (
+    SELECT 1
+    FROM (
+      VALUES ('anon'), ('authenticated'), ('authenticator')
+    ) AS runtime_role(rolname)
+    WHERE pg_catalog.has_function_privilege(
+      runtime_role.rolname,
+      'public.curriculum_create_draft_chapter(uuid,uuid,jsonb,uuid,integer,bytea,uuid)'::pg_catalog.regprocedure,
+      'EXECUTE'
+    )
+  )
+  AND pg_catalog.has_function_privilege(
+    'service_role',
+    'public.curriculum_create_draft_chapter(uuid,uuid,jsonb,uuid,integer,bytea,uuid)'::pg_catalog.regprocedure,
+    'EXECUTE'
+  ),
+  'draft-chapter facade is owner-controlled, fixed-path, and server-only'
+);
+
 SET LOCAL ROLE authenticated;
 DO $authenticated_facade_denial$
 DECLARE
@@ -311,6 +339,25 @@ BEGIN
   END;
   IF NOT v_rejected THEN
     RAISE EXCEPTION 'authenticated role unexpectedly executed a curriculum authoring facade';
+  END IF;
+
+  v_rejected := false;
+  BEGIN
+    PERFORM *
+    FROM public.curriculum_create_draft_chapter(
+      'c3000000-0000-0000-0000-000000000005',
+      'c3120000-0000-0000-0000-000000000001',
+      '{"slug":"denied-chapter","title":"Denied chapter","summaryMarkdown":"Denied.","estimatedMinutes":1}'::jsonb,
+      'c3e10000-0000-0000-0000-000000000001',
+      1,
+      pg_catalog.decode(pg_catalog.repeat('a1', 32), 'hex'),
+      'c3f10000-0000-0000-0000-000000000001'
+    );
+  EXCEPTION WHEN insufficient_privilege THEN
+    v_rejected := true;
+  END;
+  IF NOT v_rejected THEN
+    RAISE EXCEPTION 'authenticated role unexpectedly executed a chapter authoring facade';
   END IF;
 END;
 $authenticated_facade_denial$;
@@ -788,6 +835,439 @@ SELECT extensions.ok(
     WHERE audit_entry.request_id = 'c3f00000-0000-0000-0000-000000000011'
   ),
   'editor/admin draft creation serializes root positions, stores ID-only replay, audits safely, and denies held replay'
+);
+
+-- This fixed draft parent and archived child prove that chapter placement locks
+-- the parent scope and appends after every sibling status without granting the
+-- runtime role direct table reads.
+SET LOCAL ROLE coditza_owner;
+INSERT INTO public.modules (
+  id,
+  slug,
+  title,
+  description_markdown,
+  position
+)
+VALUES (
+  'c3120000-0000-0000-0000-000000000001',
+  'authoring-chapter-parent',
+  'Authoring chapter parent',
+  'Draft parent for chapter-function verification.',
+  2
+);
+INSERT INTO public.chapters (
+  id,
+  module_id,
+  slug,
+  title,
+  summary_markdown,
+  position,
+  estimated_minutes
+)
+VALUES (
+  'c3220000-0000-0000-0000-000000000001',
+  'c3120000-0000-0000-0000-000000000001',
+  'archived-sibling-chapter',
+  'Archived sibling chapter',
+  'Archived sibling for position verification.',
+  0,
+  15
+);
+UPDATE public.chapters
+SET status = 'archived'::public.content_status
+WHERE id = 'c3220000-0000-0000-0000-000000000001';
+RESET ROLE;
+
+SET LOCAL ROLE service_role;
+DO $curriculum_create_draft_chapter$
+DECLARE
+  v_editor_first record;
+  v_editor_replay record;
+  v_admin_first record;
+  v_different_hash_rejected boolean := false;
+  v_invalid_input_rejected boolean := false;
+  v_learner_rejected boolean := false;
+  v_missing_key_rejected boolean := false;
+  v_missing_parent_rejected boolean := false;
+BEGIN
+  SELECT * INTO v_editor_first
+  FROM public.curriculum_create_draft_chapter(
+    'c3000000-0000-0000-0000-000000000004',
+    'c3120000-0000-0000-0000-000000000001',
+    '{"slug":"authoring-editor-chapter","title":"Authoring editor chapter","summaryMarkdown":"Draft chapter created by an editor.","estimatedMinutes":25}'::jsonb,
+    'c3e10000-0000-0000-0000-000000000001',
+    1,
+    pg_catalog.decode(pg_catalog.repeat('a1', 32), 'hex'),
+    'c3f10000-0000-0000-0000-000000000010'
+  );
+  SELECT * INTO v_editor_replay
+  FROM public.curriculum_create_draft_chapter(
+    'c3000000-0000-0000-0000-000000000004',
+    'c3120000-0000-0000-0000-000000000001',
+    '{"slug":"authoring-editor-chapter","title":"Authoring editor chapter","summaryMarkdown":"Draft chapter created by an editor.","estimatedMinutes":25}'::jsonb,
+    'c3e10000-0000-0000-0000-000000000001',
+    1,
+    pg_catalog.decode(pg_catalog.repeat('a1', 32), 'hex'),
+    'c3f10000-0000-0000-0000-000000000011'
+  );
+  SELECT * INTO v_admin_first
+  FROM public.curriculum_create_draft_chapter(
+    'c3000000-0000-0000-0000-000000000005',
+    'c3120000-0000-0000-0000-000000000001',
+    '{"slug":"authoring-admin-chapter","title":"Authoring admin chapter","summaryMarkdown":"Draft chapter created by an administrator.","estimatedMinutes":30}'::jsonb,
+    'c3e10000-0000-0000-0000-000000000002',
+    1,
+    pg_catalog.decode(pg_catalog.repeat('b2', 32), 'hex'),
+    'c3f10000-0000-0000-0000-000000000012'
+  );
+
+  BEGIN
+    PERFORM *
+    FROM public.curriculum_create_draft_chapter(
+      'c3000000-0000-0000-0000-000000000004',
+      'c3120000-0000-0000-0000-000000000001',
+      '{"slug":"authoring-editor-chapter","title":"Authoring editor chapter","summaryMarkdown":"Draft chapter created by an editor.","estimatedMinutes":25}'::jsonb,
+      'c3e10000-0000-0000-0000-000000000001',
+      1,
+      pg_catalog.decode(pg_catalog.repeat('c3', 32), 'hex'),
+      'c3f10000-0000-0000-0000-000000000013'
+    );
+  EXCEPTION WHEN raise_exception THEN
+    v_different_hash_rejected := true;
+  END;
+
+  BEGIN
+    PERFORM *
+    FROM public.curriculum_create_draft_chapter(
+      'c3000000-0000-0000-0000-000000000005',
+      'c3120000-0000-0000-0000-000000000001',
+      '{"slug":"invalid-chapter","title":"Invalid chapter","summaryMarkdown":"Draft.","estimatedMinutes":10,"moduleId":"c3120000-0000-0000-0000-000000000001"}'::jsonb,
+      'c3e10000-0000-0000-0000-000000000003',
+      1,
+      pg_catalog.decode(pg_catalog.repeat('d4', 32), 'hex'),
+      'c3f10000-0000-0000-0000-000000000014'
+    );
+  EXCEPTION WHEN raise_exception THEN
+    v_invalid_input_rejected := true;
+  END;
+
+  BEGIN
+    PERFORM *
+    FROM public.curriculum_create_draft_chapter(
+      'c3000000-0000-0000-0000-000000000001',
+      'c3120000-0000-0000-0000-000000000001',
+      '{"slug":"learner-chapter","title":"Learner chapter","summaryMarkdown":"Learners cannot author.","estimatedMinutes":10}'::jsonb,
+      'c3e10000-0000-0000-0000-000000000004',
+      1,
+      pg_catalog.decode(pg_catalog.repeat('e5', 32), 'hex'),
+      'c3f10000-0000-0000-0000-000000000015'
+    );
+  EXCEPTION WHEN raise_exception THEN
+    v_learner_rejected := true;
+  END;
+
+  BEGIN
+    PERFORM *
+    FROM public.curriculum_create_draft_chapter(
+      'c3000000-0000-0000-0000-000000000005',
+      'c3120000-0000-0000-0000-000000000001',
+      '{"slug":"missing-key-chapter","title":"Missing key chapter","summaryMarkdown":"A key is required.","estimatedMinutes":10}'::jsonb,
+      NULL,
+      1,
+      pg_catalog.decode(pg_catalog.repeat('f6', 32), 'hex'),
+      'c3f10000-0000-0000-0000-000000000016'
+    );
+  EXCEPTION WHEN raise_exception THEN
+    v_missing_key_rejected := true;
+  END;
+
+  BEGIN
+    PERFORM *
+    FROM public.curriculum_create_draft_chapter(
+      'c3000000-0000-0000-0000-000000000005',
+      'c3120000-0000-0000-0000-000000000999',
+      '{"slug":"missing-parent-chapter","title":"Missing parent chapter","summaryMarkdown":"A parent is required.","estimatedMinutes":10}'::jsonb,
+      'c3e10000-0000-0000-0000-000000000005',
+      1,
+      pg_catalog.decode(pg_catalog.repeat('a2', 32), 'hex'),
+      'c3f10000-0000-0000-0000-000000000017'
+    );
+  EXCEPTION WHEN raise_exception THEN
+    v_missing_parent_rejected := true;
+  END;
+
+  IF v_editor_first.response_status <> 201
+    OR v_editor_first.idempotency_replayed
+    OR v_editor_first.response_body ->> 'id' IS NULL
+    OR v_editor_first.response_location IS DISTINCT FROM
+      '/api/v1/admin/chapters/' || (v_editor_first.response_body ->> 'id')
+    OR v_editor_first.response_body IS DISTINCT FROM pg_catalog.jsonb_build_object(
+      'id',
+      v_editor_first.response_body ->> 'id'
+    )
+    OR NOT v_editor_replay.idempotency_replayed
+    OR v_editor_replay.response_status IS DISTINCT FROM v_editor_first.response_status
+    OR v_editor_replay.response_location IS DISTINCT FROM v_editor_first.response_location
+    OR v_editor_replay.response_body IS DISTINCT FROM v_editor_first.response_body
+    OR v_admin_first.response_status <> 201
+    OR v_admin_first.idempotency_replayed
+    OR v_admin_first.response_body ->> 'id' IS NULL
+    OR v_admin_first.response_location IS DISTINCT FROM
+      '/api/v1/admin/chapters/' || (v_admin_first.response_body ->> 'id')
+    OR v_admin_first.response_body IS DISTINCT FROM pg_catalog.jsonb_build_object(
+      'id',
+      v_admin_first.response_body ->> 'id'
+    )
+    OR NOT v_different_hash_rejected
+    OR NOT v_invalid_input_rejected
+    OR NOT v_learner_rejected
+    OR NOT v_missing_key_rejected
+    OR NOT v_missing_parent_rejected THEN
+    RAISE EXCEPTION 'draft-chapter authoring facade did not preserve its secure creation and replay contract';
+  END IF;
+END;
+$curriculum_create_draft_chapter$;
+RESET ROLE;
+
+SET LOCAL ROLE coditza_owner;
+UPDATE public.modules
+SET
+  status = 'published'::public.content_status,
+  published_at = pg_catalog.clock_timestamp()
+WHERE id = 'c3120000-0000-0000-0000-000000000001';
+RESET ROLE;
+
+SET LOCAL ROLE service_role;
+DO $published_parent_chapter_creation$
+DECLARE
+  v_created record;
+BEGIN
+  SELECT * INTO v_created
+  FROM public.curriculum_create_draft_chapter(
+    'c3000000-0000-0000-0000-000000000005',
+    'c3120000-0000-0000-0000-000000000001',
+    '{"slug":"published-parent-chapter","title":"Published parent chapter","summaryMarkdown":"A published parent accepts new draft chapters.","estimatedMinutes":20}'::jsonb,
+    'c3e10000-0000-0000-0000-000000000007',
+    1,
+    pg_catalog.decode(pg_catalog.repeat('c4', 32), 'hex'),
+    'c3f10000-0000-0000-0000-000000000021'
+  );
+
+  IF v_created.response_status <> 201
+    OR v_created.idempotency_replayed
+    OR v_created.response_body ->> 'id' IS NULL
+    OR v_created.response_location IS DISTINCT FROM
+      '/api/v1/admin/chapters/' || (v_created.response_body ->> 'id')
+    OR v_created.response_body IS DISTINCT FROM pg_catalog.jsonb_build_object(
+      'id',
+      v_created.response_body ->> 'id'
+    ) THEN
+    RAISE EXCEPTION 'a published module unexpectedly rejected a draft chapter';
+  END IF;
+END;
+$published_parent_chapter_creation$;
+RESET ROLE;
+
+SET LOCAL ROLE coditza_owner;
+UPDATE public.modules
+SET status = 'archived'::public.content_status
+WHERE id = 'c3120000-0000-0000-0000-000000000001';
+RESET ROLE;
+
+SET LOCAL ROLE service_role;
+DO $archived_parent_chapter_replay$
+DECLARE
+  v_replay record;
+  v_archived_parent_rejected boolean := false;
+BEGIN
+  SELECT * INTO v_replay
+  FROM public.curriculum_create_draft_chapter(
+    'c3000000-0000-0000-0000-000000000004',
+    'c3120000-0000-0000-0000-000000000001',
+    '{"slug":"authoring-editor-chapter","title":"Authoring editor chapter","summaryMarkdown":"Draft chapter created by an editor.","estimatedMinutes":25}'::jsonb,
+    'c3e10000-0000-0000-0000-000000000001',
+    1,
+    pg_catalog.decode(pg_catalog.repeat('a1', 32), 'hex'),
+    'c3f10000-0000-0000-0000-000000000018'
+  );
+
+  BEGIN
+    PERFORM *
+    FROM public.curriculum_create_draft_chapter(
+      'c3000000-0000-0000-0000-000000000005',
+      'c3120000-0000-0000-0000-000000000001',
+      '{"slug":"archived-parent-chapter","title":"Archived parent chapter","summaryMarkdown":"An archived parent rejects new chapters.","estimatedMinutes":10}'::jsonb,
+      'c3e10000-0000-0000-0000-000000000006',
+      1,
+      pg_catalog.decode(pg_catalog.repeat('b3', 32), 'hex'),
+      'c3f10000-0000-0000-0000-000000000019'
+    );
+  EXCEPTION WHEN raise_exception THEN
+    v_archived_parent_rejected := true;
+  END;
+
+  IF NOT v_replay.idempotency_replayed
+    OR v_replay.response_status <> 201
+    OR v_replay.response_body ->> 'id' IS NULL
+    OR NOT v_archived_parent_rejected THEN
+    RAISE EXCEPTION 'chapter replay did not remain stable across a later parent archive';
+  END IF;
+END;
+$archived_parent_chapter_replay$;
+RESET ROLE;
+
+SET LOCAL ROLE coditza_owner;
+UPDATE public.profiles
+SET security_hold_at = pg_catalog.clock_timestamp()
+WHERE id = 'c3000000-0000-0000-0000-000000000004';
+RESET ROLE;
+
+SET LOCAL ROLE service_role;
+DO $held_staff_chapter_replay_denial$
+DECLARE
+  v_rejected boolean := false;
+BEGIN
+  BEGIN
+    PERFORM *
+    FROM public.curriculum_create_draft_chapter(
+      'c3000000-0000-0000-0000-000000000004',
+      'c3120000-0000-0000-0000-000000000001',
+      '{"slug":"authoring-editor-chapter","title":"Authoring editor chapter","summaryMarkdown":"Draft chapter created by an editor.","estimatedMinutes":25}'::jsonb,
+      'c3e10000-0000-0000-0000-000000000001',
+      1,
+      pg_catalog.decode(pg_catalog.repeat('a1', 32), 'hex'),
+      'c3f10000-0000-0000-0000-000000000020'
+    );
+  EXCEPTION WHEN raise_exception THEN
+    v_rejected := true;
+  END;
+
+  IF NOT v_rejected THEN
+    RAISE EXCEPTION 'held staff actor unexpectedly received a chapter-create replay';
+  END IF;
+END;
+$held_staff_chapter_replay_denial$;
+RESET ROLE;
+
+SET LOCAL ROLE coditza_owner;
+UPDATE public.profiles
+SET security_hold_at = NULL
+WHERE id = 'c3000000-0000-0000-0000-000000000004';
+
+SELECT extensions.ok(
+  EXISTS (
+    SELECT 1
+    FROM public.chapters AS chapter_entry
+    WHERE chapter_entry.id = 'c3220000-0000-0000-0000-000000000001'
+      AND chapter_entry.status = 'archived'::public.content_status
+      AND chapter_entry.position = 0
+  )
+  AND (
+    SELECT pg_catalog.count(*) = 3
+      AND pg_catalog.bool_and(
+        chapter_entry.module_id = 'c3120000-0000-0000-0000-000000000001'
+        AND chapter_entry.status = 'draft'::public.content_status
+        AND chapter_entry.published_at IS NULL
+        AND chapter_entry.row_version = 1
+      )
+    FROM public.chapters AS chapter_entry
+    WHERE chapter_entry.slug IN (
+      'authoring-editor-chapter',
+      'authoring-admin-chapter',
+      'published-parent-chapter'
+    )
+  )
+  AND EXISTS (
+    SELECT 1
+    FROM public.chapters AS chapter_entry
+    WHERE chapter_entry.slug = 'authoring-editor-chapter'
+      AND chapter_entry.position = 1
+      AND chapter_entry.created_by = 'c3000000-0000-0000-0000-000000000004'
+      AND chapter_entry.updated_by = 'c3000000-0000-0000-0000-000000000004'
+  )
+  AND EXISTS (
+    SELECT 1
+    FROM public.chapters AS chapter_entry
+    WHERE chapter_entry.slug = 'authoring-admin-chapter'
+      AND chapter_entry.position = 2
+      AND chapter_entry.created_by = 'c3000000-0000-0000-0000-000000000005'
+      AND chapter_entry.updated_by = 'c3000000-0000-0000-0000-000000000005'
+  )
+  AND EXISTS (
+    SELECT 1
+    FROM public.chapters AS chapter_entry
+    WHERE chapter_entry.slug = 'published-parent-chapter'
+      AND chapter_entry.position = 3
+      AND chapter_entry.created_by = 'c3000000-0000-0000-0000-000000000005'
+      AND chapter_entry.updated_by = 'c3000000-0000-0000-0000-000000000005'
+  )
+  AND EXISTS (
+    SELECT 1
+    FROM public.modules AS module_entry
+    WHERE module_entry.id = 'c3120000-0000-0000-0000-000000000001'
+      AND module_entry.status = 'archived'::public.content_status
+      AND module_entry.published_at IS NOT NULL
+  )
+  AND (
+    SELECT pg_catalog.count(*) = 3
+      AND pg_catalog.bool_and(
+        record_entry.response_status = 201
+        AND record_entry.response_location =
+          '/api/v1/admin/chapters/' || record_entry.result_resource_id::text
+        AND record_entry.response_body = pg_catalog.jsonb_build_object(
+          'id',
+          record_entry.result_resource_id::text
+        )
+      )
+    FROM private.idempotency_records AS record_entry
+    WHERE record_entry.operation = 'admin_create_chapter'
+      AND record_entry.idempotency_key IN (
+        'c3e10000-0000-0000-0000-000000000001',
+        'c3e10000-0000-0000-0000-000000000002',
+        'c3e10000-0000-0000-0000-000000000007'
+      )
+  )
+  AND NOT EXISTS (
+    SELECT 1
+    FROM private.idempotency_records AS record_entry
+    WHERE record_entry.operation = 'admin_create_chapter'
+      AND record_entry.idempotency_key IN (
+        'c3e10000-0000-0000-0000-000000000003',
+        'c3e10000-0000-0000-0000-000000000004',
+        'c3e10000-0000-0000-0000-000000000005',
+        'c3e10000-0000-0000-0000-000000000006'
+      )
+  )
+  AND (
+    SELECT pg_catalog.count(*) = 3
+      AND pg_catalog.bool_and(
+        audit_entry.changed_fields = ARRAY['status']::text[]
+        AND audit_entry.change_summary =
+          '{"status":{"before":"none","after":"draft"}}'::jsonb
+        AND audit_entry.reason IS NULL
+      )
+    FROM private.audit_events AS audit_entry
+    WHERE audit_entry.action = 'chapter_created'
+      AND audit_entry.entity_type = 'chapter'
+      AND audit_entry.entity_id IN (
+        SELECT chapter_entry.id
+        FROM public.chapters AS chapter_entry
+        WHERE chapter_entry.slug IN (
+          'authoring-editor-chapter',
+          'authoring-admin-chapter',
+          'published-parent-chapter'
+        )
+      )
+  )
+  AND NOT EXISTS (
+    SELECT 1
+    FROM private.audit_events AS audit_entry
+    WHERE audit_entry.request_id IN (
+      'c3f10000-0000-0000-0000-000000000011',
+      'c3f10000-0000-0000-0000-000000000018'
+    )
+  ),
+  'chapter creation locks a parent scope, accepts draft/published parents, includes archived siblings, preserves safe replay, and denies archived/held writes'
 );
 
 INSERT INTO public.modules (
