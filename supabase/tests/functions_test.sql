@@ -4,7 +4,7 @@ BEGIN;
 -- and the only runtime role used for successful calls is service_role.
 GRANT USAGE ON SCHEMA extensions TO coditza_owner;
 
-SELECT extensions.plan(30);
+SELECT extensions.plan(32);
 
 SET LOCAL ROLE coditza_owner;
 DO $normalization_golden_vectors$
@@ -353,6 +353,53 @@ SELECT extensions.ok(
   'draft-quiz facade is owner-controlled, fixed-path, and server-only'
 );
 
+SELECT extensions.ok(
+  (
+    SELECT procedure_entry.proowner = 'coditza_owner'::pg_catalog.regrole
+      AND procedure_entry.prosecdef
+      AND procedure_entry.proconfig = ARRAY['search_path=""']::text[]
+    FROM pg_catalog.pg_proc AS procedure_entry
+    WHERE procedure_entry.oid =
+      'public.assessment_update_draft_exercise(uuid,uuid,integer,jsonb,uuid)'::pg_catalog.regprocedure
+  )
+  AND NOT EXISTS (
+    SELECT 1
+    FROM (
+      VALUES ('anon'), ('authenticated'), ('authenticator')
+    ) AS runtime_role(rolname)
+    WHERE pg_catalog.has_function_privilege(
+      runtime_role.rolname,
+      'public.assessment_update_draft_exercise(uuid,uuid,integer,jsonb,uuid)'::pg_catalog.regprocedure,
+      'EXECUTE'
+    )
+  )
+  AND pg_catalog.has_function_privilege(
+    'service_role',
+    'public.assessment_update_draft_exercise(uuid,uuid,integer,jsonb,uuid)'::pg_catalog.regprocedure,
+    'EXECUTE'
+  )
+  AND (
+    SELECT procedure_entry.proowner = 'coditza_owner'::pg_catalog.regrole
+      AND NOT procedure_entry.prosecdef
+      AND procedure_entry.proconfig = ARRAY['search_path=""']::text[]
+    FROM pg_catalog.pg_proc AS procedure_entry
+    WHERE procedure_entry.oid =
+      'private.apply_draft_exercise_patch(uuid,integer,text,text,public.exercise_type,integer,boolean,boolean,jsonb,uuid)'::pg_catalog.regprocedure
+  )
+  AND NOT EXISTS (
+    SELECT 1
+    FROM (
+      VALUES ('anon'), ('authenticated'), ('service_role'), ('authenticator')
+    ) AS runtime_role(rolname)
+    WHERE pg_catalog.has_function_privilege(
+      runtime_role.rolname,
+      'private.apply_draft_exercise_patch(uuid,integer,text,text,public.exercise_type,integer,boolean,boolean,jsonb,uuid)'::pg_catalog.regprocedure,
+      'EXECUTE'
+    )
+  ),
+  'draft-exercise PATCH facade is server-only while its root-and-tree helper remains private'
+);
+
 SET LOCAL ROLE authenticated;
 DO $authenticated_facade_denial$
 DECLARE
@@ -500,6 +547,23 @@ BEGIN
   IF NOT v_rejected THEN
     RAISE EXCEPTION 'authenticated role unexpectedly executed a quiz authoring facade';
   END IF;
+
+  v_rejected := false;
+  BEGIN
+    PERFORM *
+    FROM public.assessment_update_draft_exercise(
+      'c3000000-0000-0000-0000-000000000005',
+      'c3430000-0000-0000-0000-000000000001',
+      1,
+      '{"title":"Denied draft exercise update"}'::jsonb,
+      'c3f50000-0000-0000-0000-000000000001'
+    );
+  EXCEPTION WHEN insufficient_privilege THEN
+    v_rejected := true;
+  END;
+  IF NOT v_rejected THEN
+    RAISE EXCEPTION 'authenticated role unexpectedly executed a draft exercise PATCH facade';
+  END IF;
 END;
 $authenticated_facade_denial$;
 RESET ROLE;
@@ -558,6 +622,27 @@ BEGIN
   END;
   IF NOT v_rejected THEN
     RAISE EXCEPTION 'service role unexpectedly executed a private curriculum lock helper';
+  END IF;
+
+  v_rejected := false;
+  BEGIN
+    PERFORM private.apply_draft_exercise_patch(
+      'c3430000-0000-0000-0000-000000000001',
+      1,
+      'Denied private patch',
+      'Denied private patch.',
+      'short_text'::public.exercise_type,
+      1,
+      true,
+      false,
+      NULL,
+      'c3000000-0000-0000-0000-000000000005'
+    );
+  EXCEPTION WHEN insufficient_privilege THEN
+    v_rejected := true;
+  END;
+  IF NOT v_rejected THEN
+    RAISE EXCEPTION 'service role unexpectedly executed a private draft exercise patch helper';
   END IF;
 END;
 $private_runtime_denial$;
@@ -4918,6 +5003,502 @@ SELECT extensions.ok(
   TRUE,
   'progress module pagination produces a usable next cursor and a stable second page'
 );
+
+-- Keep the draft-exercise PATCH fixture independent from the creation slices:
+-- those hierarchies are deliberately archived later in their own replay proof.
+SET LOCAL ROLE coditza_owner;
+INSERT INTO public.modules (
+  id,
+  slug,
+  title,
+  description_markdown,
+  position,
+  created_by,
+  updated_by
+)
+VALUES (
+  'c3190000-0000-0000-0000-000000000001',
+  'draft-exercise-patch-module',
+  'Draft exercise PATCH module',
+  'Isolated hierarchy for scalar draft-exercise PATCH verification.',
+  901,
+  'c3000000-0000-0000-0000-000000000004',
+  'c3000000-0000-0000-0000-000000000004'
+);
+INSERT INTO public.chapters (
+  id,
+  module_id,
+  slug,
+  title,
+  summary_markdown,
+  position,
+  estimated_minutes,
+  created_by,
+  updated_by
+)
+VALUES (
+  'c3290000-0000-0000-0000-000000000001',
+  'c3190000-0000-0000-0000-000000000001',
+  'draft-exercise-patch-chapter',
+  'Draft exercise PATCH chapter',
+  'Isolated hierarchy for scalar draft-exercise PATCH verification.',
+  0,
+  10,
+  'c3000000-0000-0000-0000-000000000004',
+  'c3000000-0000-0000-0000-000000000004'
+);
+INSERT INTO public.exercises (
+  id,
+  chapter_id,
+  title,
+  prompt_markdown,
+  exercise_type,
+  position,
+  points,
+  is_required,
+  created_by,
+  updated_by
+)
+VALUES (
+  'c3430000-0000-0000-0000-000000000001',
+  'c3290000-0000-0000-0000-000000000001',
+  'Original scalar draft exercise',
+  'Choose the original correct option.',
+  'single_choice',
+  0,
+  5,
+  true,
+  'c3000000-0000-0000-0000-000000000004',
+  'c3000000-0000-0000-0000-000000000004'
+);
+SELECT pg_catalog.set_config(
+  'coditza.assessment_tree_root',
+  'exercise:c3430000-0000-0000-0000-000000000001',
+  true
+);
+INSERT INTO public.exercise_options (
+  id,
+  exercise_id,
+  label_markdown,
+  position
+)
+VALUES
+  (
+    'c3440000-0000-0000-0000-000000000001',
+    'c3430000-0000-0000-0000-000000000001',
+    'Original incorrect option.',
+    0
+  ),
+  (
+    'c3440000-0000-0000-0000-000000000002',
+    'c3430000-0000-0000-0000-000000000001',
+    'Original correct option.',
+    1
+  );
+INSERT INTO private.exercise_answer_keys (
+  exercise_id,
+  answer_spec,
+  feedback_correct_markdown,
+  feedback_incorrect_markdown,
+  created_by,
+  updated_by
+)
+VALUES (
+  'c3430000-0000-0000-0000-000000000001',
+  '{"correctOptionId":"c3440000-0000-0000-0000-000000000002"}'::jsonb,
+  'Original correct feedback.',
+  'Original incorrect feedback.',
+  'c3000000-0000-0000-0000-000000000004',
+  'c3000000-0000-0000-0000-000000000004'
+);
+SELECT pg_catalog.set_config('coditza.assessment_tree_root', '', true);
+RESET ROLE;
+
+SET LOCAL ROLE service_role;
+DO $assessment_update_draft_exercise$
+DECLARE
+  v_tree_update record;
+  v_root_update record;
+  v_noop record;
+  v_empty_rejected boolean := false;
+  v_unknown_field_rejected boolean := false;
+  v_partial_tree_rejected boolean := false;
+  v_feedback_only_rejected boolean := false;
+  v_python_rejected boolean := false;
+  v_stale_rejected boolean := false;
+  v_learner_rejected boolean := false;
+  v_missing_rejected boolean := false;
+BEGIN
+  BEGIN
+    PERFORM *
+    FROM public.assessment_update_draft_exercise(
+      'c3000000-0000-0000-0000-000000000005',
+      'c3430000-0000-0000-0000-000000000001',
+      1,
+      '{}'::jsonb,
+      'c3f50000-0000-0000-0000-000000000001'
+    );
+  EXCEPTION WHEN raise_exception THEN
+    v_empty_rejected := true;
+  END;
+
+  BEGIN
+    PERFORM *
+    FROM public.assessment_update_draft_exercise(
+      'c3000000-0000-0000-0000-000000000005',
+      'c3430000-0000-0000-0000-000000000001',
+      1,
+      '{"position":9}'::jsonb,
+      'c3f50000-0000-0000-0000-000000000002'
+    );
+  EXCEPTION WHEN raise_exception THEN
+    v_unknown_field_rejected := true;
+  END;
+
+  BEGIN
+    PERFORM *
+    FROM public.assessment_update_draft_exercise(
+      'c3000000-0000-0000-0000-000000000005',
+      'c3430000-0000-0000-0000-000000000001',
+      1,
+      '{"options":[]}'::jsonb,
+      'c3f50000-0000-0000-0000-000000000003'
+    );
+  EXCEPTION WHEN raise_exception THEN
+    v_partial_tree_rejected := true;
+  END;
+
+  BEGIN
+    PERFORM *
+    FROM public.assessment_update_draft_exercise(
+      'c3000000-0000-0000-0000-000000000005',
+      'c3430000-0000-0000-0000-000000000001',
+      1,
+      '{"feedbackCorrectMarkdown":"Feedback without a tree."}'::jsonb,
+      'c3f50000-0000-0000-0000-000000000004'
+    );
+  EXCEPTION WHEN raise_exception THEN
+    v_feedback_only_rejected := true;
+  END;
+
+  BEGIN
+    PERFORM *
+    FROM public.assessment_update_draft_exercise(
+      'c3000000-0000-0000-0000-000000000005',
+      'c3430000-0000-0000-0000-000000000001',
+      1,
+      '{"exerciseType":"python_code","options":[],"answerSpec":null}'::jsonb,
+      'c3f50000-0000-0000-0000-000000000005'
+    );
+  EXCEPTION WHEN raise_exception THEN
+    v_python_rejected := true;
+  END;
+
+  BEGIN
+    PERFORM *
+    FROM public.assessment_update_draft_exercise(
+      'c3000000-0000-0000-0000-000000000001',
+      'c3430000-0000-0000-0000-000000000001',
+      1,
+      '{"title":"Learners cannot patch draft exercises"}'::jsonb,
+      'c3f50000-0000-0000-0000-000000000006'
+    );
+  EXCEPTION WHEN raise_exception THEN
+    v_learner_rejected := true;
+  END;
+
+  BEGIN
+    PERFORM *
+    FROM public.assessment_update_draft_exercise(
+      'c3000000-0000-0000-0000-000000000005',
+      'c3430000-0000-0000-0000-000000000999',
+      1,
+      '{"title":"Missing draft exercise"}'::jsonb,
+      'c3f50000-0000-0000-0000-000000000007'
+    );
+  EXCEPTION WHEN raise_exception THEN
+    v_missing_rejected := true;
+  END;
+
+  SELECT * INTO v_tree_update
+  FROM public.assessment_update_draft_exercise(
+    'c3000000-0000-0000-0000-000000000005',
+    'c3430000-0000-0000-0000-000000000001',
+    1,
+    '{"title":"Updated short draft exercise","promptMarkdown":"Type the normalized answer.","exerciseType":"short_text","points":7,"isRequired":false,"options":[],"answerSpec":{"acceptedAnswers":["  Da\t","NU"],"normalization":"nfkc_ascii_ws_ascii_lower_v1"},"feedbackCorrectMarkdown":"Corect actualizat.","feedbackIncorrectMarkdown":"Încearcă din nou actualizat."}'::jsonb,
+    'c3f50000-0000-0000-0000-000000000010'
+  );
+
+  SELECT * INTO v_root_update
+  FROM public.assessment_update_draft_exercise(
+    'c3000000-0000-0000-0000-000000000005',
+    'c3430000-0000-0000-0000-000000000001',
+    2,
+    '{"title":"Updated short draft exercise root only"}'::jsonb,
+    'c3f50000-0000-0000-0000-000000000011'
+  );
+
+  SELECT * INTO v_noop
+  FROM public.assessment_update_draft_exercise(
+    'c3000000-0000-0000-0000-000000000005',
+    'c3430000-0000-0000-0000-000000000001',
+    3,
+    '{"title":"Updated short draft exercise root only"}'::jsonb,
+    'c3f50000-0000-0000-0000-000000000012'
+  );
+
+  BEGIN
+    PERFORM *
+    FROM public.assessment_update_draft_exercise(
+      'c3000000-0000-0000-0000-000000000005',
+      'c3430000-0000-0000-0000-000000000001',
+      1,
+      '{"title":"Stale update must not apply"}'::jsonb,
+      'c3f50000-0000-0000-0000-000000000013'
+    );
+  EXCEPTION WHEN raise_exception THEN
+    v_stale_rejected := true;
+  END;
+
+  IF v_tree_update.response_status <> 200
+    OR v_tree_update.response_body IS DISTINCT FROM pg_catalog.jsonb_build_object(
+      'id', 'c3430000-0000-0000-0000-000000000001',
+      'rowVersion', 2,
+      'definitionVersion', 2
+    )
+    OR v_tree_update.response_body OPERATOR(pg_catalog.?) 'optionIdMappings'
+    OR v_tree_update.response_body OPERATOR(pg_catalog.?) 'answerSpec'
+    OR v_tree_update.response_body OPERATOR(pg_catalog.?) 'feedbackCorrectMarkdown'
+    OR v_tree_update.response_body OPERATOR(pg_catalog.?) 'promptMarkdown'
+    OR v_root_update.response_status <> 200
+    OR v_root_update.response_body IS DISTINCT FROM pg_catalog.jsonb_build_object(
+      'id', 'c3430000-0000-0000-0000-000000000001',
+      'rowVersion', 3,
+      'definitionVersion', 3
+    )
+    OR v_noop.response_status <> 200
+    OR v_noop.response_body IS DISTINCT FROM pg_catalog.jsonb_build_object(
+      'id', 'c3430000-0000-0000-0000-000000000001',
+      'rowVersion', 3,
+      'definitionVersion', 3
+    )
+    OR NOT v_empty_rejected
+    OR NOT v_unknown_field_rejected
+    OR NOT v_partial_tree_rejected
+    OR NOT v_feedback_only_rejected
+    OR NOT v_python_rejected
+    OR NOT v_learner_rejected
+    OR NOT v_missing_rejected
+    OR NOT v_stale_rejected THEN
+    RAISE EXCEPTION 'draft-exercise PATCH facade did not preserve its exact scalar update contract';
+  END IF;
+END;
+$assessment_update_draft_exercise$;
+RESET ROLE;
+
+SET LOCAL ROLE coditza_owner;
+UPDATE public.profiles
+SET security_hold_at = pg_catalog.clock_timestamp()
+WHERE id = 'c3000000-0000-0000-0000-000000000005';
+RESET ROLE;
+
+SET LOCAL ROLE service_role;
+DO $held_staff_draft_exercise_update$
+DECLARE
+  v_rejected boolean := false;
+BEGIN
+  BEGIN
+    PERFORM *
+    FROM public.assessment_update_draft_exercise(
+      'c3000000-0000-0000-0000-000000000005',
+      'c3430000-0000-0000-0000-000000000001',
+      3,
+      '{"title":"Held staff must not patch"}'::jsonb,
+      'c3f50000-0000-0000-0000-000000000014'
+    );
+  EXCEPTION WHEN raise_exception THEN
+    v_rejected := true;
+  END;
+  IF NOT v_rejected THEN
+    RAISE EXCEPTION 'held staff actor unexpectedly patched a draft exercise';
+  END IF;
+END;
+$held_staff_draft_exercise_update$;
+RESET ROLE;
+
+SET LOCAL ROLE coditza_owner;
+UPDATE public.profiles
+SET security_hold_at = NULL
+WHERE id = 'c3000000-0000-0000-0000-000000000005';
+SELECT pg_catalog.set_config('coditza.learning_write', 'exercise', true);
+INSERT INTO public.exercise_attempts (
+  id,
+  user_id,
+  exercise_id,
+  exercise_definition_version,
+  answer,
+  is_correct,
+  points_earned,
+  points_possible
+)
+VALUES (
+  'c3450000-0000-0000-0000-000000000001',
+  'c3000000-0000-0000-0000-000000000001',
+  'c3430000-0000-0000-0000-000000000001',
+  3,
+  '{"text":"da"}'::jsonb,
+  true,
+  7,
+  7
+);
+SELECT pg_catalog.set_config('coditza.learning_write', '', true);
+RESET ROLE;
+
+SET LOCAL ROLE service_role;
+DO $draft_exercise_history_update_denial$
+DECLARE
+  v_rejected boolean := false;
+BEGIN
+  BEGIN
+    PERFORM *
+    FROM public.assessment_update_draft_exercise(
+      'c3000000-0000-0000-0000-000000000005',
+      'c3430000-0000-0000-0000-000000000001',
+      3,
+      '{"options":[],"answerSpec":{"acceptedAnswers":["nu"],"normalization":"nfkc_ascii_ws_ascii_lower_v1"}}'::jsonb,
+      'c3f50000-0000-0000-0000-000000000015'
+    );
+  EXCEPTION WHEN raise_exception THEN
+    v_rejected := true;
+  END;
+  IF NOT v_rejected THEN
+    RAISE EXCEPTION 'draft exercise history unexpectedly allowed a tree replacement';
+  END IF;
+END;
+$draft_exercise_history_update_denial$;
+RESET ROLE;
+
+SET LOCAL ROLE coditza_owner;
+UPDATE public.modules
+SET status = 'archived'::public.content_status
+WHERE id = 'c3190000-0000-0000-0000-000000000001';
+RESET ROLE;
+
+SET LOCAL ROLE service_role;
+DO $archived_parent_draft_exercise_update_denial$
+DECLARE
+  v_parent_rejected boolean := false;
+  v_published_rejected boolean := false;
+BEGIN
+  BEGIN
+    PERFORM *
+    FROM public.assessment_update_draft_exercise(
+      'c3000000-0000-0000-0000-000000000005',
+      'c3430000-0000-0000-0000-000000000001',
+      3,
+      '{"title":"Archived parent must reject updates"}'::jsonb,
+      'c3f50000-0000-0000-0000-000000000016'
+    );
+  EXCEPTION WHEN raise_exception THEN
+    v_parent_rejected := true;
+  END;
+
+  BEGIN
+    PERFORM *
+    FROM public.assessment_update_draft_exercise(
+      'c3000000-0000-0000-0000-000000000005',
+      'c3400000-0000-0000-0000-000000000001',
+      2,
+      '{"title":"Published exercises are immutable"}'::jsonb,
+      'c3f50000-0000-0000-0000-000000000017'
+    );
+  EXCEPTION WHEN raise_exception THEN
+    v_published_rejected := true;
+  END;
+
+  IF NOT v_parent_rejected OR NOT v_published_rejected THEN
+    RAISE EXCEPTION 'archived parents or published exercise roots unexpectedly allowed PATCH';
+  END IF;
+END;
+$archived_parent_draft_exercise_update_denial$;
+RESET ROLE;
+
+SET LOCAL ROLE coditza_owner;
+SELECT extensions.ok(
+  EXISTS (
+    SELECT 1
+    FROM public.exercises AS exercise
+    JOIN private.exercise_answer_keys AS answer_key
+      ON answer_key.exercise_id = exercise.id
+    WHERE exercise.id = 'c3430000-0000-0000-0000-000000000001'
+      AND exercise.chapter_id = 'c3290000-0000-0000-0000-000000000001'
+      AND exercise.title = 'Updated short draft exercise root only'
+      AND exercise.prompt_markdown = 'Type the normalized answer.'
+      AND exercise.exercise_type = 'short_text'::public.exercise_type
+      AND exercise.position = 0
+      AND exercise.points = 7
+      AND NOT exercise.is_required
+      AND exercise.status = 'draft'::public.content_status
+      AND exercise.row_version = 3
+      AND exercise.definition_version = 3
+      AND exercise.created_by = 'c3000000-0000-0000-0000-000000000004'
+      AND exercise.updated_by = 'c3000000-0000-0000-0000-000000000005'
+      AND answer_key.answer_spec =
+        '{"acceptedAnswers":["da","nu"],"normalization":"nfkc_ascii_ws_ascii_lower_v1"}'::jsonb
+      AND answer_key.feedback_correct_markdown = 'Corect actualizat.'
+      AND answer_key.feedback_incorrect_markdown = 'Încearcă din nou actualizat.'
+      AND answer_key.created_by = 'c3000000-0000-0000-0000-000000000005'
+      AND answer_key.updated_by = 'c3000000-0000-0000-0000-000000000005'
+  )
+  AND NOT EXISTS (
+    SELECT 1
+    FROM public.exercise_options AS option_entry
+    WHERE option_entry.exercise_id = 'c3430000-0000-0000-0000-000000000001'
+  )
+  AND EXISTS (
+    SELECT 1
+    FROM public.exercise_attempts AS attempt
+    WHERE attempt.id = 'c3450000-0000-0000-0000-000000000001'
+      AND attempt.exercise_id = 'c3430000-0000-0000-0000-000000000001'
+      AND attempt.exercise_definition_version = 3
+  )
+  AND EXISTS (
+    SELECT 1
+    FROM public.modules AS module_entry
+    WHERE module_entry.id = 'c3190000-0000-0000-0000-000000000001'
+      AND module_entry.status = 'archived'::public.content_status
+  )
+  AND (
+    SELECT pg_catalog.count(*) = 2
+      AND pg_catalog.bool_and(
+        audit_entry.actor_kind = 'user'
+        AND audit_entry.actor_user_id = 'c3000000-0000-0000-0000-000000000005'
+        AND audit_entry.changed_fields = ARRAY['definition']::text[]
+        AND audit_entry.change_summary =
+          '{"definition":{"before":"draft","after":"updated"}}'::jsonb
+        AND audit_entry.reason IS NULL
+        AND audit_entry.request_id IN (
+          'c3f50000-0000-0000-0000-000000000010',
+          'c3f50000-0000-0000-0000-000000000011'
+        )
+      )
+    FROM private.audit_events AS audit_entry
+    WHERE audit_entry.action = 'exercise_updated'
+      AND audit_entry.entity_type = 'exercise'
+      AND audit_entry.entity_id = 'c3430000-0000-0000-0000-000000000001'
+  )
+  AND NOT EXISTS (
+    SELECT 1
+    FROM private.idempotency_records AS record_entry
+    WHERE record_entry.result_resource_id = 'c3430000-0000-0000-0000-000000000001'
+  )
+  AND COALESCE(
+    pg_catalog.current_setting('coditza.assessment_tree_root', true),
+    ''
+  ) = '',
+  'draft-exercise PATCH keeps partial/root and complete-tree changes atomic, scalar-only, versioned once, audited safely, and outside idempotency'
+);
+RESET ROLE;
 
 SET LOCAL ROLE coditza_owner;
 DO $unsafe_idempotency_response$

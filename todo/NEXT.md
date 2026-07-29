@@ -23,17 +23,21 @@ scalar draft-exercise and complete draft-quiz creation clusters documented in
 [slice 05](../docs/implementation/SUP-FUNCTIONS-001-slice-05.md),
 [slice 06](../docs/implementation/SUP-FUNCTIONS-001-slice-06.md),
 [slice 07](../docs/implementation/SUP-FUNCTIONS-001-slice-07.md), and
-[slice 08](../docs/implementation/SUP-FUNCTIONS-001-slice-08.md), and
-[slice 09](../docs/implementation/SUP-FUNCTIONS-001-slice-09.md). Continue
+[slice 08](../docs/implementation/SUP-FUNCTIONS-001-slice-08.md),
+[slice 09](../docs/implementation/SUP-FUNCTIONS-001-slice-09.md), and
+[slice 10](../docs/implementation/SUP-FUNCTIONS-001-slice-10.md). Continue
 from those bounded baselines with the assessment-owned
-`assessment_update_draft_exercise` facade. It must establish an exact
-server-owned update body and expected root-row-version contract, assert active
-staff before replay/content access, lock canonical ancestors then the draft
-exercise, and use the reviewed complete-tree replacement helper only under its
-marker. It must validate scalar-only definitions, advance root and definition
-versions exactly once for a definition change, store/replay only a safe result,
-and append a sanitized audit transition. It may not expose keys or mappings,
-add HTTP/direct-client behavior, introduce Python/WASM work, or change
+`assessment_update_draft_quiz` facade. It must establish an exact nonempty
+partial root-field PATCH body and expected root-row-version contract, assert
+active staff before content access, lock canonical module, chapter, and draft
+quiz rows, and reject missing/archived ancestors, stale versions, and
+non-draft roots. PATCH is not a retry-sensitive operation: it must not accept,
+store, hash, or replay an idempotency key. For a real root change, it must
+advance the root and definition versions exactly once, append a sanitized audit
+transition, and return only a safe result; an exact no-op returns current safe
+versions without a write or audit. Complete question-tree replacement is a
+separate later facade. This slice may not expose keys or mappings, add
+HTTP/direct-client behavior, introduce Python/WASM work, or change
 identity/hosted configuration.
 
 ## Read first
