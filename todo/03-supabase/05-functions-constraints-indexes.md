@@ -206,7 +206,7 @@ saved/graded answers so omitted questions cannot disappear.
 - [ ] Grant execution only to the server path and prove direct user denial.
 - [ ] Add concurrency tests before any HTTP mutation task uses a function.
 
-Implementation note (2026-07-29): nineteen forward-only slices are present:
+Implementation note (2026-07-29): twenty forward-only slices are present:
 structured idempotency replay, exact safe exercise/quiz-start response schemas,
 assessment learner mutations, matching SQL/TypeScript normalization vectors,
 service-role-only theory completion/current-curriculum progress reads with
@@ -256,7 +256,12 @@ canonical module-to-chapter locking, constrained hierarchy rechecks, strict
 scalar partial validation, non-archived parent allowance, exact
 expected-version/no-op behavior, one child-root update, a redacted correction
 audit, and a complete descendant/learning row-digest preservation fingerprint
-without invented replay.
+without invented replay, plus a named published-theory-section correction
+facade with canonical module-to-chapter-to-theory locking, constrained
+hierarchy rechecks, strict scalar partial validation, non-archived ancestor
+allowance, exact expected-version/no-op behavior, one theory-root update, a
+redacted correction audit, and a complete relevant learning-row-digest
+preservation fingerprint without invented replay.
 They are documented in
 [slice 01](../../docs/implementation/SUP-FUNCTIONS-001-slice-01.md) and
 [slice 02](../../docs/implementation/SUP-FUNCTIONS-001-slice-02.md) and
@@ -276,7 +281,8 @@ They are documented in
 [slice 16](../../docs/implementation/SUP-FUNCTIONS-001-slice-16.md), and
 [slice 17](../../docs/implementation/SUP-FUNCTIONS-001-slice-17.md), and
 [slice 18](../../docs/implementation/SUP-FUNCTIONS-001-slice-18.md), and
-[slice 19](../../docs/implementation/SUP-FUNCTIONS-001-slice-19.md).
+[slice 19](../../docs/implementation/SUP-FUNCTIONS-001-slice-19.md), and
+[slice 20](../../docs/implementation/SUP-FUNCTIONS-001-slice-20.md).
 Remaining authoring/lifecycle/operations facades and real two-session race
 proof remain open; each authoring facade must use the locked active-staff
 assertion rather than a bare role boolean.
