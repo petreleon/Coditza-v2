@@ -206,7 +206,7 @@ saved/graded answers so omitted questions cannot disappear.
 - [ ] Grant execution only to the server path and prove direct user denial.
 - [ ] Add concurrency tests before any HTTP mutation task uses a function.
 
-Implementation note (2026-07-29): sixteen forward-only slices are present:
+Implementation note (2026-07-29): seventeen forward-only slices are present:
 structured idempotency replay, exact safe exercise/quiz-start response schemas,
 assessment learner mutations, matching SQL/TypeScript normalization vectors,
 service-role-only theory completion/current-curriculum progress reads with
@@ -242,6 +242,10 @@ expected-version/no-op behavior, one root-only update, and redacted audit
 without invented replay, plus a named draft-chapter PATCH facade with canonical
 module-to-chapter locking, constrained hierarchy rechecks, strict scalar
 partial validation, published-parent allowance, exact expected-version/no-op
+behavior, one child-root update, and redacted audit without invented replay,
+plus a named draft-theory-section PATCH facade with canonical module-to-chapter-
+to-theory locking, constrained hierarchy rechecks, strict scalar partial
+validation, published-ancestor allowance, exact expected-version/no-op
 behavior, one child-root update, and redacted audit without invented replay.
 They are documented in
 [slice 01](../../docs/implementation/SUP-FUNCTIONS-001-slice-01.md) and
@@ -259,7 +263,8 @@ They are documented in
 [slice 13](../../docs/implementation/SUP-FUNCTIONS-001-slice-13.md), and
 [slice 14](../../docs/implementation/SUP-FUNCTIONS-001-slice-14.md), and
 [slice 15](../../docs/implementation/SUP-FUNCTIONS-001-slice-15.md), and
-[slice 16](../../docs/implementation/SUP-FUNCTIONS-001-slice-16.md).
+[slice 16](../../docs/implementation/SUP-FUNCTIONS-001-slice-16.md), and
+[slice 17](../../docs/implementation/SUP-FUNCTIONS-001-slice-17.md).
 Remaining authoring/lifecycle/operations facades and real two-session race
 proof remain open; each authoring facade must use the locked active-staff
 assertion rather than a bare role boolean.

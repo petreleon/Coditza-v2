@@ -4,7 +4,7 @@ BEGIN;
 -- and the only runtime role used for successful calls is service_role.
 GRANT USAGE ON SCHEMA extensions TO coditza_owner;
 
-SELECT extensions.plan(44);
+SELECT extensions.plan(46);
 
 SET LOCAL ROLE coditza_owner;
 DO $normalization_golden_vectors$
@@ -635,6 +635,42 @@ SELECT extensions.ok(
   'draft-chapter PATCH facade is owner-controlled, fixed-path, exact-name, and server-only'
 );
 
+SELECT extensions.ok(
+  (
+    SELECT procedure_entry.proowner = 'coditza_owner'::pg_catalog.regrole
+      AND procedure_entry.prosecdef
+      AND procedure_entry.proconfig = ARRAY['search_path=""']::text[]
+    FROM pg_catalog.pg_proc AS procedure_entry
+    WHERE procedure_entry.oid =
+      'public.curriculum_update_draft_theory_section(uuid,uuid,integer,jsonb,uuid)'::pg_catalog.regprocedure
+  )
+  AND (
+    SELECT pg_catalog.count(*) = 1
+    FROM pg_catalog.pg_proc AS procedure_entry
+    JOIN pg_catalog.pg_namespace AS procedure_namespace
+      ON procedure_namespace.oid = procedure_entry.pronamespace
+    WHERE procedure_namespace.nspname = 'public'
+      AND procedure_entry.proname = 'curriculum_update_draft_theory_section'
+  )
+  AND NOT EXISTS (
+    SELECT 1
+    FROM (
+      VALUES ('anon'), ('authenticated'), ('authenticator')
+    ) AS runtime_role(rolname)
+    WHERE pg_catalog.has_function_privilege(
+      runtime_role.rolname,
+      'public.curriculum_update_draft_theory_section(uuid,uuid,integer,jsonb,uuid)'::pg_catalog.regprocedure,
+      'EXECUTE'
+    )
+  )
+  AND pg_catalog.has_function_privilege(
+    'service_role',
+    'public.curriculum_update_draft_theory_section(uuid,uuid,integer,jsonb,uuid)'::pg_catalog.regprocedure,
+    'EXECUTE'
+  ),
+  'draft-theory-section PATCH facade is owner-controlled, fixed-path, exact-name, and server-only'
+);
+
 SET LOCAL ROLE authenticated;
 DO $authenticated_facade_denial$
 DECLARE
@@ -894,6 +930,23 @@ BEGIN
   END;
   IF NOT v_rejected THEN
     RAISE EXCEPTION 'authenticated role unexpectedly executed a draft chapter PATCH facade';
+  END IF;
+
+  v_rejected := false;
+  BEGIN
+    PERFORM *
+    FROM public.curriculum_update_draft_theory_section(
+      'c3000000-0000-0000-0000-000000000005',
+      'c33e0000-0000-0000-0000-000000000001',
+      1,
+      '{"title":"Denied draft theory section update"}'::jsonb,
+      'c3fc0000-0000-0000-0000-000000000001'
+    );
+  EXCEPTION WHEN insufficient_privilege THEN
+    v_rejected := true;
+  END;
+  IF NOT v_rejected THEN
+    RAISE EXCEPTION 'authenticated role unexpectedly executed a draft theory-section PATCH facade';
   END IF;
 END;
 $authenticated_facade_denial$;
@@ -9663,6 +9716,880 @@ SELECT extensions.ok(
     ''
   ) = '',
   'draft-chapter PATCH locks parent then chapter, preserves hierarchy and descendants, permits a published parent, audits redacted content safely, and has no replay'
+);
+RESET ROLE;
+
+-- The draft-theory-section PATCH fixture starts after the chapter PATCH
+-- assertion, so it can reuse that untouched draft theory child and prove this
+-- narrower scalar update leaves its chapter and assessment siblings intact.
+SET LOCAL ROLE coditza_owner;
+INSERT INTO public.theory_sections (
+  id,
+  chapter_id,
+  title,
+  body_markdown,
+  position,
+  estimated_minutes,
+  created_by,
+  updated_by
+)
+VALUES
+  (
+    'c33f0000-0000-0000-0000-000000000001',
+    'c32e0000-0000-0000-0000-000000000001',
+    'Draft theory PATCH sibling',
+    'Sibling retained to prove position and sibling preservation.',
+    1,
+    6,
+    'c3000000-0000-0000-0000-000000000004',
+    'c3000000-0000-0000-0000-000000000004'
+  ),
+  (
+    'c33a0000-0000-0000-0000-000000000001',
+    'c32e0000-0000-0000-0000-000000000001',
+    'Published theory PATCH denial',
+    'This theory section becomes published before its draft PATCH denial.',
+    2,
+    7,
+    'c3000000-0000-0000-0000-000000000004',
+    'c3000000-0000-0000-0000-000000000004'
+  ),
+  (
+    'c33b0000-0000-0000-0000-000000000001',
+    'c32e0000-0000-0000-0000-000000000001',
+    'Archived theory PATCH denial',
+    'This theory section becomes archived before its draft PATCH denial.',
+    3,
+    8,
+    'c3000000-0000-0000-0000-000000000004',
+    'c3000000-0000-0000-0000-000000000004'
+  ),
+  (
+    'c3c30000-0000-0000-0000-000000000001',
+    'c3200000-0000-0000-0000-000000000001',
+    'Published-ancestor draft theory',
+    'A draft theory section remains editable under published ancestors.',
+    1,
+    16,
+    'c3000000-0000-0000-0000-000000000004',
+    'c3000000-0000-0000-0000-000000000004'
+  ),
+  (
+    'c33c0000-0000-0000-0000-000000000001',
+    'c32c0000-0000-0000-0000-000000000001',
+    'Archived-chapter draft theory',
+    'This draft theory section must be blocked by its archived chapter.',
+    0,
+    9,
+    'c3000000-0000-0000-0000-000000000004',
+    'c3000000-0000-0000-0000-000000000004'
+  ),
+  (
+    'c33d0000-0000-0000-0000-000000000001',
+    'c3310000-0000-0000-0000-000000000001',
+    'Archived-module draft theory',
+    'This draft theory section must be blocked by its archived module.',
+    0,
+    10,
+    'c3000000-0000-0000-0000-000000000004',
+    'c3000000-0000-0000-0000-000000000004'
+  );
+UPDATE public.theory_sections
+SET
+  status = 'published'::public.content_status,
+  published_at = pg_catalog.clock_timestamp()
+WHERE id = 'c33a0000-0000-0000-0000-000000000001';
+UPDATE public.theory_sections
+SET status = 'archived'::public.content_status
+WHERE id = 'c33b0000-0000-0000-0000-000000000001';
+RESET ROLE;
+
+SET LOCAL ROLE service_role;
+DO $curriculum_update_draft_theory_section$
+DECLARE
+  v_full_update record;
+  v_noop record;
+  v_published_ancestor_update record;
+  v_empty_rejected boolean := false;
+  v_nonobject_rejected boolean := false;
+  v_unknown_field_rejected boolean := false;
+  v_untrimmed_title_rejected boolean := false;
+  v_wrong_title_type_rejected boolean := false;
+  v_long_title_rejected boolean := false;
+  v_blank_body_rejected boolean := false;
+  v_wrong_body_type_rejected boolean := false;
+  v_long_body_rejected boolean := false;
+  v_zero_minutes_rejected boolean := false;
+  v_high_minutes_rejected boolean := false;
+  v_fractional_minutes_rejected boolean := false;
+  v_wrong_minutes_type_rejected boolean := false;
+  v_null_field_rejected boolean := false;
+  v_null_minutes_rejected boolean := false;
+  v_learner_rejected boolean := false;
+  v_held_actor_rejected boolean := false;
+  v_null_actor_rejected boolean := false;
+  v_missing_actor_rejected boolean := false;
+  v_null_theory_section_rejected boolean := false;
+  v_missing_theory_section_rejected boolean := false;
+  v_null_version_rejected boolean := false;
+  v_zero_version_rejected boolean := false;
+  v_negative_version_rejected boolean := false;
+  v_null_input_rejected boolean := false;
+  v_null_request_rejected boolean := false;
+  v_stale_rejected boolean := false;
+  v_stale_noop_rejected boolean := false;
+BEGIN
+  BEGIN
+    PERFORM *
+    FROM public.curriculum_update_draft_theory_section(
+      'c3000000-0000-0000-0000-000000000005',
+      'c33e0000-0000-0000-0000-000000000001',
+      1,
+      '{}'::jsonb,
+      'c3fc0000-0000-0000-0000-000000000002'
+    );
+  EXCEPTION WHEN raise_exception THEN
+    v_empty_rejected := true;
+  END;
+
+  BEGIN
+    PERFORM *
+    FROM public.curriculum_update_draft_theory_section(
+      'c3000000-0000-0000-0000-000000000005',
+      'c33e0000-0000-0000-0000-000000000001',
+      1,
+      '[]'::jsonb,
+      'c3fc0000-0000-0000-0000-000000000003'
+    );
+  EXCEPTION WHEN raise_exception THEN
+    v_nonobject_rejected := true;
+  END;
+
+  BEGIN
+    PERFORM *
+    FROM public.curriculum_update_draft_theory_section(
+      'c3000000-0000-0000-0000-000000000005',
+      'c33e0000-0000-0000-0000-000000000001',
+      1,
+      '{"chapterId":"c3200000-0000-0000-0000-000000000001"}'::jsonb,
+      'c3fc0000-0000-0000-0000-000000000004'
+    );
+  EXCEPTION WHEN raise_exception THEN
+    v_unknown_field_rejected := true;
+  END;
+
+  BEGIN
+    PERFORM *
+    FROM public.curriculum_update_draft_theory_section(
+      'c3000000-0000-0000-0000-000000000005',
+      'c33e0000-0000-0000-0000-000000000001',
+      1,
+      '{"title":" Untrimmed theory section title"}'::jsonb,
+      'c3fc0000-0000-0000-0000-000000000005'
+    );
+  EXCEPTION WHEN raise_exception THEN
+    v_untrimmed_title_rejected := true;
+  END;
+
+  BEGIN
+    PERFORM *
+    FROM public.curriculum_update_draft_theory_section(
+      'c3000000-0000-0000-0000-000000000005',
+      'c33e0000-0000-0000-0000-000000000001',
+      1,
+      '{"title":1}'::jsonb,
+      'c3fc0000-0000-0000-0000-000000000006'
+    );
+  EXCEPTION WHEN raise_exception THEN
+    v_wrong_title_type_rejected := true;
+  END;
+
+  BEGIN
+    PERFORM *
+    FROM public.curriculum_update_draft_theory_section(
+      'c3000000-0000-0000-0000-000000000005',
+      'c33e0000-0000-0000-0000-000000000001',
+      1,
+      pg_catalog.jsonb_build_object('title', pg_catalog.repeat('x', 161)),
+      'c3fc0000-0000-0000-0000-000000000023'
+    );
+  EXCEPTION WHEN raise_exception THEN
+    v_long_title_rejected := true;
+  END;
+
+  BEGIN
+    PERFORM *
+    FROM public.curriculum_update_draft_theory_section(
+      'c3000000-0000-0000-0000-000000000005',
+      'c33e0000-0000-0000-0000-000000000001',
+      1,
+      '{"bodyMarkdown":"   "}'::jsonb,
+      'c3fc0000-0000-0000-0000-000000000007'
+    );
+  EXCEPTION WHEN raise_exception THEN
+    v_blank_body_rejected := true;
+  END;
+
+  BEGIN
+    PERFORM *
+    FROM public.curriculum_update_draft_theory_section(
+      'c3000000-0000-0000-0000-000000000005',
+      'c33e0000-0000-0000-0000-000000000001',
+      1,
+      '{"bodyMarkdown":1}'::jsonb,
+      'c3fc0000-0000-0000-0000-000000000008'
+    );
+  EXCEPTION WHEN raise_exception THEN
+    v_wrong_body_type_rejected := true;
+  END;
+
+  BEGIN
+    PERFORM *
+    FROM public.curriculum_update_draft_theory_section(
+      'c3000000-0000-0000-0000-000000000005',
+      'c33e0000-0000-0000-0000-000000000001',
+      1,
+      pg_catalog.jsonb_build_object(
+        'bodyMarkdown',
+        pg_catalog.repeat('x', 100001)
+      ),
+      'c3fc0000-0000-0000-0000-000000000024'
+    );
+  EXCEPTION WHEN raise_exception THEN
+    v_long_body_rejected := true;
+  END;
+
+  BEGIN
+    PERFORM *
+    FROM public.curriculum_update_draft_theory_section(
+      'c3000000-0000-0000-0000-000000000005',
+      'c33e0000-0000-0000-0000-000000000001',
+      1,
+      '{"estimatedMinutes":0}'::jsonb,
+      'c3fc0000-0000-0000-0000-000000000009'
+    );
+  EXCEPTION WHEN raise_exception THEN
+    v_zero_minutes_rejected := true;
+  END;
+
+  BEGIN
+    PERFORM *
+    FROM public.curriculum_update_draft_theory_section(
+      'c3000000-0000-0000-0000-000000000005',
+      'c33e0000-0000-0000-0000-000000000001',
+      1,
+      '{"estimatedMinutes":1441}'::jsonb,
+      'c3fc0000-0000-0000-0000-000000000010'
+    );
+  EXCEPTION WHEN raise_exception THEN
+    v_high_minutes_rejected := true;
+  END;
+
+  BEGIN
+    PERFORM *
+    FROM public.curriculum_update_draft_theory_section(
+      'c3000000-0000-0000-0000-000000000005',
+      'c33e0000-0000-0000-0000-000000000001',
+      1,
+      '{"estimatedMinutes":1.5}'::jsonb,
+      'c3fc0000-0000-0000-0000-000000000025'
+    );
+  EXCEPTION WHEN raise_exception THEN
+    v_fractional_minutes_rejected := true;
+  END;
+
+  BEGIN
+    PERFORM *
+    FROM public.curriculum_update_draft_theory_section(
+      'c3000000-0000-0000-0000-000000000005',
+      'c33e0000-0000-0000-0000-000000000001',
+      1,
+      '{"estimatedMinutes":"10"}'::jsonb,
+      'c3fc0000-0000-0000-0000-000000000011'
+    );
+  EXCEPTION WHEN raise_exception THEN
+    v_wrong_minutes_type_rejected := true;
+  END;
+
+  BEGIN
+    PERFORM *
+    FROM public.curriculum_update_draft_theory_section(
+      'c3000000-0000-0000-0000-000000000005',
+      'c33e0000-0000-0000-0000-000000000001',
+      1,
+      '{"title":null}'::jsonb,
+      'c3fc0000-0000-0000-0000-000000000012'
+    );
+  EXCEPTION WHEN raise_exception THEN
+    v_null_field_rejected := true;
+  END;
+
+  BEGIN
+    PERFORM *
+    FROM public.curriculum_update_draft_theory_section(
+      'c3000000-0000-0000-0000-000000000005',
+      'c33e0000-0000-0000-0000-000000000001',
+      1,
+      '{"estimatedMinutes":null}'::jsonb,
+      'c3fc0000-0000-0000-0000-000000000026'
+    );
+  EXCEPTION WHEN raise_exception THEN
+    v_null_minutes_rejected := true;
+  END;
+
+  BEGIN
+    PERFORM *
+    FROM public.curriculum_update_draft_theory_section(
+      'c3000000-0000-0000-0000-000000000001',
+      'c33e0000-0000-0000-0000-000000000001',
+      1,
+      '{"title":"Learners cannot update draft theory sections"}'::jsonb,
+      'c3fc0000-0000-0000-0000-000000000013'
+    );
+  EXCEPTION WHEN raise_exception THEN
+    v_learner_rejected := true;
+  END;
+
+  BEGIN
+    PERFORM *
+    FROM public.curriculum_update_draft_theory_section(
+      'c3000000-0000-0000-0000-000000000006',
+      'c33e0000-0000-0000-0000-000000000001',
+      1,
+      '{"title":"Held staff cannot update draft theory sections"}'::jsonb,
+      'c3fc0000-0000-0000-0000-000000000014'
+    );
+  EXCEPTION WHEN raise_exception THEN
+    v_held_actor_rejected := true;
+  END;
+
+  BEGIN
+    PERFORM *
+    FROM public.curriculum_update_draft_theory_section(
+      NULL::uuid,
+      'c33e0000-0000-0000-0000-000000000001',
+      1,
+      '{"title":"Null actor"}'::jsonb,
+      'c3fc0000-0000-0000-0000-000000000015'
+    );
+  EXCEPTION WHEN raise_exception THEN
+    v_null_actor_rejected := true;
+  END;
+
+  BEGIN
+    PERFORM *
+    FROM public.curriculum_update_draft_theory_section(
+      'c3000000-0000-0000-0000-000000000999',
+      'c33e0000-0000-0000-0000-000000000001',
+      1,
+      '{"title":"Missing actor"}'::jsonb,
+      'c3fc0000-0000-0000-0000-000000000016'
+    );
+  EXCEPTION WHEN raise_exception THEN
+    v_missing_actor_rejected := true;
+  END;
+
+  BEGIN
+    PERFORM *
+    FROM public.curriculum_update_draft_theory_section(
+      'c3000000-0000-0000-0000-000000000005',
+      NULL::uuid,
+      1,
+      '{"title":"Null theory section"}'::jsonb,
+      'c3fc0000-0000-0000-0000-000000000017'
+    );
+  EXCEPTION WHEN raise_exception THEN
+    v_null_theory_section_rejected := true;
+  END;
+
+  BEGIN
+    PERFORM *
+    FROM public.curriculum_update_draft_theory_section(
+      'c3000000-0000-0000-0000-000000000005',
+      'c3c30000-0000-0000-0000-000000000999',
+      1,
+      '{"title":"Missing theory section"}'::jsonb,
+      'c3fc0000-0000-0000-0000-000000000018'
+    );
+  EXCEPTION WHEN raise_exception THEN
+    v_missing_theory_section_rejected := true;
+  END;
+
+  BEGIN
+    PERFORM *
+    FROM public.curriculum_update_draft_theory_section(
+      'c3000000-0000-0000-0000-000000000005',
+      'c33e0000-0000-0000-0000-000000000001',
+      NULL::integer,
+      '{"title":"Null version"}'::jsonb,
+      'c3fc0000-0000-0000-0000-000000000019'
+    );
+  EXCEPTION WHEN raise_exception THEN
+    v_null_version_rejected := true;
+  END;
+
+  BEGIN
+    PERFORM *
+    FROM public.curriculum_update_draft_theory_section(
+      'c3000000-0000-0000-0000-000000000005',
+      'c33e0000-0000-0000-0000-000000000001',
+      0,
+      '{"title":"Zero version"}'::jsonb,
+      'c3fc0000-0000-0000-0000-000000000020'
+    );
+  EXCEPTION WHEN raise_exception THEN
+    v_zero_version_rejected := true;
+  END;
+
+  BEGIN
+    PERFORM *
+    FROM public.curriculum_update_draft_theory_section(
+      'c3000000-0000-0000-0000-000000000005',
+      'c33e0000-0000-0000-0000-000000000001',
+      -1,
+      '{"title":"Negative version"}'::jsonb,
+      'c3fc0000-0000-0000-0000-000000000021'
+    );
+  EXCEPTION WHEN raise_exception THEN
+    v_negative_version_rejected := true;
+  END;
+
+  BEGIN
+    PERFORM *
+    FROM public.curriculum_update_draft_theory_section(
+      'c3000000-0000-0000-0000-000000000005',
+      'c33e0000-0000-0000-0000-000000000001',
+      1,
+      NULL::jsonb,
+      'c3fc0000-0000-0000-0000-000000000022'
+    );
+  EXCEPTION WHEN raise_exception THEN
+    v_null_input_rejected := true;
+  END;
+
+  BEGIN
+    PERFORM *
+    FROM public.curriculum_update_draft_theory_section(
+      'c3000000-0000-0000-0000-000000000005',
+      'c33e0000-0000-0000-0000-000000000001',
+      1,
+      '{"title":"Null request"}'::jsonb,
+      NULL::uuid
+    );
+  EXCEPTION WHEN raise_exception THEN
+    v_null_request_rejected := true;
+  END;
+
+  SELECT * INTO v_full_update
+  FROM public.curriculum_update_draft_theory_section(
+    'c3000000-0000-0000-0000-000000000004',
+    'c33e0000-0000-0000-0000-000000000001',
+    1,
+    '{"title":"Updated draft theory section title","bodyMarkdown":"Updated draft theory section body.","estimatedMinutes":15}'::jsonb,
+    'c3fc0000-0000-0000-0000-000000000030'
+  );
+
+  SELECT * INTO v_noop
+  FROM public.curriculum_update_draft_theory_section(
+    'c3000000-0000-0000-0000-000000000005',
+    'c33e0000-0000-0000-0000-000000000001',
+    2,
+    '{"title":"Updated draft theory section title"}'::jsonb,
+    'c3fc0000-0000-0000-0000-000000000031'
+  );
+
+  SELECT * INTO v_published_ancestor_update
+  FROM public.curriculum_update_draft_theory_section(
+    'c3000000-0000-0000-0000-000000000005',
+    'c3c30000-0000-0000-0000-000000000001',
+    1,
+    '{"estimatedMinutes":17}'::jsonb,
+    'c3fc0000-0000-0000-0000-000000000032'
+  );
+
+  BEGIN
+    PERFORM *
+    FROM public.curriculum_update_draft_theory_section(
+      'c3000000-0000-0000-0000-000000000004',
+      'c33e0000-0000-0000-0000-000000000001',
+      1,
+      '{"title":"Updated draft theory section title","bodyMarkdown":"Updated draft theory section body.","estimatedMinutes":15}'::jsonb,
+      'c3fc0000-0000-0000-0000-000000000030'
+    );
+  EXCEPTION WHEN raise_exception THEN
+    v_stale_rejected := true;
+  END;
+
+  BEGIN
+    PERFORM *
+    FROM public.curriculum_update_draft_theory_section(
+      'c3000000-0000-0000-0000-000000000005',
+      'c33e0000-0000-0000-0000-000000000001',
+      1,
+      '{"title":"Updated draft theory section title"}'::jsonb,
+      'c3fc0000-0000-0000-0000-000000000034'
+    );
+  EXCEPTION WHEN raise_exception THEN
+    v_stale_noop_rejected := true;
+  END;
+
+  IF v_full_update.response_status <> 200
+    OR v_full_update.response_body IS DISTINCT FROM pg_catalog.jsonb_build_object(
+      'id', 'c33e0000-0000-0000-0000-000000000001',
+      'rowVersion', 2
+    )
+    OR v_noop.response_status <> 200
+    OR v_noop.response_body IS DISTINCT FROM pg_catalog.jsonb_build_object(
+      'id', 'c33e0000-0000-0000-0000-000000000001',
+      'rowVersion', 2
+    )
+    OR v_published_ancestor_update.response_status <> 200
+    OR v_published_ancestor_update.response_body IS DISTINCT FROM pg_catalog.jsonb_build_object(
+      'id', 'c3c30000-0000-0000-0000-000000000001',
+      'rowVersion', 2
+    )
+    OR NOT v_empty_rejected
+    OR NOT v_nonobject_rejected
+    OR NOT v_unknown_field_rejected
+    OR NOT v_untrimmed_title_rejected
+    OR NOT v_wrong_title_type_rejected
+    OR NOT v_long_title_rejected
+    OR NOT v_blank_body_rejected
+    OR NOT v_wrong_body_type_rejected
+    OR NOT v_long_body_rejected
+    OR NOT v_zero_minutes_rejected
+    OR NOT v_high_minutes_rejected
+    OR NOT v_fractional_minutes_rejected
+    OR NOT v_wrong_minutes_type_rejected
+    OR NOT v_null_field_rejected
+    OR NOT v_null_minutes_rejected
+    OR NOT v_learner_rejected
+    OR NOT v_held_actor_rejected
+    OR NOT v_null_actor_rejected
+    OR NOT v_missing_actor_rejected
+    OR NOT v_null_theory_section_rejected
+    OR NOT v_missing_theory_section_rejected
+    OR NOT v_null_version_rejected
+    OR NOT v_zero_version_rejected
+    OR NOT v_negative_version_rejected
+    OR NOT v_null_input_rejected
+    OR NOT v_null_request_rejected
+    OR NOT v_stale_rejected
+    OR NOT v_stale_noop_rejected THEN
+    RAISE EXCEPTION 'draft-theory-section PATCH facade did not preserve its exact hierarchy-scoped update contract';
+  END IF;
+END;
+$curriculum_update_draft_theory_section$;
+RESET ROLE;
+
+SET LOCAL ROLE service_role;
+DO $draft_theory_section_update_lifecycle_denial$
+DECLARE
+  v_published_theory_rejected boolean := false;
+  v_archived_theory_rejected boolean := false;
+  v_archived_chapter_rejected boolean := false;
+  v_archived_module_rejected boolean := false;
+BEGIN
+  BEGIN
+    PERFORM *
+    FROM public.curriculum_update_draft_theory_section(
+      'c3000000-0000-0000-0000-000000000005',
+      'c33a0000-0000-0000-0000-000000000001',
+      2,
+      '{"title":"Published theory sections are immutable in draft PATCH"}'::jsonb,
+      'c3fc0000-0000-0000-0000-000000000035'
+    );
+  EXCEPTION WHEN raise_exception THEN
+    v_published_theory_rejected := true;
+  END;
+
+  BEGIN
+    PERFORM *
+    FROM public.curriculum_update_draft_theory_section(
+      'c3000000-0000-0000-0000-000000000005',
+      'c33b0000-0000-0000-0000-000000000001',
+      2,
+      '{"title":"Archived theory sections are immutable in draft PATCH"}'::jsonb,
+      'c3fc0000-0000-0000-0000-000000000036'
+    );
+  EXCEPTION WHEN raise_exception THEN
+    v_archived_theory_rejected := true;
+  END;
+
+  BEGIN
+    PERFORM *
+    FROM public.curriculum_update_draft_theory_section(
+      'c3000000-0000-0000-0000-000000000005',
+      'c33c0000-0000-0000-0000-000000000001',
+      1,
+      '{"title":"Archived chapters block draft theory PATCH"}'::jsonb,
+      'c3fc0000-0000-0000-0000-000000000037'
+    );
+  EXCEPTION WHEN raise_exception THEN
+    v_archived_chapter_rejected := true;
+  END;
+
+  BEGIN
+    PERFORM *
+    FROM public.curriculum_update_draft_theory_section(
+      'c3000000-0000-0000-0000-000000000005',
+      'c33d0000-0000-0000-0000-000000000001',
+      1,
+      '{"title":"Archived modules block draft theory PATCH"}'::jsonb,
+      'c3fc0000-0000-0000-0000-000000000038'
+    );
+  EXCEPTION WHEN raise_exception THEN
+    v_archived_module_rejected := true;
+  END;
+
+  IF NOT v_published_theory_rejected
+    OR NOT v_archived_theory_rejected
+    OR NOT v_archived_chapter_rejected
+    OR NOT v_archived_module_rejected THEN
+    RAISE EXCEPTION 'draft-theory-section PATCH unexpectedly accepted a non-draft theory section or archived ancestor';
+  END IF;
+END;
+$draft_theory_section_update_lifecycle_denial$;
+RESET ROLE;
+
+SET LOCAL ROLE coditza_owner;
+SELECT extensions.ok(
+  EXISTS (
+    SELECT 1
+    FROM public.theory_sections AS theory_entry
+    WHERE theory_entry.id = 'c33e0000-0000-0000-0000-000000000001'
+      AND theory_entry.chapter_id = 'c32e0000-0000-0000-0000-000000000001'
+      AND theory_entry.title = 'Updated draft theory section title'
+      AND theory_entry.body_markdown = 'Updated draft theory section body.'
+      AND theory_entry.position = 0
+      AND theory_entry.estimated_minutes = 15
+      AND theory_entry.status = 'draft'::public.content_status
+      AND theory_entry.published_at IS NULL
+      AND theory_entry.row_version = 2
+      AND theory_entry.created_by = 'c3000000-0000-0000-0000-000000000004'
+      AND theory_entry.updated_by = 'c3000000-0000-0000-0000-000000000004'
+  )
+  AND EXISTS (
+    SELECT 1
+    FROM public.theory_sections AS theory_entry
+    WHERE theory_entry.id = 'c3c30000-0000-0000-0000-000000000001'
+      AND theory_entry.chapter_id = 'c3200000-0000-0000-0000-000000000001'
+      AND theory_entry.title = 'Published-ancestor draft theory'
+      AND theory_entry.body_markdown =
+        'A draft theory section remains editable under published ancestors.'
+      AND theory_entry.position = 1
+      AND theory_entry.estimated_minutes = 17
+      AND theory_entry.status = 'draft'::public.content_status
+      AND theory_entry.published_at IS NULL
+      AND theory_entry.row_version = 2
+      AND theory_entry.created_by = 'c3000000-0000-0000-0000-000000000004'
+      AND theory_entry.updated_by = 'c3000000-0000-0000-0000-000000000005'
+  )
+  AND EXISTS (
+    SELECT 1
+    FROM public.theory_sections AS theory_entry
+    WHERE theory_entry.id = 'c33f0000-0000-0000-0000-000000000001'
+      AND theory_entry.chapter_id = 'c32e0000-0000-0000-0000-000000000001'
+      AND theory_entry.title = 'Draft theory PATCH sibling'
+      AND theory_entry.body_markdown =
+        'Sibling retained to prove position and sibling preservation.'
+      AND theory_entry.position = 1
+      AND theory_entry.estimated_minutes = 6
+      AND theory_entry.status = 'draft'::public.content_status
+      AND theory_entry.row_version = 1
+      AND theory_entry.created_by = 'c3000000-0000-0000-0000-000000000004'
+      AND theory_entry.updated_by = 'c3000000-0000-0000-0000-000000000004'
+  )
+  AND EXISTS (
+    SELECT 1
+    FROM public.theory_sections AS theory_entry
+    WHERE theory_entry.id = 'c33a0000-0000-0000-0000-000000000001'
+      AND theory_entry.chapter_id = 'c32e0000-0000-0000-0000-000000000001'
+      AND theory_entry.status = 'published'::public.content_status
+      AND theory_entry.published_at IS NOT NULL
+      AND theory_entry.row_version = 2
+  )
+  AND EXISTS (
+    SELECT 1
+    FROM public.theory_sections AS theory_entry
+    WHERE theory_entry.id = 'c33b0000-0000-0000-0000-000000000001'
+      AND theory_entry.chapter_id = 'c32e0000-0000-0000-0000-000000000001'
+      AND theory_entry.status = 'archived'::public.content_status
+      AND theory_entry.row_version = 2
+  )
+  AND EXISTS (
+    SELECT 1
+    FROM public.theory_sections AS theory_entry
+    WHERE theory_entry.id = 'c33c0000-0000-0000-0000-000000000001'
+      AND theory_entry.chapter_id = 'c32c0000-0000-0000-0000-000000000001'
+      AND theory_entry.status = 'draft'::public.content_status
+      AND theory_entry.row_version = 1
+  )
+  AND EXISTS (
+    SELECT 1
+    FROM public.theory_sections AS theory_entry
+    WHERE theory_entry.id = 'c33d0000-0000-0000-0000-000000000001'
+      AND theory_entry.chapter_id = 'c3310000-0000-0000-0000-000000000001'
+      AND theory_entry.status = 'draft'::public.content_status
+      AND theory_entry.row_version = 1
+  )
+  AND EXISTS (
+    SELECT 1
+    FROM public.modules AS module_entry
+    WHERE module_entry.id = 'c31e0000-0000-0000-0000-000000000001'
+      AND module_entry.status = 'draft'::public.content_status
+      AND module_entry.row_version = 3
+  )
+  AND EXISTS (
+    SELECT 1
+    FROM public.chapters AS chapter_entry
+    WHERE chapter_entry.id = 'c32e0000-0000-0000-0000-000000000001'
+      AND chapter_entry.module_id = 'c31e0000-0000-0000-0000-000000000001'
+      AND chapter_entry.position = 0
+      AND chapter_entry.status = 'draft'::public.content_status
+      AND chapter_entry.row_version = 2
+      AND chapter_entry.updated_by = 'c3000000-0000-0000-0000-000000000004'
+  )
+  AND EXISTS (
+    SELECT 1
+    FROM public.exercises AS exercise_entry
+    WHERE exercise_entry.id = 'c34e0000-0000-0000-0000-000000000001'
+      AND exercise_entry.chapter_id = 'c32e0000-0000-0000-0000-000000000001'
+      AND exercise_entry.status = 'draft'::public.content_status
+      AND exercise_entry.row_version = 1
+      AND exercise_entry.definition_version = 1
+      AND exercise_entry.updated_by = 'c3000000-0000-0000-0000-000000000004'
+  )
+  AND EXISTS (
+    SELECT 1
+    FROM public.modules AS module_entry
+    WHERE module_entry.id = 'c3100000-0000-0000-0000-000000000001'
+      AND module_entry.status = 'published'::public.content_status
+      AND module_entry.row_version = 2
+  )
+  AND EXISTS (
+    SELECT 1
+    FROM public.chapters AS chapter_entry
+    WHERE chapter_entry.id = 'c3200000-0000-0000-0000-000000000001'
+      AND chapter_entry.status = 'published'::public.content_status
+      AND chapter_entry.row_version = 2
+  )
+  AND EXISTS (
+    SELECT 1
+    FROM public.modules AS module_entry
+    WHERE module_entry.id = 'c31f0000-0000-0000-0000-000000000001'
+      AND module_entry.status = 'archived'::public.content_status
+      AND module_entry.row_version = 2
+  )
+  AND EXISTS (
+    SELECT 1
+    FROM public.chapters AS chapter_entry
+    WHERE chapter_entry.id = 'c3310000-0000-0000-0000-000000000001'
+      AND chapter_entry.status = 'draft'::public.content_status
+      AND chapter_entry.row_version = 1
+  )
+  AND EXISTS (
+    SELECT 1
+    FROM public.modules AS module_entry
+    WHERE module_entry.id = 'c31c0000-0000-0000-0000-000000000001'
+      AND module_entry.status = 'draft'::public.content_status
+      AND module_entry.row_version = 1
+  )
+  AND EXISTS (
+    SELECT 1
+    FROM public.chapters AS chapter_entry
+    WHERE chapter_entry.id = 'c32c0000-0000-0000-0000-000000000001'
+      AND chapter_entry.module_id = 'c31c0000-0000-0000-0000-000000000001'
+      AND chapter_entry.status = 'archived'::public.content_status
+      AND chapter_entry.row_version = 2
+  )
+  AND (
+    SELECT pg_catalog.count(*) = 2
+      AND pg_catalog.bool_and(
+        audit_entry.actor_kind = 'user'
+        AND audit_entry.action = 'theory_section_updated'
+        AND audit_entry.entity_type = 'theory_section'
+        AND audit_entry.changed_fields = ARRAY['content']::text[]
+        AND audit_entry.change_summary =
+          '{"content":{"before":"redacted","after":"redacted"}}'::jsonb
+        AND audit_entry.reason IS NULL
+        AND (
+          (
+            audit_entry.actor_user_id = 'c3000000-0000-0000-0000-000000000004'
+            AND audit_entry.entity_id = 'c33e0000-0000-0000-0000-000000000001'
+            AND audit_entry.request_id = 'c3fc0000-0000-0000-0000-000000000030'::uuid
+          )
+          OR (
+            audit_entry.actor_user_id = 'c3000000-0000-0000-0000-000000000005'
+            AND audit_entry.entity_id = 'c3c30000-0000-0000-0000-000000000001'
+            AND audit_entry.request_id = 'c3fc0000-0000-0000-0000-000000000032'::uuid
+          )
+        )
+      )
+    FROM private.audit_events AS audit_entry
+    WHERE audit_entry.entity_id IN (
+      'c33e0000-0000-0000-0000-000000000001'::uuid,
+      'c3c30000-0000-0000-0000-000000000001'::uuid
+    )
+  )
+  AND (
+    SELECT pg_catalog.count(*) = 2
+    FROM private.audit_events AS audit_entry
+    WHERE audit_entry.request_id IN (
+      'c3fc0000-0000-0000-0000-000000000030'::uuid,
+      'c3fc0000-0000-0000-0000-000000000032'::uuid
+    )
+  )
+  AND NOT EXISTS (
+    SELECT 1
+    FROM private.audit_events AS audit_entry
+    WHERE audit_entry.request_id IN (
+      'c3fc0000-0000-0000-0000-000000000002'::uuid,
+      'c3fc0000-0000-0000-0000-000000000003'::uuid,
+      'c3fc0000-0000-0000-0000-000000000004'::uuid,
+      'c3fc0000-0000-0000-0000-000000000005'::uuid,
+      'c3fc0000-0000-0000-0000-000000000006'::uuid,
+      'c3fc0000-0000-0000-0000-000000000007'::uuid,
+      'c3fc0000-0000-0000-0000-000000000008'::uuid,
+      'c3fc0000-0000-0000-0000-000000000009'::uuid,
+      'c3fc0000-0000-0000-0000-000000000010'::uuid,
+      'c3fc0000-0000-0000-0000-000000000011'::uuid,
+      'c3fc0000-0000-0000-0000-000000000012'::uuid,
+      'c3fc0000-0000-0000-0000-000000000013'::uuid,
+      'c3fc0000-0000-0000-0000-000000000014'::uuid,
+      'c3fc0000-0000-0000-0000-000000000015'::uuid,
+      'c3fc0000-0000-0000-0000-000000000016'::uuid,
+      'c3fc0000-0000-0000-0000-000000000017'::uuid,
+      'c3fc0000-0000-0000-0000-000000000018'::uuid,
+      'c3fc0000-0000-0000-0000-000000000019'::uuid,
+      'c3fc0000-0000-0000-0000-000000000020'::uuid,
+      'c3fc0000-0000-0000-0000-000000000021'::uuid,
+      'c3fc0000-0000-0000-0000-000000000022'::uuid,
+      'c3fc0000-0000-0000-0000-000000000023'::uuid,
+      'c3fc0000-0000-0000-0000-000000000024'::uuid,
+      'c3fc0000-0000-0000-0000-000000000025'::uuid,
+      'c3fc0000-0000-0000-0000-000000000026'::uuid,
+      'c3fc0000-0000-0000-0000-000000000031'::uuid,
+      'c3fc0000-0000-0000-0000-000000000034'::uuid,
+      'c3fc0000-0000-0000-0000-000000000035'::uuid,
+      'c3fc0000-0000-0000-0000-000000000036'::uuid,
+      'c3fc0000-0000-0000-0000-000000000037'::uuid,
+      'c3fc0000-0000-0000-0000-000000000038'::uuid
+    )
+  )
+  AND NOT EXISTS (
+    SELECT 1
+    FROM private.idempotency_records AS record_entry
+    WHERE record_entry.result_resource_id IN (
+      'c33e0000-0000-0000-0000-000000000001'::uuid,
+      'c3c30000-0000-0000-0000-000000000001'::uuid
+    )
+  )
+  AND COALESCE(
+    pg_catalog.current_setting('coditza.learning_write', true),
+    ''
+  ) = '',
+  'draft-theory-section PATCH locks the full hierarchy, preserves siblings and assessment state, permits published ancestors, audits redacted content safely, and has no replay'
 );
 RESET ROLE;
 

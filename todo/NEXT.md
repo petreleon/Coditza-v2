@@ -14,9 +14,10 @@ This task builds the named server-only transaction facades over those existing
 tables. Its completed slices are the structured idempotency/assessment learner
 mutation cluster, learner progress cluster, own assessment-history cluster,
 staff-authorization primitive cluster, root draft-module creation cluster,
-draft-chapter creation cluster, draft-theory-section creation cluster, and
-scalar draft-exercise and complete draft-quiz creation clusters, then scalar
-draft-exercise and draft-quiz PATCH clusters, documented in
+draft-chapter creation cluster, draft-theory-section creation cluster, scalar
+draft-exercise and complete draft-quiz creation clusters, scalar
+draft-exercise and draft-quiz PATCH clusters, protected assessment authoring
+reads, and draft-module/chapter/theory-section PATCH clusters, documented in
 [slice 01](../docs/implementation/SUP-FUNCTIONS-001-slice-01.md),
 [slice 02](../docs/implementation/SUP-FUNCTIONS-001-slice-02.md), and
 [slice 03](../docs/implementation/SUP-FUNCTIONS-001-slice-03.md), and
@@ -31,33 +32,38 @@ draft-exercise and draft-quiz PATCH clusters, documented in
 [slice 12](../docs/implementation/SUP-FUNCTIONS-001-slice-12.md), and
 [slice 13](../docs/implementation/SUP-FUNCTIONS-001-slice-13.md), and
 [slice 14](../docs/implementation/SUP-FUNCTIONS-001-slice-14.md), and
-[slice 15](../docs/implementation/SUP-FUNCTIONS-001-slice-15.md). Continue
+[slice 15](../docs/implementation/SUP-FUNCTIONS-001-slice-15.md), and
+[slice 16](../docs/implementation/SUP-FUNCTIONS-001-slice-16.md), and
+[slice 17](../docs/implementation/SUP-FUNCTIONS-001-slice-17.md). Continue
 from those bounded baselines with the curriculum-owned
-curriculum_update_draft_theory_section facade. It must require a
-server-generated request UUID, recheck the live active staff actor before
-content access, discover the current chapter, lock module then chapter then
-theory section in canonical order, and recheck both theory-to-chapter and
-chapter-to-module relationships under those locks. It must reject missing or
-reparented hierarchy, stale or non-draft theory sections, and archived module
-or chapter ancestors. Draft or published non-archived ancestors remain valid.
+curriculum_correct_published_module facade. It must require a server-generated
+request UUID, non-null actor and module identifiers, a positive expected row
+version, and the exact reason code content_correction. It must recheck the live
+active editor/admin actor before any module content access, then lock exactly
+the target module row. It must reject missing, draft, archived, and stale
+modules. It must not take a sibling or descendant lock because it cannot change
+position, hierarchy, lifecycle, descendants, or learner state.
 
-The facade must require a positive expected row version and a nonempty partial
-JSON object whose only accepted fields are title, bodyMarkdown, and
-estimatedMinutes. Every supplied field must pass the same validation as
-draft-theory-section creation: trimmed 1..160 title; nonblank Markdown of at
-most 100,000 characters; and a JSON integer from 1 through 1,440. JSON null,
-unknown or server-owned fields must be rejected. Resolve omitted fields from
-the locked row. A no-op must return only id and rowVersion without an UPDATE or
-audit; a real change must update only those three scalar fields plus updated_by,
-advance row_version once through the existing trigger, and append exactly one
-closed-contract redacted theory_section_updated audit event. Execution must be
-granted only to service_role.
+The facade must accept a nonempty partial JSON object whose only accepted fields
+are title and descriptionMarkdown. Every supplied field must pass the exact
+draft-module scalar validation: trimmed 1..160 title and nonblank Markdown of
+at most 10,000 characters. SQL NULL input, non-object input, JSON nulls,
+unknown fields, and all server-owned fields including slug must be rejected.
+Resolve omitted fields from the locked row. A current-version semantic no-op
+must return only id and rowVersion without an UPDATE, row-version/timestamp or
+updated_by change, or audit; a stale no-op must be rejected. A real change must
+update only title, description_markdown, and updated_by, advance row_version
+once through the existing trigger, and append exactly one closed-contract
+module_corrected audit event with changed_fields ['content'], the redacted
+content delta, and reason content_correction. Execution must be granted only to
+service_role.
 
-This PATCH must not lock a sibling scope because it may not change position. It
-must not create replay/idempotency behavior, reparent the theory section, touch
-assessment descendants, alter an ancestor lifecycle, correct published content,
-reorder, publish, archive, add a generic curriculum facade, or add
-Fastify/HTTP/direct-client/Python/SMTP/MFA/Vercel behavior.
+This correction must preserve slug, position, status, published_at, IDs,
+created_at, hierarchy, descendants, assessment definitions, theory
+completions, and all learner progress. It must not create replay/idempotency
+behavior, correct chapter/theory content, reparent, reorder, publish, archive,
+add a generic curriculum facade, or add Fastify/HTTP/direct-client/Python/SMTP/
+MFA/Vercel behavior.
 
 ## Read first
 
