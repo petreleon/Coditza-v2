@@ -14,10 +14,10 @@
   definition-replacement and protected draft-exercise and draft-quiz
   authoring-read and draft-module/draft-chapter/draft-theory-section PATCH and
   published-module/published-chapter/published-theory-section correction and
-  theory-section, exercise, quiz, and chapter publication slices are
+  theory-section, exercise, quiz, chapter, and module publication slices are
   implemented and verified; remaining owner families and real concurrency
   proof are still required.
-- Last verified implementation slice: SUP-FUNCTIONS-001 chapter publication
+- Last verified implementation slice: SUP-FUNCTIONS-001 module publication
   facade with protected local and Docker verification
 - Last updated: 2026-07-29
 
@@ -286,6 +286,12 @@ to the deadlines in that file.
   reconciles snapshot/current/optional/archived learner sources only under a
   published module, preserves draft-module progress exactly, retries safely by
   lifecycle state, and passes protected local/Docker proof.
+- [SUP-FUNCTIONS-001 module publication slice report](../docs/implementation/SUP-FUNCTIONS-001-slice-25.md);
+  a service-role-only facade now publishes one validated module only after it
+  has a direct published chapter, validates archived-inclusive root position,
+  activates every effective direct chapter/user pair from snapshot and
+  historical source rows, retries safely by lifecycle state, and passes
+  protected local/Docker proof.
 - [G1 completion record](08-execution/00-roadmap.md#g1-completion-record);
   Foundation reproducibility is recorded from the accepted architecture/product
   contracts, current checks, Docker evidence, and scope review.

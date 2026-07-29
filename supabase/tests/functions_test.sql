@@ -4,7 +4,7 @@ BEGIN;
 -- and the only runtime role used for successful calls is service_role.
 GRANT USAGE ON SCHEMA extensions TO coditza_owner;
 
-SELECT extensions.plan(60);
+SELECT extensions.plan(62);
 
 SET LOCAL ROLE coditza_owner;
 DO $normalization_golden_vectors$
@@ -941,6 +941,42 @@ SELECT extensions.ok(
   'chapter publication facade is owner-controlled, fixed-path, exact-name, and server-only'
 );
 
+SELECT extensions.ok(
+  (
+    SELECT procedure_entry.proowner = 'coditza_owner'::pg_catalog.regrole
+      AND procedure_entry.prosecdef
+      AND procedure_entry.proconfig = ARRAY['search_path=""']::text[]
+    FROM pg_catalog.pg_proc AS procedure_entry
+    WHERE procedure_entry.oid =
+      'public.curriculum_publish_module(uuid,uuid,integer,uuid)'::pg_catalog.regprocedure
+  )
+  AND (
+    SELECT pg_catalog.count(*) = 1
+    FROM pg_catalog.pg_proc AS procedure_entry
+    JOIN pg_catalog.pg_namespace AS procedure_namespace
+      ON procedure_namespace.oid = procedure_entry.pronamespace
+    WHERE procedure_namespace.nspname = 'public'
+      AND procedure_entry.proname = 'curriculum_publish_module'
+  )
+  AND NOT EXISTS (
+    SELECT 1
+    FROM (
+      VALUES ('anon'), ('authenticated'), ('authenticator')
+    ) AS runtime_role(rolname)
+    WHERE pg_catalog.has_function_privilege(
+      runtime_role.rolname,
+      'public.curriculum_publish_module(uuid,uuid,integer,uuid)'::pg_catalog.regprocedure,
+      'EXECUTE'
+    )
+  )
+  AND pg_catalog.has_function_privilege(
+    'service_role',
+    'public.curriculum_publish_module(uuid,uuid,integer,uuid)'::pg_catalog.regprocedure,
+    'EXECUTE'
+  ),
+  'module publication facade is owner-controlled, fixed-path, exact-name, and server-only'
+);
+
 SET LOCAL ROLE authenticated;
 DO $authenticated_facade_denial$
 DECLARE
@@ -1335,6 +1371,22 @@ BEGIN
   END;
   IF NOT v_rejected THEN
     RAISE EXCEPTION 'authenticated role unexpectedly executed a chapter publication facade';
+  END IF;
+
+  v_rejected := false;
+  BEGIN
+    PERFORM *
+    FROM public.curriculum_publish_module(
+      'c3000000-0000-0000-0000-000000000005',
+      'c4100000-0000-0000-0000-000000000001',
+      1,
+      'c6040000-0000-0000-0000-000000000001'
+    );
+  EXCEPTION WHEN insufficient_privilege THEN
+    v_rejected := true;
+  END;
+  IF NOT v_rejected THEN
+    RAISE EXCEPTION 'authenticated role unexpectedly executed a module publication facade';
   END IF;
 END;
 $authenticated_facade_denial$;
@@ -21599,6 +21651,1263 @@ RESET ROLE;
 SELECT extensions.ok(
   TRUE,
   'chapter publication requires all published child categories, locks the hierarchy safely, reconciles snapshot/current/optional/archived progress sources only when effective, preserves descendants and history, and uses state-based retry without replay'
+);
+
+-- Slice 25: module publication flips the final visibility ancestor for every
+-- already-published direct chapter. The owner-only seed deliberately supplies
+-- one complete child, one second published child for pair-scoped progress
+-- proof, historical source rows on an archived leaf, and a draft child that
+-- must remain outside the activation set.
+SET LOCAL ROLE coditza_owner;
+DO $curriculum_publish_module_seed$
+BEGIN
+  INSERT INTO public.modules (
+    id,
+    slug,
+    title,
+    description_markdown,
+    position,
+    created_by,
+    updated_by
+  )
+  VALUES (
+    'c6000000-0000-0000-0000-000000000001',
+    'module-publication-without-published-chapter',
+    'Module without a published chapter',
+    'A valid draft root that deliberately fails module publication readiness.',
+    9800,
+    'c3000000-0000-0000-0000-000000000004',
+    'c3000000-0000-0000-0000-000000000004'
+  );
+
+  INSERT INTO public.chapters (
+    id,
+    module_id,
+    slug,
+    title,
+    summary_markdown,
+    position,
+    estimated_minutes,
+    created_by,
+    updated_by
+  )
+  VALUES
+    (
+      'c6010000-0000-0000-0000-000000000001',
+      'c6000000-0000-0000-0000-000000000001',
+      'module-publication-draft-readiness-sentinel',
+      'Draft child does not satisfy module readiness',
+      'A direct draft chapter proves publication requires a published child rather than any child.',
+      0,
+      10,
+      'c3000000-0000-0000-0000-000000000004',
+      'c3000000-0000-0000-0000-000000000004'
+    ),
+    (
+      'c6100000-0000-0000-0000-000000000001',
+      'c4100000-0000-0000-0000-000000000001',
+      'module-publication-second-published-chapter',
+      'Second published chapter for module activation',
+      'A second direct chapter proves module activation keys progress by chapter and learner.',
+      1,
+      15,
+      'c3000000-0000-0000-0000-000000000004',
+      'c3000000-0000-0000-0000-000000000004'
+    ),
+    (
+      'c6110000-0000-0000-0000-000000000001',
+      'c4100000-0000-0000-0000-000000000001',
+      'module-publication-draft-child-sentinel',
+      'Draft chapter outside module activation',
+      'This draft direct child proves source rows under nonpublished chapters stay ineffective.',
+      2,
+      16,
+      'c3000000-0000-0000-0000-000000000004',
+      'c3000000-0000-0000-0000-000000000004'
+    ),
+    (
+      'c6120000-0000-0000-0000-000000000001',
+      'c4100000-0000-0000-0000-000000000001',
+      'module-publication-archived-child-sentinel',
+      'Archived chapter outside module activation',
+      'This archived direct child proves module activation never recalculates archived chapter snapshots.',
+      3,
+      17,
+      'c3000000-0000-0000-0000-000000000004',
+      'c3000000-0000-0000-0000-000000000004'
+    );
+
+  UPDATE public.chapters
+  SET
+    status = 'published'::public.content_status,
+    published_at = pg_catalog.clock_timestamp(),
+    updated_by = 'c3000000-0000-0000-0000-000000000004'
+  WHERE id = 'c6100000-0000-0000-0000-000000000001';
+
+  UPDATE public.chapters
+  SET
+    status = 'archived'::public.content_status,
+    updated_by = 'c3000000-0000-0000-0000-000000000004'
+  WHERE id = 'c6120000-0000-0000-0000-000000000001';
+
+  INSERT INTO public.theory_sections (
+    id,
+    chapter_id,
+    title,
+    body_markdown,
+    position,
+    estimated_minutes,
+    created_by,
+    updated_by
+  )
+  VALUES
+    (
+      'c6300000-0000-0000-0000-000000000001',
+      'c6100000-0000-0000-0000-000000000001',
+      'Published source for the second chapter',
+      'A completed theory section makes the same learner affect two direct chapters.',
+      0,
+      5,
+      'c3000000-0000-0000-0000-000000000004',
+      'c3000000-0000-0000-0000-000000000004'
+    ),
+    (
+      'c6310000-0000-0000-0000-000000000001',
+      'c4200000-0000-0000-0000-000000000001',
+      'Archived history source',
+      'This archived theory section must still contribute its historical learner candidate.',
+      99,
+      5,
+      'c3000000-0000-0000-0000-000000000004',
+      'c3000000-0000-0000-0000-000000000004'
+    ),
+    (
+      'c6320000-0000-0000-0000-000000000001',
+      'c6110000-0000-0000-0000-000000000001',
+      'Published leaf under a draft chapter',
+      'This source stays ineffective because its chapter itself is still draft.',
+      0,
+      5,
+      'c3000000-0000-0000-0000-000000000004',
+      'c3000000-0000-0000-0000-000000000004'
+    ),
+    (
+      'c6330000-0000-0000-0000-000000000001',
+      'c6120000-0000-0000-0000-000000000001',
+      'Published leaf under an archived chapter',
+      'This source stays ineffective because its chapter itself is archived.',
+      0,
+      5,
+      'c3000000-0000-0000-0000-000000000004',
+      'c3000000-0000-0000-0000-000000000004'
+    );
+
+  UPDATE public.theory_sections
+  SET
+    status = 'published'::public.content_status,
+    published_at = pg_catalog.clock_timestamp(),
+    updated_by = 'c3000000-0000-0000-0000-000000000004'
+  WHERE id IN (
+    'c6300000-0000-0000-0000-000000000001'::uuid,
+    'c6320000-0000-0000-0000-000000000001'::uuid,
+    'c6330000-0000-0000-0000-000000000001'::uuid
+  );
+
+  UPDATE public.theory_sections
+  SET
+    status = 'archived'::public.content_status,
+    updated_by = 'c3000000-0000-0000-0000-000000000004'
+  WHERE id = 'c6310000-0000-0000-0000-000000000001';
+
+  PERFORM pg_catalog.set_config(
+    'coditza.learning_write',
+    'theory:c3000000-0000-0000-0000-000000000007:c4300000-0000-0000-0000-000000000001',
+    true
+  );
+  INSERT INTO public.theory_section_completions (
+    user_id,
+    theory_section_id
+  )
+  VALUES (
+    'c3000000-0000-0000-0000-000000000007',
+    'c4300000-0000-0000-0000-000000000001'
+  );
+
+  PERFORM pg_catalog.set_config(
+    'coditza.learning_write',
+    'theory:c3000000-0000-0000-0000-000000000007:c6300000-0000-0000-0000-000000000001',
+    true
+  );
+  INSERT INTO public.theory_section_completions (
+    user_id,
+    theory_section_id
+  )
+  VALUES (
+    'c3000000-0000-0000-0000-000000000007',
+    'c6300000-0000-0000-0000-000000000001'
+  );
+
+  PERFORM pg_catalog.set_config(
+    'coditza.learning_write',
+    'theory:c3000000-0000-0000-0000-000000000010:c6310000-0000-0000-0000-000000000001',
+    true
+  );
+  INSERT INTO public.theory_section_completions (
+    user_id,
+    theory_section_id
+  )
+  VALUES (
+    'c3000000-0000-0000-0000-000000000010',
+    'c6310000-0000-0000-0000-000000000001'
+  );
+
+  PERFORM pg_catalog.set_config(
+    'coditza.learning_write',
+    'theory:c3000000-0000-0000-0000-000000000012:c6320000-0000-0000-0000-000000000001',
+    true
+  );
+  INSERT INTO public.theory_section_completions (
+    user_id,
+    theory_section_id
+  )
+  VALUES (
+    'c3000000-0000-0000-0000-000000000012',
+    'c6320000-0000-0000-0000-000000000001'
+  );
+
+  PERFORM pg_catalog.set_config(
+    'coditza.learning_write',
+    'theory:c3000000-0000-0000-0000-000000000011:c6330000-0000-0000-0000-000000000001',
+    true
+  );
+  INSERT INTO public.theory_section_completions (
+    user_id,
+    theory_section_id
+  )
+  VALUES (
+    'c3000000-0000-0000-0000-000000000011',
+    'c6330000-0000-0000-0000-000000000001'
+  );
+
+  PERFORM pg_catalog.set_config('coditza.learning_write', 'exercise', true);
+  INSERT INTO public.exercise_attempts (
+    id,
+    user_id,
+    exercise_id,
+    exercise_definition_version,
+    answer,
+    is_correct,
+    points_earned,
+    points_possible
+  )
+  VALUES (
+    'c6420000-0000-0000-0000-000000000001',
+    'c3000000-0000-0000-0000-000000000008',
+    'c4420000-0000-0000-0000-000000000001',
+    1,
+    '{"text":"yes"}'::jsonb,
+    true,
+    1,
+    1
+  );
+
+  PERFORM pg_catalog.set_config('coditza.learning_write', 'quiz-start', true);
+  INSERT INTO public.quiz_attempts (
+    id,
+    user_id,
+    quiz_id,
+    quiz_definition_version,
+    attempt_number,
+    status,
+    submitted_at,
+    points_earned,
+    points_possible,
+    score_percent,
+    passed
+  )
+  VALUES (
+    'c6620000-0000-0000-0000-000000000001',
+    'c3000000-0000-0000-0000-000000000009',
+    'c4620000-0000-0000-0000-000000000001',
+    1,
+    1,
+    'submitted'::public.quiz_attempt_status,
+    pg_catalog.clock_timestamp(),
+    1,
+    1,
+    100,
+    true
+  );
+
+  PERFORM pg_catalog.set_config(
+    'coditza.learning_write',
+    'progress:c3000000-0000-0000-0000-000000000011:c6120000-0000-0000-0000-000000000001',
+    true
+  );
+  INSERT INTO public.chapter_progress (
+    user_id,
+    chapter_id,
+    theory_percent,
+    exercise_percent,
+    quiz_percent,
+    overall_percent
+  )
+  VALUES (
+    'c3000000-0000-0000-0000-000000000011',
+    'c6120000-0000-0000-0000-000000000001',
+    41,
+    42,
+    43,
+    42
+  );
+  PERFORM pg_catalog.set_config('coditza.learning_write', '', true);
+END;
+$curriculum_publish_module_seed$;
+RESET ROLE;
+
+SET LOCAL ROLE coditza_owner;
+DO $curriculum_publish_module_initial_snapshot$
+DECLARE
+  v_module_static jsonb;
+  v_other_module_snapshot jsonb;
+  v_descendant_snapshot jsonb;
+  v_history_fingerprint text;
+  v_initial_progress_snapshot jsonb;
+  v_archived_progress_snapshot jsonb;
+BEGIN
+  SELECT
+    pg_catalog.to_jsonb(module_entry)
+      - 'status'
+      - 'row_version'
+      - 'published_at'
+      - 'updated_by'
+      - 'updated_at'
+  INTO v_module_static
+  FROM public.modules AS module_entry
+  WHERE module_entry.id = 'c4100000-0000-0000-0000-000000000001';
+
+  SELECT COALESCE(
+    pg_catalog.jsonb_agg(
+      pg_catalog.to_jsonb(module_entry)
+      ORDER BY module_entry.id
+    ),
+    '[]'::jsonb
+  )
+  INTO v_other_module_snapshot
+  FROM public.modules AS module_entry
+  WHERE module_entry.id IN (
+    'c6000000-0000-0000-0000-000000000001'::uuid,
+    'c31e0000-0000-0000-0000-000000000001'::uuid,
+    'c31f0000-0000-0000-0000-000000000001'::uuid
+  );
+
+  SELECT pg_catalog.jsonb_build_object(
+    'chapters',
+    (
+      SELECT pg_catalog.jsonb_agg(
+        pg_catalog.to_jsonb(chapter_entry)
+        ORDER BY chapter_entry.id
+      )
+      FROM public.chapters AS chapter_entry
+      WHERE chapter_entry.id IN (
+        'c4200000-0000-0000-0000-000000000001'::uuid,
+        'c6100000-0000-0000-0000-000000000001'::uuid,
+        'c6110000-0000-0000-0000-000000000001'::uuid,
+        'c6120000-0000-0000-0000-000000000001'::uuid
+      )
+    ),
+    'theorySections',
+    (
+      SELECT pg_catalog.jsonb_agg(
+        pg_catalog.to_jsonb(theory_entry)
+        ORDER BY theory_entry.id
+      )
+      FROM public.theory_sections AS theory_entry
+      WHERE theory_entry.id IN (
+        'c4300000-0000-0000-0000-000000000001'::uuid,
+        'c6300000-0000-0000-0000-000000000001'::uuid,
+        'c6310000-0000-0000-0000-000000000001'::uuid,
+        'c6320000-0000-0000-0000-000000000001'::uuid,
+        'c6330000-0000-0000-0000-000000000001'::uuid
+      )
+    ),
+    'exercise',
+    (
+      SELECT pg_catalog.to_jsonb(exercise_entry)
+      FROM public.exercises AS exercise_entry
+      WHERE exercise_entry.id =
+        'c4420000-0000-0000-0000-000000000001'::uuid
+    ),
+    'quiz',
+    (
+      SELECT pg_catalog.to_jsonb(quiz_entry)
+      FROM public.quizzes AS quiz_entry
+      WHERE quiz_entry.id =
+        'c4620000-0000-0000-0000-000000000001'::uuid
+    )
+  )
+  INTO v_descendant_snapshot;
+
+  SELECT pg_catalog.md5(
+    COALESCE(
+      pg_catalog.jsonb_agg(
+        pg_catalog.jsonb_build_object(
+          'kind',
+          source_entry.kind,
+          'state',
+          source_entry.state
+        )
+        ORDER BY source_entry.kind, source_entry.state::text
+      )::text,
+      '[]'
+    )
+  )
+  INTO v_history_fingerprint
+  FROM (
+    SELECT
+      'theoryCompletion'::text AS kind,
+      pg_catalog.to_jsonb(completion_entry) AS state
+    FROM public.theory_section_completions AS completion_entry
+    WHERE (completion_entry.user_id, completion_entry.theory_section_id) IN (
+      (
+        'c3000000-0000-0000-0000-000000000007'::uuid,
+        'c4300000-0000-0000-0000-000000000001'::uuid
+      ),
+      (
+        'c3000000-0000-0000-0000-000000000007'::uuid,
+        'c6300000-0000-0000-0000-000000000001'::uuid
+      ),
+      (
+        'c3000000-0000-0000-0000-000000000010'::uuid,
+        'c6310000-0000-0000-0000-000000000001'::uuid
+      ),
+      (
+        'c3000000-0000-0000-0000-000000000012'::uuid,
+        'c6320000-0000-0000-0000-000000000001'::uuid
+      ),
+      (
+        'c3000000-0000-0000-0000-000000000011'::uuid,
+        'c6330000-0000-0000-0000-000000000001'::uuid
+      )
+    )
+
+    UNION ALL
+
+    SELECT
+      'exerciseAttempt'::text,
+      pg_catalog.to_jsonb(attempt_entry)
+    FROM public.exercise_attempts AS attempt_entry
+    WHERE attempt_entry.id =
+      'c6420000-0000-0000-0000-000000000001'::uuid
+
+    UNION ALL
+
+    SELECT
+      'quizAttempt'::text,
+      pg_catalog.to_jsonb(attempt_entry)
+    FROM public.quiz_attempts AS attempt_entry
+    WHERE attempt_entry.id =
+      'c6620000-0000-0000-0000-000000000001'::uuid
+  ) AS source_entry;
+
+  SELECT COALESCE(
+    pg_catalog.jsonb_agg(
+      pg_catalog.to_jsonb(progress_entry)
+      ORDER BY progress_entry.user_id
+    ),
+    '[]'::jsonb
+  )
+  INTO v_initial_progress_snapshot
+  FROM public.chapter_progress AS progress_entry
+  WHERE progress_entry.chapter_id =
+    'c4200000-0000-0000-0000-000000000001'::uuid;
+
+  SELECT COALESCE(
+    pg_catalog.jsonb_agg(
+      pg_catalog.to_jsonb(progress_entry)
+      ORDER BY progress_entry.user_id
+    ),
+    '[]'::jsonb
+  )
+  INTO v_archived_progress_snapshot
+  FROM public.chapter_progress AS progress_entry
+  WHERE progress_entry.chapter_id =
+    'c6120000-0000-0000-0000-000000000001'::uuid;
+
+  IF v_module_static IS NULL
+    OR v_other_module_snapshot IS NULL
+    OR v_descendant_snapshot IS NULL
+    OR v_history_fingerprint IS NULL
+    OR v_initial_progress_snapshot IS DISTINCT FROM (
+      SELECT pg_catalog.jsonb_build_array(pg_catalog.to_jsonb(progress_entry))
+      FROM public.chapter_progress AS progress_entry
+      WHERE progress_entry.user_id =
+          'c3000000-0000-0000-0000-000000000005'::uuid
+        AND progress_entry.chapter_id =
+          'c4200000-0000-0000-0000-000000000001'::uuid
+    )
+    OR v_archived_progress_snapshot IS DISTINCT FROM (
+      SELECT pg_catalog.jsonb_build_array(pg_catalog.to_jsonb(progress_entry))
+      FROM public.chapter_progress AS progress_entry
+      WHERE progress_entry.user_id =
+          'c3000000-0000-0000-0000-000000000011'::uuid
+        AND progress_entry.chapter_id =
+          'c6120000-0000-0000-0000-000000000001'::uuid
+    )
+    OR NOT EXISTS (
+      SELECT 1
+      FROM public.modules AS module_entry
+      WHERE module_entry.id =
+          'c4100000-0000-0000-0000-000000000001'::uuid
+        AND module_entry.status = 'draft'::public.content_status
+        AND module_entry.row_version = 1
+        AND module_entry.position = 9900
+    )
+    OR (
+      SELECT pg_catalog.count(*)
+      FROM public.chapters AS chapter_entry
+      WHERE chapter_entry.id IN (
+        'c4200000-0000-0000-0000-000000000001'::uuid,
+        'c6100000-0000-0000-0000-000000000001'::uuid
+      )
+        AND chapter_entry.status = 'published'::public.content_status
+        AND chapter_entry.row_version = 2
+    ) <> 2
+    OR NOT EXISTS (
+      SELECT 1
+      FROM public.chapters AS chapter_entry
+      WHERE chapter_entry.id =
+          'c6010000-0000-0000-0000-000000000001'::uuid
+        AND chapter_entry.module_id =
+          'c6000000-0000-0000-0000-000000000001'::uuid
+        AND chapter_entry.status = 'draft'::public.content_status
+        AND chapter_entry.row_version = 1
+    )
+    OR NOT EXISTS (
+      SELECT 1
+      FROM public.chapters AS chapter_entry
+      WHERE chapter_entry.id =
+          'c6110000-0000-0000-0000-000000000001'::uuid
+        AND chapter_entry.status = 'draft'::public.content_status
+        AND chapter_entry.row_version = 1
+    )
+    OR NOT EXISTS (
+      SELECT 1
+      FROM public.chapters AS chapter_entry
+      WHERE chapter_entry.id =
+          'c6120000-0000-0000-0000-000000000001'::uuid
+        AND chapter_entry.status = 'archived'::public.content_status
+        AND chapter_entry.row_version = 2
+    )
+    OR (
+      SELECT pg_catalog.count(*)
+      FROM public.theory_sections AS theory_entry
+      WHERE theory_entry.id IN (
+        'c4300000-0000-0000-0000-000000000001'::uuid,
+        'c6300000-0000-0000-0000-000000000001'::uuid,
+        'c6320000-0000-0000-0000-000000000001'::uuid,
+        'c6330000-0000-0000-0000-000000000001'::uuid
+      )
+        AND theory_entry.status = 'published'::public.content_status
+    ) <> 4
+    OR NOT EXISTS (
+      SELECT 1
+      FROM public.theory_sections AS theory_entry
+      WHERE theory_entry.id =
+          'c6310000-0000-0000-0000-000000000001'::uuid
+        AND theory_entry.status = 'archived'::public.content_status
+        AND theory_entry.row_version = 2
+    )
+    OR EXISTS (
+      SELECT 1
+      FROM public.chapter_progress AS progress_entry
+      WHERE progress_entry.chapter_id IN (
+        'c6100000-0000-0000-0000-000000000001'::uuid,
+        'c6110000-0000-0000-0000-000000000001'::uuid
+      )
+    ) THEN
+    RAISE EXCEPTION 'module publication fixture is incomplete';
+  END IF;
+
+  PERFORM pg_catalog.set_config(
+    'coditza.slice25_module_static',
+    v_module_static::text,
+    true
+  );
+  PERFORM pg_catalog.set_config(
+    'coditza.slice25_other_modules',
+    v_other_module_snapshot::text,
+    true
+  );
+  PERFORM pg_catalog.set_config(
+    'coditza.slice25_descendants',
+    v_descendant_snapshot::text,
+    true
+  );
+  PERFORM pg_catalog.set_config(
+    'coditza.slice25_history_fingerprint',
+    v_history_fingerprint,
+    true
+  );
+  PERFORM pg_catalog.set_config(
+    'coditza.slice25_archived_progress',
+    v_archived_progress_snapshot::text,
+    true
+  );
+END;
+$curriculum_publish_module_initial_snapshot$;
+RESET ROLE;
+
+-- The public facade, rather than the deferred root uniqueness constraint,
+-- must identify a position collision with an archived sibling before it writes
+-- the module lifecycle transition.
+SET LOCAL ROLE coditza_owner;
+DO $curriculum_publish_module_position_readiness_denial$
+DECLARE
+  v_duplicate_position integer;
+  v_rejected boolean := false;
+BEGIN
+  SELECT module_entry.position
+  INTO v_duplicate_position
+  FROM public.modules AS module_entry
+  WHERE module_entry.id = 'c31f0000-0000-0000-0000-000000000001'
+    AND module_entry.status = 'archived'::public.content_status;
+
+  IF v_duplicate_position IS NULL THEN
+    RAISE EXCEPTION 'module publication duplicate-position fixture is incomplete';
+  END IF;
+
+  BEGIN
+    SET CONSTRAINTS modules_position_key DEFERRED;
+    UPDATE public.modules
+    SET position = v_duplicate_position
+    WHERE id = 'c4100000-0000-0000-0000-000000000001';
+
+    PERFORM *
+    FROM public.curriculum_publish_module(
+      'c3000000-0000-0000-0000-000000000005',
+      'c4100000-0000-0000-0000-000000000001',
+      2,
+      'c6040000-0000-0000-0000-000000000002'
+    );
+  EXCEPTION WHEN raise_exception THEN
+    v_rejected := true;
+  END;
+
+  IF NOT v_rejected THEN
+    RAISE EXCEPTION 'module publication did not reject a deferred duplicate root position itself';
+  END IF;
+END;
+$curriculum_publish_module_position_readiness_denial$;
+RESET ROLE;
+
+SET LOCAL ROLE service_role;
+DO $curriculum_publish_module_validation$
+DECLARE
+  v_case record;
+  v_rejected boolean;
+BEGIN
+  FOR v_case IN
+    SELECT *
+    FROM (
+      VALUES
+        (
+          'learner actor'::text,
+          'c3000000-0000-0000-0000-000000000001'::uuid,
+          'c4100000-0000-0000-0000-000000000001'::uuid,
+          1::integer,
+          'c6040000-0000-0000-0000-000000000003'::uuid
+        ),
+        (
+          'held staff actor'::text,
+          'c3000000-0000-0000-0000-000000000006'::uuid,
+          'c4100000-0000-0000-0000-000000000001'::uuid,
+          1::integer,
+          'c6040000-0000-0000-0000-000000000004'::uuid
+        ),
+        (
+          'null actor'::text,
+          NULL::uuid,
+          'c4100000-0000-0000-0000-000000000001'::uuid,
+          1::integer,
+          'c6040000-0000-0000-0000-000000000005'::uuid
+        ),
+        (
+          'missing actor'::text,
+          'c3000000-0000-0000-0000-000000000999'::uuid,
+          'c4100000-0000-0000-0000-000000000001'::uuid,
+          1::integer,
+          'c6040000-0000-0000-0000-000000000006'::uuid
+        ),
+        (
+          'null module'::text,
+          'c3000000-0000-0000-0000-000000000005'::uuid,
+          NULL::uuid,
+          1::integer,
+          'c6040000-0000-0000-0000-000000000007'::uuid
+        ),
+        (
+          'missing module'::text,
+          'c3000000-0000-0000-0000-000000000005'::uuid,
+          'c6000000-0000-0000-0000-000000000999'::uuid,
+          1::integer,
+          'c6040000-0000-0000-0000-000000000008'::uuid
+        ),
+        (
+          'null expected version'::text,
+          'c3000000-0000-0000-0000-000000000005'::uuid,
+          'c4100000-0000-0000-0000-000000000001'::uuid,
+          NULL::integer,
+          'c6040000-0000-0000-0000-000000000009'::uuid
+        ),
+        (
+          'zero expected version'::text,
+          'c3000000-0000-0000-0000-000000000005'::uuid,
+          'c4100000-0000-0000-0000-000000000001'::uuid,
+          0::integer,
+          'c6040000-0000-0000-0000-000000000010'::uuid
+        ),
+        (
+          'negative expected version'::text,
+          'c3000000-0000-0000-0000-000000000005'::uuid,
+          'c4100000-0000-0000-0000-000000000001'::uuid,
+          -1::integer,
+          'c6040000-0000-0000-0000-000000000011'::uuid
+        ),
+        (
+          'null request identifier'::text,
+          'c3000000-0000-0000-0000-000000000005'::uuid,
+          'c4100000-0000-0000-0000-000000000001'::uuid,
+          1::integer,
+          NULL::uuid
+        ),
+        (
+          'stale draft version'::text,
+          'c3000000-0000-0000-0000-000000000005'::uuid,
+          'c4100000-0000-0000-0000-000000000001'::uuid,
+          2::integer,
+          'c6040000-0000-0000-0000-000000000013'::uuid
+        ),
+        (
+          'missing published chapter'::text,
+          'c3000000-0000-0000-0000-000000000005'::uuid,
+          'c6000000-0000-0000-0000-000000000001'::uuid,
+          1::integer,
+          'c6040000-0000-0000-0000-000000000014'::uuid
+        ),
+        (
+          'archived module'::text,
+          'c3000000-0000-0000-0000-000000000005'::uuid,
+          'c31f0000-0000-0000-0000-000000000001'::uuid,
+          2::integer,
+          'c6040000-0000-0000-0000-000000000015'::uuid
+        )
+    ) AS validation_case(
+      label,
+      actor_user_id,
+      module_id,
+      expected_row_version,
+      request_id
+    )
+  LOOP
+    v_rejected := false;
+    BEGIN
+      PERFORM *
+      FROM public.curriculum_publish_module(
+        v_case.actor_user_id,
+        v_case.module_id,
+        v_case.expected_row_version,
+        v_case.request_id
+      );
+    EXCEPTION WHEN raise_exception THEN
+      v_rejected := true;
+    END;
+    IF NOT v_rejected THEN
+      RAISE EXCEPTION 'module publication unexpectedly accepted validation case: %', v_case.label;
+    END IF;
+  END LOOP;
+END;
+$curriculum_publish_module_validation$;
+RESET ROLE;
+
+SET LOCAL ROLE service_role;
+DO $curriculum_publish_module_success$
+DECLARE
+  v_success record;
+BEGIN
+  SELECT *
+  INTO v_success
+  FROM public.curriculum_publish_module(
+    'c3000000-0000-0000-0000-000000000004',
+    'c4100000-0000-0000-0000-000000000001',
+    1,
+    'c6040000-0000-0000-0000-000000000040'
+  );
+
+  IF v_success.response_status <> 200
+    OR v_success.response_body IS DISTINCT FROM pg_catalog.jsonb_build_object(
+      'id', 'c4100000-0000-0000-0000-000000000001',
+      'rowVersion', 2
+    ) THEN
+    RAISE EXCEPTION 'module publication did not return its single lifecycle response';
+  END IF;
+END;
+$curriculum_publish_module_success$;
+RESET ROLE;
+
+SET LOCAL ROLE coditza_owner;
+DO $curriculum_publish_module_post_success_snapshot$
+DECLARE
+  v_progress_snapshot jsonb;
+BEGIN
+  SELECT COALESCE(
+    pg_catalog.jsonb_agg(
+      pg_catalog.to_jsonb(progress_entry)
+      ORDER BY progress_entry.chapter_id, progress_entry.user_id
+    ),
+    '[]'::jsonb
+  )
+  INTO v_progress_snapshot
+  FROM public.chapter_progress AS progress_entry
+  WHERE progress_entry.chapter_id IN (
+    'c4200000-0000-0000-0000-000000000001'::uuid,
+    'c6100000-0000-0000-0000-000000000001'::uuid,
+    'c6120000-0000-0000-0000-000000000001'::uuid
+  );
+
+  IF (
+    SELECT pg_catalog.count(*)
+    FROM public.chapter_progress AS progress_entry
+    WHERE progress_entry.chapter_id IN (
+      'c4200000-0000-0000-0000-000000000001'::uuid,
+      'c6100000-0000-0000-0000-000000000001'::uuid,
+      'c6120000-0000-0000-0000-000000000001'::uuid
+    )
+  ) <> 7 THEN
+    RAISE EXCEPTION 'module publication did not produce the expected post-success progress snapshot';
+  END IF;
+
+  PERFORM pg_catalog.set_config(
+    'coditza.slice25_progress_after_success',
+    v_progress_snapshot::text,
+    true
+  );
+END;
+$curriculum_publish_module_post_success_snapshot$;
+RESET ROLE;
+
+SET LOCAL ROLE service_role;
+DO $curriculum_publish_module_retry$
+DECLARE
+  v_retry record;
+BEGIN
+  SELECT *
+  INTO v_retry
+  FROM public.curriculum_publish_module(
+    'c3000000-0000-0000-0000-000000000005',
+    'c4100000-0000-0000-0000-000000000001',
+    999,
+    'c6040000-0000-0000-0000-000000000041'
+  );
+
+  IF v_retry.response_status <> 200
+    OR v_retry.response_body IS DISTINCT FROM pg_catalog.jsonb_build_object(
+      'id', 'c4100000-0000-0000-0000-000000000001',
+      'rowVersion', 2
+    ) THEN
+    RAISE EXCEPTION 'module publication did not preserve its state-based retry response';
+  END IF;
+END;
+$curriculum_publish_module_retry$;
+RESET ROLE;
+
+SET LOCAL ROLE coditza_owner;
+DO $curriculum_publish_module_state_preservation$
+DECLARE
+  v_module_static jsonb;
+  v_other_module_snapshot jsonb;
+  v_descendant_snapshot jsonb;
+  v_history_fingerprint text;
+  v_archived_progress_snapshot jsonb;
+  v_progress_after_success_snapshot jsonb;
+BEGIN
+  SELECT
+    pg_catalog.to_jsonb(module_entry)
+      - 'status'
+      - 'row_version'
+      - 'published_at'
+      - 'updated_by'
+      - 'updated_at'
+  INTO v_module_static
+  FROM public.modules AS module_entry
+  WHERE module_entry.id = 'c4100000-0000-0000-0000-000000000001';
+
+  SELECT COALESCE(
+    pg_catalog.jsonb_agg(
+      pg_catalog.to_jsonb(module_entry)
+      ORDER BY module_entry.id
+    ),
+    '[]'::jsonb
+  )
+  INTO v_other_module_snapshot
+  FROM public.modules AS module_entry
+  WHERE module_entry.id IN (
+    'c6000000-0000-0000-0000-000000000001'::uuid,
+    'c31e0000-0000-0000-0000-000000000001'::uuid,
+    'c31f0000-0000-0000-0000-000000000001'::uuid
+  );
+
+  SELECT pg_catalog.jsonb_build_object(
+    'chapters',
+    (
+      SELECT pg_catalog.jsonb_agg(
+        pg_catalog.to_jsonb(chapter_entry)
+        ORDER BY chapter_entry.id
+      )
+      FROM public.chapters AS chapter_entry
+      WHERE chapter_entry.id IN (
+        'c4200000-0000-0000-0000-000000000001'::uuid,
+        'c6100000-0000-0000-0000-000000000001'::uuid,
+        'c6110000-0000-0000-0000-000000000001'::uuid,
+        'c6120000-0000-0000-0000-000000000001'::uuid
+      )
+    ),
+    'theorySections',
+    (
+      SELECT pg_catalog.jsonb_agg(
+        pg_catalog.to_jsonb(theory_entry)
+        ORDER BY theory_entry.id
+      )
+      FROM public.theory_sections AS theory_entry
+      WHERE theory_entry.id IN (
+        'c4300000-0000-0000-0000-000000000001'::uuid,
+        'c6300000-0000-0000-0000-000000000001'::uuid,
+        'c6310000-0000-0000-0000-000000000001'::uuid,
+        'c6320000-0000-0000-0000-000000000001'::uuid,
+        'c6330000-0000-0000-0000-000000000001'::uuid
+      )
+    ),
+    'exercise',
+    (
+      SELECT pg_catalog.to_jsonb(exercise_entry)
+      FROM public.exercises AS exercise_entry
+      WHERE exercise_entry.id =
+        'c4420000-0000-0000-0000-000000000001'::uuid
+    ),
+    'quiz',
+    (
+      SELECT pg_catalog.to_jsonb(quiz_entry)
+      FROM public.quizzes AS quiz_entry
+      WHERE quiz_entry.id =
+        'c4620000-0000-0000-0000-000000000001'::uuid
+    )
+  )
+  INTO v_descendant_snapshot;
+
+  SELECT pg_catalog.md5(
+    COALESCE(
+      pg_catalog.jsonb_agg(
+        pg_catalog.jsonb_build_object(
+          'kind',
+          source_entry.kind,
+          'state',
+          source_entry.state
+        )
+        ORDER BY source_entry.kind, source_entry.state::text
+      )::text,
+      '[]'
+    )
+  )
+  INTO v_history_fingerprint
+  FROM (
+    SELECT
+      'theoryCompletion'::text AS kind,
+      pg_catalog.to_jsonb(completion_entry) AS state
+    FROM public.theory_section_completions AS completion_entry
+    WHERE (completion_entry.user_id, completion_entry.theory_section_id) IN (
+      (
+        'c3000000-0000-0000-0000-000000000007'::uuid,
+        'c4300000-0000-0000-0000-000000000001'::uuid
+      ),
+      (
+        'c3000000-0000-0000-0000-000000000007'::uuid,
+        'c6300000-0000-0000-0000-000000000001'::uuid
+      ),
+      (
+        'c3000000-0000-0000-0000-000000000010'::uuid,
+        'c6310000-0000-0000-0000-000000000001'::uuid
+      ),
+      (
+        'c3000000-0000-0000-0000-000000000012'::uuid,
+        'c6320000-0000-0000-0000-000000000001'::uuid
+      ),
+      (
+        'c3000000-0000-0000-0000-000000000011'::uuid,
+        'c6330000-0000-0000-0000-000000000001'::uuid
+      )
+    )
+
+    UNION ALL
+
+    SELECT
+      'exerciseAttempt'::text,
+      pg_catalog.to_jsonb(attempt_entry)
+    FROM public.exercise_attempts AS attempt_entry
+    WHERE attempt_entry.id =
+      'c6420000-0000-0000-0000-000000000001'::uuid
+
+    UNION ALL
+
+    SELECT
+      'quizAttempt'::text,
+      pg_catalog.to_jsonb(attempt_entry)
+    FROM public.quiz_attempts AS attempt_entry
+    WHERE attempt_entry.id =
+      'c6620000-0000-0000-0000-000000000001'::uuid
+  ) AS source_entry;
+
+  SELECT COALESCE(
+    pg_catalog.jsonb_agg(
+      pg_catalog.to_jsonb(progress_entry)
+      ORDER BY progress_entry.user_id
+    ),
+    '[]'::jsonb
+  )
+  INTO v_archived_progress_snapshot
+  FROM public.chapter_progress AS progress_entry
+  WHERE progress_entry.chapter_id =
+    'c6120000-0000-0000-0000-000000000001'::uuid;
+
+  SELECT COALESCE(
+    pg_catalog.jsonb_agg(
+      pg_catalog.to_jsonb(progress_entry)
+      ORDER BY progress_entry.chapter_id, progress_entry.user_id
+    ),
+    '[]'::jsonb
+  )
+  INTO v_progress_after_success_snapshot
+  FROM public.chapter_progress AS progress_entry
+  WHERE progress_entry.chapter_id IN (
+    'c4200000-0000-0000-0000-000000000001'::uuid,
+    'c6100000-0000-0000-0000-000000000001'::uuid,
+    'c6120000-0000-0000-0000-000000000001'::uuid
+  );
+
+  IF v_module_static IS DISTINCT FROM pg_catalog.current_setting(
+      'coditza.slice25_module_static',
+      true
+    )::jsonb
+    OR v_other_module_snapshot IS DISTINCT FROM pg_catalog.current_setting(
+      'coditza.slice25_other_modules',
+      true
+    )::jsonb
+    OR v_descendant_snapshot IS DISTINCT FROM pg_catalog.current_setting(
+      'coditza.slice25_descendants',
+      true
+    )::jsonb
+    OR v_history_fingerprint IS DISTINCT FROM pg_catalog.current_setting(
+      'coditza.slice25_history_fingerprint',
+      true
+    )
+    OR v_archived_progress_snapshot IS DISTINCT FROM pg_catalog.current_setting(
+      'coditza.slice25_archived_progress',
+      true
+    )::jsonb
+    OR v_progress_after_success_snapshot IS DISTINCT FROM pg_catalog.current_setting(
+      'coditza.slice25_progress_after_success',
+      true
+    )::jsonb
+    OR NOT EXISTS (
+      SELECT 1
+      FROM public.modules AS module_entry
+      WHERE module_entry.id =
+          'c4100000-0000-0000-0000-000000000001'::uuid
+        AND module_entry.status = 'published'::public.content_status
+        AND module_entry.row_version = 2
+        AND module_entry.published_at IS NOT NULL
+        AND module_entry.updated_by =
+          'c3000000-0000-0000-0000-000000000004'::uuid
+    )
+    OR NOT EXISTS (
+      SELECT 1
+      FROM public.modules AS module_entry
+      WHERE module_entry.id =
+          'c6000000-0000-0000-0000-000000000001'::uuid
+        AND module_entry.status = 'draft'::public.content_status
+        AND module_entry.row_version = 1
+        AND module_entry.published_at IS NULL
+    )
+    OR NOT EXISTS (
+      SELECT 1
+      FROM public.chapters AS chapter_entry
+      WHERE chapter_entry.id =
+          'c6010000-0000-0000-0000-000000000001'::uuid
+        AND chapter_entry.module_id =
+          'c6000000-0000-0000-0000-000000000001'::uuid
+        AND chapter_entry.status = 'draft'::public.content_status
+        AND chapter_entry.row_version = 1
+    )
+    OR (
+      SELECT pg_catalog.count(*)
+      FROM public.chapter_progress AS progress_entry
+      WHERE progress_entry.chapter_id =
+        'c4200000-0000-0000-0000-000000000001'::uuid
+    ) <> 5
+    OR (
+      SELECT pg_catalog.count(*)
+      FROM public.chapter_progress AS progress_entry
+      WHERE progress_entry.chapter_id =
+        'c6100000-0000-0000-0000-000000000001'::uuid
+    ) <> 1
+    OR EXISTS (
+      SELECT 1
+      FROM public.chapter_progress AS progress_entry
+      WHERE progress_entry.chapter_id =
+        'c6110000-0000-0000-0000-000000000001'::uuid
+    )
+    OR NOT EXISTS (
+      SELECT 1
+      FROM public.chapter_progress AS progress_entry
+      WHERE progress_entry.user_id =
+          'c3000000-0000-0000-0000-000000000005'::uuid
+        AND progress_entry.chapter_id =
+          'c4200000-0000-0000-0000-000000000001'::uuid
+        AND progress_entry.theory_percent = 0
+        AND progress_entry.exercise_percent = 0
+        AND progress_entry.quiz_percent = 0
+        AND progress_entry.overall_percent = 0
+        AND progress_entry.first_completed_at IS NULL
+        AND progress_entry.completed_at IS NULL
+    )
+    OR NOT EXISTS (
+      SELECT 1
+      FROM public.chapter_progress AS progress_entry
+      WHERE progress_entry.user_id =
+          'c3000000-0000-0000-0000-000000000007'::uuid
+        AND progress_entry.chapter_id =
+          'c4200000-0000-0000-0000-000000000001'::uuid
+        AND progress_entry.theory_percent = 100
+        AND progress_entry.exercise_percent = 0
+        AND progress_entry.quiz_percent = 0
+        AND progress_entry.overall_percent = 33
+    )
+    OR NOT EXISTS (
+      SELECT 1
+      FROM public.chapter_progress AS progress_entry
+      WHERE progress_entry.user_id =
+          'c3000000-0000-0000-0000-000000000008'::uuid
+        AND progress_entry.chapter_id =
+          'c4200000-0000-0000-0000-000000000001'::uuid
+        AND progress_entry.theory_percent = 0
+        AND progress_entry.exercise_percent = 100
+        AND progress_entry.quiz_percent = 0
+        AND progress_entry.overall_percent = 33
+    )
+    OR NOT EXISTS (
+      SELECT 1
+      FROM public.chapter_progress AS progress_entry
+      WHERE progress_entry.user_id =
+          'c3000000-0000-0000-0000-000000000009'::uuid
+        AND progress_entry.chapter_id =
+          'c4200000-0000-0000-0000-000000000001'::uuid
+        AND progress_entry.theory_percent = 0
+        AND progress_entry.exercise_percent = 0
+        AND progress_entry.quiz_percent = 100
+        AND progress_entry.overall_percent = 33
+    )
+    OR NOT EXISTS (
+      SELECT 1
+      FROM public.chapter_progress AS progress_entry
+      WHERE progress_entry.user_id =
+          'c3000000-0000-0000-0000-000000000010'::uuid
+        AND progress_entry.chapter_id =
+          'c4200000-0000-0000-0000-000000000001'::uuid
+        AND progress_entry.theory_percent = 0
+        AND progress_entry.exercise_percent = 0
+        AND progress_entry.quiz_percent = 0
+        AND progress_entry.overall_percent = 0
+    )
+    OR NOT EXISTS (
+      SELECT 1
+      FROM public.chapter_progress AS progress_entry
+      WHERE progress_entry.user_id =
+          'c3000000-0000-0000-0000-000000000007'::uuid
+        AND progress_entry.chapter_id =
+          'c6100000-0000-0000-0000-000000000001'::uuid
+        AND progress_entry.theory_percent = 100
+        AND progress_entry.exercise_percent = 100
+        AND progress_entry.quiz_percent = 100
+        AND progress_entry.overall_percent = 100
+        AND progress_entry.first_completed_at IS NOT NULL
+        AND progress_entry.completed_at IS NOT NULL
+    )
+    OR (
+      SELECT pg_catalog.count(*)
+      FROM private.audit_events AS audit_entry
+      WHERE audit_entry.action = 'module_published'
+        AND audit_entry.entity_type = 'module'
+        AND audit_entry.entity_id =
+          'c4100000-0000-0000-0000-000000000001'::uuid
+    ) <> 1
+    OR NOT EXISTS (
+      SELECT 1
+      FROM private.audit_events AS audit_entry
+      WHERE audit_entry.actor_kind = 'user'
+        AND audit_entry.actor_user_id =
+          'c3000000-0000-0000-0000-000000000004'::uuid
+        AND audit_entry.action = 'module_published'
+        AND audit_entry.entity_type = 'module'
+        AND audit_entry.entity_id =
+          'c4100000-0000-0000-0000-000000000001'::uuid
+        AND audit_entry.changed_fields = ARRAY['status']::text[]
+        AND audit_entry.change_summary =
+          '{"status":{"before":"draft","after":"published"}}'::jsonb
+        AND audit_entry.reason IS NULL
+        AND audit_entry.request_id =
+          'c6040000-0000-0000-0000-000000000040'::uuid
+    )
+    OR EXISTS (
+      SELECT 1
+      FROM private.audit_events AS audit_entry
+      WHERE audit_entry.request_id IN (
+        'c6040000-0000-0000-0000-000000000001'::uuid,
+        'c6040000-0000-0000-0000-000000000002'::uuid,
+        'c6040000-0000-0000-0000-000000000003'::uuid,
+        'c6040000-0000-0000-0000-000000000004'::uuid,
+        'c6040000-0000-0000-0000-000000000005'::uuid,
+        'c6040000-0000-0000-0000-000000000006'::uuid,
+        'c6040000-0000-0000-0000-000000000007'::uuid,
+        'c6040000-0000-0000-0000-000000000008'::uuid,
+        'c6040000-0000-0000-0000-000000000009'::uuid,
+        'c6040000-0000-0000-0000-000000000010'::uuid,
+        'c6040000-0000-0000-0000-000000000011'::uuid,
+        'c6040000-0000-0000-0000-000000000013'::uuid,
+        'c6040000-0000-0000-0000-000000000014'::uuid,
+        'c6040000-0000-0000-0000-000000000015'::uuid,
+        'c6040000-0000-0000-0000-000000000041'::uuid
+      )
+    )
+    OR EXISTS (
+      SELECT 1
+      FROM private.idempotency_records AS record_entry
+      WHERE record_entry.result_resource_id IN (
+        'c6000000-0000-0000-0000-000000000001'::uuid,
+        'c4100000-0000-0000-0000-000000000001'::uuid
+      )
+    )
+    OR COALESCE(
+      pg_catalog.current_setting('coditza.learning_write', true),
+      ''
+    ) <> '' THEN
+    RAISE EXCEPTION 'module publication changed protected state, missed a source candidate, or wrote outside its lifecycle contract';
+  END IF;
+END;
+$curriculum_publish_module_state_preservation$;
+RESET ROLE;
+
+SELECT extensions.ok(
+  TRUE,
+  'module publication validates archived-inclusive root position and direct published-child readiness, activates only effective chapter-user pairs from every historical source, preserves descendants and history, audits one transition, and uses state-based retry without replay'
 );
 
 SELECT * FROM extensions.finish();

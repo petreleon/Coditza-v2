@@ -10,73 +10,76 @@ protected, and covered by deterministic reset proof. ARC-SEC-003 completed the
 closed audit contract. SUP-SMTP-LOCAL-001 and SUP-MFA-001 remain independently
 ineligible; neither blocks this task.
 
-This task builds the named server-only transaction facades over those existing
-tables. Its completed slices are the structured idempotency/assessment learner
-mutation cluster, learner progress cluster, own assessment-history cluster,
-staff-authorization primitive cluster, root draft-module creation cluster,
-draft-chapter creation cluster, draft-theory-section creation cluster, scalar
-draft-exercise and complete draft-quiz creation clusters, scalar
-draft-exercise and draft-quiz PATCH clusters, protected assessment authoring
-reads, draft-module/chapter/theory-section PATCH clusters,
-published-module/chapter/theory-section correction clusters, and
-theory-section, exercise, and quiz publication, documented in
-[slice 01](../docs/implementation/SUP-FUNCTIONS-001-slice-01.md),
-[slice 02](../docs/implementation/SUP-FUNCTIONS-001-slice-02.md), and
-[slice 03](../docs/implementation/SUP-FUNCTIONS-001-slice-03.md), and
-[slice 04](../docs/implementation/SUP-FUNCTIONS-001-slice-04.md),
-[slice 05](../docs/implementation/SUP-FUNCTIONS-001-slice-05.md),
-[slice 06](../docs/implementation/SUP-FUNCTIONS-001-slice-06.md),
-[slice 07](../docs/implementation/SUP-FUNCTIONS-001-slice-07.md), and
-[slice 08](../docs/implementation/SUP-FUNCTIONS-001-slice-08.md),
-[slice 09](../docs/implementation/SUP-FUNCTIONS-001-slice-09.md),
-[slice 10](../docs/implementation/SUP-FUNCTIONS-001-slice-10.md), and
-[slice 11](../docs/implementation/SUP-FUNCTIONS-001-slice-11.md), and
-[slice 12](../docs/implementation/SUP-FUNCTIONS-001-slice-12.md), and
-[slice 13](../docs/implementation/SUP-FUNCTIONS-001-slice-13.md), and
-[slice 14](../docs/implementation/SUP-FUNCTIONS-001-slice-14.md), and
-[slice 15](../docs/implementation/SUP-FUNCTIONS-001-slice-15.md), and
-[slice 16](../docs/implementation/SUP-FUNCTIONS-001-slice-16.md), and
-[slice 17](../docs/implementation/SUP-FUNCTIONS-001-slice-17.md), and
-[slice 18](../docs/implementation/SUP-FUNCTIONS-001-slice-18.md), and
-[slice 19](../docs/implementation/SUP-FUNCTIONS-001-slice-19.md), and
-[slice 20](../docs/implementation/SUP-FUNCTIONS-001-slice-20.md), and
-[slice 21](../docs/implementation/SUP-FUNCTIONS-001-slice-21.md), and
-[slice 22](../docs/implementation/SUP-FUNCTIONS-001-slice-22.md), and
-[slice 23](../docs/implementation/SUP-FUNCTIONS-001-slice-23.md), and
-[slice 24](../docs/implementation/SUP-FUNCTIONS-001-slice-24.md). Continue
-from those bounded baselines with the curriculum-owned
-curriculum_publish_module facade. It must require a server-generated request
-UUID, non-null actor and module identifiers, and a positive expected row
-version. It must recheck the live active editor/admin actor before module-root,
-chapter-readiness, or learner-progress access, then lock the module before
-any dependent data. It must not read or lock unrelated modules.
+This task builds named server-only transaction facades over those existing
+tables. Twenty-five bounded slices are now complete, including the module
+publication boundary documented in
+[slice 25](../docs/implementation/SUP-FUNCTIONS-001-slice-25.md). Continue
+from that baseline with the curriculum-owned
+curriculum_archive_module facade only.
 
-The target is a closed lifecycle transition: an archived module is rejected;
-an already published module returns only its current id and rowVersion before
-expected-version comparison, child scan, audit, or progress recalculation; and
-only a current draft with the expected version may publish. Validate the locked
-root slug through private.is_valid_slug, title (trimmed 1..160), description
-Markdown (nonblank, at most 10,000 characters), non-negative unique root
-position, and null published_at. While the module remains locked, require at
-least one published direct chapter. Do not republish, repair, or revalidate a
-published chapter's children; chapter publication remains their readiness
-boundary.
+Its exact public signature is
+public.curriculum_archive_module(actor_user_id uuid, module_id uuid,
+expected_row_version integer, reason_code text, request_id uuid), returning
+one response_status/response_body row. It must be SECURITY DEFINER, owned by
+coditza_owner, use an empty fixed search path, revoke every default/runtime
+grant, and grant execute only to service_role. It accepts no input envelope,
+idempotency key, generic resource type, or client-supplied actor derivation.
 
-The sole real write changes only status, first published_at, and updated_by;
-the lifecycle triggers advance row_version/updated_at once. It then appends
-exactly one module_published audit event with changed_fields ['status'], the
-closed draft-to-published status delta, and no reason code. Publishing the
-module makes its already-published chapters learner-effective: derive the
-distinct affected (chapter,user) pairs from every published direct chapter's
-chapter_progress, theory completions, exercise attempts, and quiz attempts,
-without filtering historical source rows by current leaf status. Sort and
-acquire all corresponding progress locks deterministically before invoking the
-existing recalculator for each pair. Draft and archived chapters must not gain
-progress work. Preserve all child statuses, versions, definition trees,
-hierarchy, created fields, and learner history. Do not add input/reason
-envelopes, idempotency records, hierarchy/reorder/replacement, generic
-lifecycle, Fastify/HTTP/direct-client/Python/SMTP/MFA/Vercel behavior, or WASM
-work.
+Call private.assert_server_request_id first. Require a non-null actor and
+module ID, a positive expected row version, and exactly the closed
+content_archive reason code. Before any module, descendant, learner-history,
+or progress read, call private.assert_active_staff_actor to lock and recheck
+the current editor/admin profile. Then lock the target module root first.
+
+An already archived target is a state-based retry: return only its current
+safe id and rowVersion before stale-version comparison, descendant scan,
+progress work, or audit. Any draft or published non-archived target must
+match expected_row_version. A missing root, malformed request, invalid reason,
+inactive/held/nonstaff actor, or stale non-archived root fails without a write.
+
+The module archive is one all-or-nothing tree transaction. After locking the
+module, discover and lock its direct chapters in UUID order, then lock theory
+sections, exercises, and quizzes below those chapters in UUID order. Do not
+touch question, option, answer-key, attempt, completion, or profile rows.
+Every currently draft or published row in this module tree becomes archived;
+already archived rows remain byte-for-byte unchanged. Each newly archived
+content root changes only status and updated_by; existing lifecycle triggers
+advance its row_version and updated_at once. Do not erase published_at,
+created fields, hierarchy, positions, definitions, keys, attempts, or
+completion history.
+
+Only when the target module was published immediately before the transition,
+derive the distinct affected (user_id, chapter_id) pairs from every direct
+chapter that is currently published, using chapter_progress, theory
+completions, exercise attempts, and quiz attempts. Historical source rows
+remain candidates regardless of current leaf status. Draft and already
+archived chapters are excluded. After all content locks are held, lock every
+progress pair in deterministic user/chapter order, archive the tree, and only
+then call private.recalculate_chapter_progress for every locked pair in the
+same order. This makes denominators reflect the archived module while
+preserving source history. When the target module was draft, perform no
+progress-source or snapshot work. Do not batch, defer, or make network calls.
+
+Append one closed audit event for every row that actually transitions:
+module_archived, chapter_archived, theory_section_archived, exercise_archived,
+or quiz_archived. Each event uses its actual entity type/ID, changed_fields
+['status'], the exact prior-status-to-archived delta, the required
+content_archive reason, the verified user actor, and the same request UUID.
+No audit is written for already archived rows or a retry. The response may
+return only safe IDs/counts and the root rowVersion; it must never return
+authored content, answers, private keys, raw audit data, or learner history.
+
+The pgTAP proof must cover exact ownership/path/ACL/one-overload/direct-user
+denial; argument/actor/reason/missing/stale denial; both draft and published
+tree archive; archived retry with a snapshot proving no repeat progress writes;
+complete descendant status/version preservation; unchanged already archived
+descendants; retained attempts/completions/definitions; all four affected-user
+arms including snapshot-only and archived-leaf history; exclusion of draft and
+archived chapters; exact per-row audit count/deltas; no idempotency record; and
+a deferred failure/rollback proof. Preserve all preceding protected suites.
+Do not implement chapter/leaf/assessment archive, reorder, clone,
+replacement, generic lifecycle, Fastify/HTTP/direct-client/Python/SMTP/MFA/
+Vercel behavior, WASM work, secrets, or hosted configuration in this slice.
 
 ## Read first
 
